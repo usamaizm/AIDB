@@ -8,6 +8,11 @@ The goal is to preserve the vocabulary, concept structure, and patterns that sha
 
 ### Core structure primitives
 
+- [scalar](concepts/scalar.md)
+- [super-scalar](concepts/super-scalar.md)
+- [array](concepts/array.md)
+- [matrix](concepts/matrix.md)
+- [tensor](concepts/tensor.md)
 - [x](concepts/x.md)
 - [x,y](concepts/x-y.md)
 - [x,y,z](concepts/x-y-z.md)
@@ -17,7 +22,6 @@ The goal is to preserve the vocabulary, concept structure, and patterns that sha
 - [set](concepts/set.md)
 - [graph](concepts/graph.md)
 - [tree](concepts/tree.md)
-- [matrix](concepts/matrix.md)
 - [document](concepts/document.md)
 
 ### Geometry and topology
@@ -36,6 +40,18 @@ The goal is to preserve the vocabulary, concept structure, and patterns that sha
 - [self-similarity](concepts/self-similarity.md)
 - [invariance](concepts/invariance.md)
 - [super-symmetry](concepts/super-symmetry.md)
+
+### Transform and storage layer
+
+- [encoding](concepts/encoding.md)
+- [decoding](concepts/decoding.md)
+- [compression](concepts/compression.md)
+- [decompression](concepts/decompression.md)
+- [encryption](concepts/encryption.md)
+- [decryption](concepts/decryption.md)
+- [serialization](concepts/serialization.md)
+- [deserialization](concepts/deserialization.md)
+- [hashing](concepts/hashing.md)
 
 ### Core project concepts
 

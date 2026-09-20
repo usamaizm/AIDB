@@ -11,6 +11,10 @@ AIDB is intentionally model-agnostic and repository-native. It does not run mode
 AIDB should remain able to hold many kinds of structured knowledge, not just documents and rows.
 
 - x: a single scalar value
+- super-scalar: a value with identity, metadata, provenance, and structure
+- array: an indexed sequence of values
+- matrix: a 2D array or tabular structure
+- tensor: an N-dimensional array
 - x,y: a pair, coordinate, relationship, or correlation
 - x,y,z: a triad, positional relation, or spatial/causal structure
 - x,y,z,t: a spacetime state, trajectory, process, or event record
@@ -19,7 +23,6 @@ AIDB should remain able to hold many kinds of structured knowledge, not just doc
 - set: unordered collection
 - graph: nodes and edges
 - tree: hierarchy
-- matrix: structured grid
 - document: prose or narrative knowledge
 - world map: geospatial layer
 - event: time-based record
@@ -32,6 +35,11 @@ AIDB should remain able to hold many kinds of structured knowledge, not just doc
 - fractal: recursive self-similarity across scales
 - symmetry: invariance under transformation
 - super-symmetry: higher-order relations across layers and domains
+- encoding / decoding: representation conversion
+- compression / decompression: size reduction and restoration
+- encryption / decryption: confidentiality and access control
+- serialization / deserialization: object-to-format conversion
+- hashing / verification: integrity and identity checks
 
 The distinction matters:
 
@@ -44,8 +52,9 @@ This makes AIDB usable as both:
 
 - a conceptual archive for ideas and proposals
 - a geometric and topological memory model for connected knowledge
+- a transformation-aware knowledge system for representation, storage, and access
 
-See `docs/idea-taxonomy.md` and the encyclopedia for the evolving concept system.
+See `docs/idea-taxonomy.md`, `docs/knowledge-transformations.md`, and the encyclopedia for the evolving concept system.
 
 ## Core project posture
 
@@ -68,5 +77,7 @@ This includes:
 - relation-rich graphs
 - abstract geometric organization
 - multi-scale concept navigation
+- representation transformations for storage and transport
+- meaningful scalar and higher-order knowledge units
 
 AIDB is best understood as a living archive of concepts, not a finalized product specification.
