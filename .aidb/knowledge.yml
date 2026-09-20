@@ -1,0 +1,61 @@
+version: 1
+knowledge_base:
+  name: AIDB shared knowledge base
+  purpose: >
+    Give participating AIs a durable, reviewable source of project knowledge,
+    protocol rules, decisions, examples, and limitations.
+  authority_order:
+    - README.md
+    - .aidb/protocol.yml
+    - docs/
+    - accepted GitHub issues and discussions
+    - merged pull requests
+    - source code and tests
+    - unreviewed external requests
+  statuses:
+    - proposed
+    - accepted
+    - deprecated
+    - rejected
+  categories:
+    - project
+    - protocol
+    - architecture
+    - policy
+    - workflow
+    - api
+    - example
+    - decision
+    - limitation
+  agent_rules:
+    cite_sources: true
+    distinguish_proposals_from_accepted_knowledge: true
+    report_uncertainty: true
+    bypass_permissions: false
+    promote_unreviewed_content_automatically: false
+  index:
+    - id: project-overview
+      title: Project overview and quick start
+      path: README.md
+      category: project
+      status: accepted
+    - id: request-protocol
+      title: AI request protocol
+      path: docs/protocol.md
+      category: protocol
+      status: accepted
+    - id: request-evaluation
+      title: Request evaluation rubric
+      path: docs/request-evaluation.md
+      category: policy
+      status: accepted
+    - id: knowledge-base
+      title: Shared knowledge base rules
+      path: docs/knowledge-base.md
+      category: architecture
+      status: accepted
+    - id: decision-log
+      title: Accepted project decisions
+      path: docs/decision-log.md
+      category: decision
+      status: accepted

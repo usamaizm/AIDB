@@ -8,49 +8,50 @@ on:
 permissions:
   contents: read
   issues: write
-  pull-requests: read
 
 jobs:
   triage:
+    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.issue.labels.*.name, ','), 'aidb:request')
     runs-on: ubuntu-latest
     steps:
-      - name: Check if issue is an AI intake request
-        id: check
-        run: |
-          if [[ "${{ github.event.issue.labels.*.name }}" == *"aidb:request"* ]]; then
-            echo "is_ai_request=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_ai_request=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Add triage labels
-        if: steps.check.outputs.is_ai_request == 'true'
+      - name: Validate, label, and acknowledge request
         uses: actions/github-script@v7
         with:
           script: |
             const issue = context.payload.issue;
-            const labels = issue.labels.map(label => label.name);
-            const toAdd = ["aidb:review", "status:triage"];
-            for (const label of toAdd) {
-              if (!labels.includes(label)) {
-                await github.rest.issues.addLabels({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issue.number,
-                  labels: [label]
-                });
+            if (!issue) return;
+            const repo = { owner: context.repo.owner, repo: context.repo.repo };
+            const definitions = [
+              ['aidb:review', '5319e7'],
+              ['status:triage', 'fbca04'],
+              ['source:external-ai', '7057ff'],
+              ['status:accepted', '0e8a16'],
+              ['status:rejected', 'b60205'],
+              ['status:needs-clarification', 'd876e3'],
+            ];
+            for (const [name, color] of definitions) {
+              try {
+                await github.rest.issues.getLabel({ ...repo, name });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+                await github.rest.issues.createLabel({ ...repo, name, color });
               }
             }
-
-      - name: Post triage comment
-        if: steps.check.outputs.is_ai_request == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const issue = context.payload.issue;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+            await github.rest.issues.addLabels({
+              ...repo,
               issue_number: issue.number,
-              body: `Thanks for submitting an AIDB request.\n\nThis request has been placed in review and will be evaluated before any implementation work or task assignment begins.\n\n- Request type: ${issue.title}\n- Review status: triage\n- Approval requirement: human review required before code changes or task execution.`
+              labels: ['aidb:review', 'status:triage', 'source:external-ai'],
             });
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...repo,
+              issue_number: issue.number,
+              per_page: 100,
+            });
+            const marker = '<!-- aidb-triage -->';
+            if (!comments.some(comment => comment.body?.includes(marker))) {
+              await github.rest.issues.createComment({
+                ...repo,
+                issue_number: issue.number,
+                body: `${marker}\nThanks for submitting an AIDB request. This request is now in review.\n\nIt will be evaluated before becoming a task, code change, or pull request. Human review is required for implementation and approval.\n\nNext states: \`status:accepted\`, \`status:rejected\`, or \`status:needs-clarification\`.`,
+              });
+            }

@@ -1,0 +1,52 @@
+version: 1
+protocol: aidb-request
+name: AIDB request protocol
+summary: >
+  Structured intake and review rules for external AI requests submitted to this repository.
+request:
+  required_fields:
+    - type
+    - title
+    - source_ai
+    - summary
+    - risk
+    - priority
+  allowed_types:
+    - feature_request
+    - suggestion
+    - bug_report
+    - protocol_proposal
+    - adapter_request
+    - security_report
+    - task_offer
+    - collaboration_request
+policy:
+  default:
+    trust_level: untrusted
+    direct_code_changes: false
+    direct_merge: false
+    secret_access: false
+    workflow_modification: false
+    repo_setting_changes: false
+    human_review_required: true
+  accepted_request_actions:
+    - triage
+    - evaluate
+    - create_task
+    - ask_for_clarification
+    - route_to_specialist
+  denied_actions:
+    - merge_pull_request
+    - modify_workflows
+    - modify_permissions
+    - access_secrets
+    - direct_repo_admin_actions
+knowledge:
+  authoritative_order:
+    - README.md
+    - .aidb/protocol.yml
+    - docs/
+    - accepted issues and discussions
+    - merged pull requests
+    - source code and tests
+    - unreviewed external requests
