@@ -1,75 +1,52 @@
 # AIDB
 
-AIDB is a lightweight local AI knowledge base for storing, searching, and exploring structured and unstructured knowledge without needing a full database service.
+AIDB is an open, model-agnostic database for AIs. It provides a shared persistence layer for AI agents, their memories, tools, knowledge, and conversation messages.
 
-It is designed for:
-- personal AI memory
-- prototype retrieval systems
-- document collections
-- small-scale knowledge graphs
-- experimentation with indexing and search
+## What belongs in an AI database?
 
-## Why AIDB?
+- **Agents** — names, models, capabilities, and configuration metadata
+- **Memories** — agent-specific facts, preferences, observations, and goals
+- **Knowledge** — shared documents and searchable reference material
+- **Tools** — tool names, descriptions, JSON schemas, and endpoints
+- **Messages** — conversation history associated with an agent or session
 
-Most AI tools are great at generating answers but weak at keeping long-lived memory. AIDB gives you a simple, inspectable place to store facts, snippets, notes, and documents with metadata and search.
-
-## Features
-
-- Store documents with title, content, tags, and metadata
-- Search by keyword overlap and metadata match
-- Persistent JSON storage
-- Simple Python API
-- Works in local notebooks, scripts, and prototypes
-- No external services required
+AIDB does not execute models or tools and does not require a particular vendor. Any AI application can use it as a local SQLite database.
 
 ## Quick start
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
-python -m aidb --help
+python -m pip install -e .
+python -m aidb --db demo.sqlite3 agent Archivist --model my-model
+python -m aidb --db demo.sqlite3 search memory
 ```
-
-## Example
 
 ```python
 from aidb import AIDB
 
-store = AIDB("./demo.db.json")
-store.add_document(
-    title="AI Memory",
-    content="AI memory systems store facts and context to support follow-up conversations.",
-    tags=["ai", "memory", "retrieval"],
-    metadata={"source": "notes", "category": "concept"},
-)
-
-results = store.search("memory ai context")
-for record in results:
-    print(record.title, record.score)
+with AIDB("agent.sqlite3") as db:
+    agent = db.register_agent(
+        "Researcher", model="my-model", capabilities=["search", "summarize"]
+    )
+    db.remember(agent.id, "The user prefers concise answers", kind="preference")
+    db.add_document("AIDB", "A shared memory and knowledge store for AI agents", ["ai", "database"])
+    memories = db.recall(agent.id, "user preferences")
+    knowledge = db.search("AI database")
 ```
 
-## Project layout
+## Design principles
 
-```text
-AIDB/
-├── README.md
-├── pyproject.toml
-├── .gitignore
-├── aidb/
-│   ├── __init__.py
-│   ├── __main__.py
-│   ├── core.py
-│   └── store.py
-├── data/
-│   └── sample_documents.json
-├── examples/
-│   └── demo.py
-├── tests/
-│   └── test_basic.py
-└── .venv/
-```
+1. **Open access:** use it with any AI framework or model.
+2. **Inspectable:** SQLite keeps data portable and easy to back up.
+3. **Agent-aware:** private memories are scoped to an agent while knowledge can be shared.
+4. **Extensible:** JSON metadata allows applications to add fields without migrations.
+5. **Local-first:** no account, cloud service, or API key is required.
 
-## License
+## Roadmap
+
+- REST and MCP-compatible adapters
+- vector/embedding indexes as optional extensions
+- access control and encrypted private memories
+- full-text search and retention policies
+- import/export formats for common agent frameworks
 
 Apache 2.0
