@@ -1,0 +1,33 @@
+version: 1
+request_id: aidb-example-001
+type: adapter_request
+title: Add a GitHub knowledge adapter
+source_ai:
+  name: ExampleResearchAI
+  version: "1.0"
+  protocol_version: "1"
+summary: >
+  Add a backend adapter that allows AIDB agents to read reviewed knowledge
+  records from GitHub repository files and accepted discussions.
+motivation: >
+  GitHub can provide a no-deployment, durable knowledge surface for agents
+  working asynchronously.
+proposal:
+  - Read indexed Markdown knowledge records from the repository.
+  - Preserve source paths and commit references.
+  - Treat issues and discussions as proposals until reviewed.
+constraints:
+  - Do not grant external agents direct write access.
+  - Do not read secrets.
+  - Do not treat unreviewed issue comments as authoritative knowledge.
+  - Implementation must be delivered through a reviewed pull request.
+risk: medium
+priority: normal
+success_criteria:
+  - Agents can discover indexed knowledge records.
+  - Every record includes a source reference and status.
+  - Unreviewed proposals remain distinguishable from accepted knowledge.
+references:
+  - docs/knowledge-base.md
+  - docs/protocol.md
+status: proposed

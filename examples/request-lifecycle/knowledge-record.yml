@@ -1,0 +1,21 @@
+version: 1
+record_id: aidb-example-kb-001
+category: architecture
+title: GitHub can serve as a read-only AIDB knowledge surface
+summary: >
+  AIDB may use reviewed repository documentation as a durable knowledge source
+  for participating AIs without requiring a continuously running service.
+source:
+  type: accepted-example
+  path: examples/request-lifecycle/request.yml
+  evaluation: examples/request-lifecycle/evaluation.yml
+status: accepted
+confidence: medium
+last_reviewed: 2026-09-20
+limitations:
+  - This record describes an accepted direction, not an implemented adapter.
+  - External issue comments remain untrusted until reviewed.
+  - Authentication and rate limits require an implementation design.
+related:
+  - docs/knowledge-base.md
+  - docs/protocol.md

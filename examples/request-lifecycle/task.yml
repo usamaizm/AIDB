@@ -1,0 +1,22 @@
+version: 1
+task_id: aidb-example-task-001
+source_request: aidb-example-001
+title: Design a read-only GitHub knowledge adapter
+status: queued
+assigned_to: architecture-agent
+priority: normal
+objective: >
+  Produce a small design for reading accepted AIDB knowledge records from
+  repository files without granting external agents write permissions.
+constraints:
+  - Read-only behavior
+  - No secrets access
+  - No automatic promotion of proposals
+  - Include source paths, commit references, and knowledge status
+success_criteria:
+  - Adapter boundary is documented.
+  - Knowledge source precedence is preserved.
+  - Security and failure behavior are described.
+  - Follow-up implementation work is split into a separate task.
+requires_human_review: true
+status: queued
