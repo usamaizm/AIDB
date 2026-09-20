@@ -1,0 +1,27 @@
+from aidb import AIDB
+
+
+def main() -> None:
+    db = AIDB("demo.db.json")
+
+    db.add_document(
+        title="AI Memory",
+        content="AI memory stores facts, preferences, and context to support smarter conversations over time.",
+        tags=["ai", "memory", "agents"],
+        metadata={"category": "concept", "source": "notes"},
+    )
+
+    db.add_document(
+        title="Retrieval Systems",
+        content="Retrieval systems search across indexed documents to surface the most relevant knowledge for a prompt.",
+        tags=["retrieval", "search", "ai"],
+        metadata={"category": "systems", "source": "knowledge"},
+    )
+
+    results = db.search("memory retrieval systems")
+    for record in results:
+        print(f"{record.title} | score={record.score}")
+
+
+if __name__ == "__main__":
+    main()

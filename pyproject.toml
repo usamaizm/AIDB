@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aidb"
+version = "0.1.0"
+description = "A lightweight AI knowledge base for local memory and retrieval"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "usamaizm" }]
+license = { text = "Apache-2.0" }
+keywords = ["ai", "database", "retrieval", "memory", "knowledge-base"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
