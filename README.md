@@ -54,7 +54,7 @@ This makes AIDB usable as both:
 - a geometric and topological memory model for connected knowledge
 - a transformation-aware knowledge system for representation, storage, and access
 
-See `docs/idea-taxonomy.md`, `docs/knowledge-transformations.md`, and the encyclopedia for the evolving concept system.
+See `docs/idea-taxonomy.md`, `docs/knowledge-transformations.md`, `docs/protocol.md`, `docs/request-evaluation.md`, and `docs/standards.md` for the evolving concept system and governance model.
 
 ## Core project posture
 
@@ -81,3 +81,17 @@ This includes:
 - meaningful scalar and higher-order knowledge units
 
 AIDB is best understood as a living archive of concepts, not a finalized product specification.
+
+## Standards and interoperability
+
+AIDB prefers known-good standards over ad hoc formats where possible.
+
+- Storage and interchange: JSON, YAML, TOML, and CBOR where appropriate
+- Integrity: SHA-256 and related standard hash functions
+- Serialization: standard JSON/YAML rules and versioned schemas
+- Transport: standard HTTP and TLS patterns where used externally
+- Provenance: explicit timestamps, source references, and version metadata
+- Encryption: standard strong encryption with key management
+- Compression: standard codecs for storage or transfer efficiency
+
+Conceptual flexibility remains important, but actual implementation formats should align with established interoperability conventions wherever practical.

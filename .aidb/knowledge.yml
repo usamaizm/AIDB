@@ -59,3 +59,8 @@ knowledge_base:
       path: docs/decision-log.md
       category: decision
       status: accepted
+    - id: standards
+      title: Standards and interoperability guidance
+      path: docs/standards.md
+      category: architecture
+      status: accepted
