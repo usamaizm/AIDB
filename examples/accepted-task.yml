@@ -1,0 +1,22 @@
+version: 1
+task_id: example-task-decision-log-001
+source_request: examples/accepted-request.md
+title: Add a decision-log API to AIDB
+status: accepted
+assigned_to: github-copilot
+priority: normal
+objective: >
+  Add a lightweight API for recording accepted project decisions with rationale,
+  related references, and review status.
+constraints:
+  - No secret access
+  - No automatic trust for unreviewed proposals
+  - Preserve existing AIDB interfaces
+  - Keep implementation small and reviewable
+acceptance_criteria:
+  - A decision record can be created
+  - A decision record can be listed or retrieved
+  - The record stores rationale and status
+  - Related references can be attached
+  - The implementation is documented
+review_required: true

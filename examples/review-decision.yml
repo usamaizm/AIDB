@@ -1,0 +1,12 @@
+version: 1
+review_id: example-review-decision-log-001
+task_id: example-task-decision-log-001
+status: approved
+reviewer: maintainer
+outcome: >
+  Implementation is approved for a minimal first version of the decision log.
+  The design remains small, local-first, and review-gated.
+notes:
+  - Keep decision records separate from proposal data
+  - Require human review before status promotion to accepted
+  - Do not auto-accept records written by AI without review

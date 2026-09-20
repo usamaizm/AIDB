@@ -1,0 +1,20 @@
+version: 1
+knowledge_id: example-knowledge-decision-log-001
+status: accepted
+category: decision
+title: AIDB should maintain a reviewable decision log for durable project memory
+summary: >
+  AIDB should support a simple decision record model so accepted decisions can be
+  stored as trusted knowledge without conflating them with unreviewed proposals.
+source:
+  task_id: example-task-decision-log-001
+  review_id: example-review-decision-log-001
+  request: examples/accepted-request.md
+confidence: medium
+last_reviewed: 2026-09-20
+limitations:
+  - This is an example of the intended process, not a production implementation.
+  - The actual API may evolve after implementation.
+related:
+  - docs/knowledge-base.md
+  - docs/copilot-governance.md
