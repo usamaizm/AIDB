@@ -41,6 +41,54 @@ policy:
     - modify_permissions
     - access_secrets
     - direct_repo_admin_actions
+artifact_protocol:
+  format_agnostic: true
+  policy: >
+    AIDB should treat artifacts as content objects first and file extensions second.
+    A format-specific adapter may read a .txt, .pdf, .jpg, .mp3, or binary blob,
+    but the core protocol should care about identity, provenance, checksum,
+    media type, and transformation history rather than a single preferred file type.
+  required_fields:
+    - id
+    - name
+    - media_type
+    - size_bytes
+    - checksum
+    - provenance
+    - status
+  optional_fields:
+    - filename
+    - encoding
+    - parent_artifact_id
+    - transformation_history
+    - embedded_metadata
+    - tags
+    - access_policy
+  media_types:
+    - text/plain
+    - application/pdf
+    - image/png
+    - image/jpeg
+    - image/webp
+    - audio/mpeg
+    - audio/wav
+    - application/json
+    - application/xml
+    - application/octet-stream
+    - application/zip
+    - other/unknown
+  integrity_requirements:
+    - checksum_required: true
+    - algorithm: sha-256
+    - verification_on_ingest: true
+  provenance_requirements:
+    - source_required: true
+    - created_at_required: true
+    - owner_or_author_required: false
+  transformation_rules:
+    - derived_artifacts_must_reference_parent: true
+    - transformation_steps_must_be_recorded: true
+    - original_artifact_must_preserve_identity: true
 knowledge:
   authoritative_order:
     - README.md

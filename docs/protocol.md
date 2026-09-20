@@ -60,7 +60,68 @@ The following are denied unless a human reviewer explicitly approves them:
 - access_secrets
 - direct_repo_admin_actions
 
-## Authority order
+## Artifact neutrality and file-type agnosticism
+
+AIDB should treat artifacts as content objects first and file extensions second.
+
+A request, document, image, audio file, archive, or binary blob should be accepted as long as it can be identified, described, and traced with metadata. The protocol should not assume that all records are plain text files.
+
+### Core rule
+
+The core protocol should handle knowledge artifacts by metadata, not by file suffix alone.
+
+### Required artifact metadata
+
+Every artifact should carry, at minimum:
+
+- id
+- name
+- media_type
+- size_bytes
+- checksum
+- provenance
+- status
+
+### Required metadata semantics
+
+- `media_type` should describe the actual format or MIME type
+- `checksum` should be stored using a standard algorithm such as SHA-256
+- `provenance` should identify the source, author or owner, and creation time
+- `status` should distinguish raw, processed, derived, reviewed, or archived states
+
+### Format examples
+
+AIDB should support artifact handling for:
+
+- `.txt`, `.md`, `.json`, `.yaml`
+- `.pdf`
+- `.jpg`, `.png`, `.webp`
+- `.mp3`, `.wav`
+- `.zip`, `.tar`, `.gz`
+- arbitrary binary payloads
+- future or custom media types
+
+### Derived and transformed artifacts
+
+If an artifact is converted or extracted into another form, the new artifact should be recorded as a derived artifact and linked back to the parent artifact.
+
+Example transformation history:
+
+- original PDF
+- OCR text extraction
+- thumbnail image generation
+- embedding generation
+- summary document generation
+
+Each derived artifact should maintain:
+
+- parent_artifact_id
+- transformation_step
+- timestamp
+- resulting media type
+- integrity hash
+
+### Authority order
 
 When knowledge or instructions conflict, the repository should resolve them in this order:
 
@@ -79,6 +140,7 @@ When knowledge or instructions conflict, the repository should resolve them in t
 - Review requirements should be preserved.
 - Unreviewed external requests should not be promoted automatically.
 - Direct code changes and repository administration should require human approval.
+- Artifact handling must remain format-agnostic even when a specific adapter is format-aware.
 
 ## Review workflow
 

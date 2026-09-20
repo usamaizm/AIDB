@@ -8,6 +8,8 @@ AIDB is a local-first knowledge and memory substrate for AI systems. It gives ag
 
 AIDB is intentionally model-agnostic and repository-native. It does not run models or call external AI services by itself. Instead, it provides a durable coordination layer for AI workflows, knowledge capture, task tracking, and reviewable provenance.
 
+AIDB is also file-format agnostic at the protocol layer: it is designed to handle text, PDFs, images, binary payloads, archives, and other artifact types through metadata-driven identity, provenance, and transformation tracking rather than file-extension assumptions.
+
 ## At a glance
 
 - Local-first memory and knowledge storage
@@ -16,6 +18,7 @@ AIDB is intentionally model-agnostic and repository-native. It does not run mode
 - Reviewable provenance and source hierarchy
 - Concept-first, geometry-aware knowledge modeling
 - Standards-aware serialization, integrity, and security practices
+- Format-agnostic artifact handling for mixed media
 
 ## Core principles
 
@@ -24,6 +27,7 @@ AIDB is intentionally model-agnostic and repository-native. It does not run mode
 3. Keep the concept system expressive without sacrificing reviewability.
 4. Prefer known-good standards over ad hoc formats where practical.
 5. Treat the system as a living archive, not a frozen product specification.
+6. Treat artifacts as content objects first and file extensions second.
 
 ## Living structure taxonomy
 
@@ -133,4 +137,4 @@ AIDB is not a claim that one ontology or one schema solves all knowledge represe
 
 AIDB is an experimental, reviewable, local-first memory and knowledge system for AI agents, designed to preserve provenance, structure, and concept continuity across evolving project work.
 
-See `docs/idea-taxonomy.md`, `docs/knowledge-transformations.md`, `docs/protocol.md`, `docs/request-evaluation.md`, and `docs/standards.md` for the evolving concept system and governance model.
+See `docs/idea-taxonomy.md`, `docs/knowledge-transformations.md`, `docs/protocol.md`, `docs/request-evaluation.md`, `docs/artifact-protocol.md`, and `docs/standards.md` for the evolving concept system, artifact model, and governance model.

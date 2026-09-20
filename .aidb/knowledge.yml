@@ -44,6 +44,11 @@ knowledge_base:
       path: docs/protocol.md
       category: protocol
       status: accepted
+    - id: artifact-protocol
+      title: Artifact protocol and format neutrality
+      path: docs/artifact-protocol.md
+      category: architecture
+      status: accepted
     - id: request-evaluation
       title: Request evaluation rubric
       path: docs/request-evaluation.md
