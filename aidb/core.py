@@ -47,9 +47,15 @@ class KnowledgeRecord:
     agent_id: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"id": self.id, "title": self.title, "content": self.content,
-                "tags": self.tags, "metadata": self.metadata, "score": self.score,
-                "agent_id": self.agent_id}
+        return {
+            "id": self.id,
+            "title": self.title,
+            "content": self.content,
+            "tags": self.tags,
+            "metadata": self.metadata,
+            "score": self.score,
+            "agent_id": self.agent_id,
+        }
 
 
 @dataclass
