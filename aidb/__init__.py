@@ -6,11 +6,21 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from .core import Agent, KnowledgeRecord, Memory, Message, Session, Task, Tool, ToolCall
+from .core import (
+    Agent,
+    KnowledgeRecord,
+    Memory,
+    Message,
+    Session,
+    Task,
+    Tool,
+    ToolCall,
+    WorkflowEvent,
+)
 
 
 class AIDB:
-    """SQLite-backed state layer for agents, sessions, tasks, memory, tools, and tool-call auditing."""
+    """SQLite-backed state layer for agents, sessions, tasks, memory, tools, and workflow events."""
 
     def __init__(self, path: str | Path = "aidb.sqlite3"):
         self.path = str(path)
@@ -28,6 +38,8 @@ class AIDB:
                 name TEXT NOT NULL UNIQUE,
                 description TEXT,
                 model TEXT,
+                role TEXT NOT NULL DEFAULT 'agent',
+                permissions TEXT NOT NULL DEFAULT '[]',
                 capabilities TEXT NOT NULL DEFAULT '[]',
                 metadata TEXT NOT NULL DEFAULT '{}'
             );
@@ -39,6 +51,7 @@ class AIDB:
                 metadata TEXT NOT NULL DEFAULT '{}',
                 created_by INTEGER,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                status TEXT NOT NULL DEFAULT 'active',
                 FOREIGN KEY(created_by) REFERENCES agents(id) ON DELETE SET NULL
             );
 
@@ -103,7 +116,24 @@ class AIDB:
                 metadata TEXT NOT NULL DEFAULT '{}',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(assigned_to) REFERENCES agents(id) ON DELETE SET NULL
+                depends_on INTEGER,
+                priority INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(assigned_to) REFERENCES agents(id) ON DELETE SET NULL,
+                FOREIGN KEY(depends_on) REFERENCES tasks(id) ON DELETE SET NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS workflow_events (
+                id INTEGER PRIMARY KEY,
+                kind TEXT NOT NULL,
+                message TEXT NOT NULL DEFAULT '',
+                agent_id INTEGER,
+                task_id INTEGER,
+                session_id TEXT,
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE SET NULL,
+                FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+                FOREIGN KEY(session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS messages (
@@ -144,15 +174,34 @@ class AIDB:
         name: str,
         description: str = "",
         model: str = "",
+        role: str = "agent",
+        permissions: list[str] | None = None,
         capabilities: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> Agent:
         cur = self.db.execute(
-            "INSERT INTO agents(name, description, model, capabilities, metadata) VALUES (?, ?, ?, ?, ?)",
-            (name, description, model, self._json(capabilities or []), self._json(metadata or {})),
+            "INSERT INTO agents(name, description, model, role, permissions, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                name,
+                description,
+                model,
+                role,
+                self._json(permissions or []),
+                self._json(capabilities or []),
+                self._json(metadata or {}),
+            ),
         )
         self.db.commit()
-        return Agent(name, description, model, capabilities or [], metadata or {}, cur.lastrowid)
+        return Agent(
+            name,
+            description,
+            model,
+            role,
+            permissions or [],
+            capabilities or [],
+            metadata or {},
+            cur.lastrowid,
+        )
 
     def list_agents(self) -> list[Agent]:
         rows = self.db.execute("SELECT * FROM agents ORDER BY name").fetchall()
@@ -161,6 +210,8 @@ class AIDB:
                 r["name"],
                 r["description"] or "",
                 r["model"] or "",
+                r["role"],
+                json.loads(r["permissions"]),
                 json.loads(r["capabilities"]),
                 json.loads(r["metadata"]),
                 r["id"],
@@ -175,16 +226,26 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
         created_by: int | None = None,
         session_id: str | None = None,
+        status: str = "active",
     ) -> Session:
         key = session_id or uuid.uuid4().hex
         self.db.execute(
-            "INSERT INTO sessions(session_id, title, description, metadata, created_by) VALUES (?, ?, ?, ?, ?)",
-            (key, title, description, self._json(metadata or {}), created_by),
+            "INSERT INTO sessions(session_id, title, description, metadata, created_by, status) VALUES (?, ?, ?, ?, ?, ?)",
+            (key, title, description, self._json(metadata or {}), created_by, status),
         )
         self.db.commit()
         if created_by is not None:
             self.join_session(key, created_by)
-        return Session(key, title, description, metadata or {}, created_by)
+        return Session(key, title, description, metadata or {}, created_by, None, status)
+
+    def update_session_status(self, session_id: str, status: str) -> Session:
+        self.db.execute(
+            "UPDATE sessions SET status = ? WHERE session_id = ?",
+            (status, session_id),
+        )
+        self.db.commit()
+        row = self.db.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
+        return self._session_from_row(row)
 
     def join_session(self, session_id: str, agent_id: int) -> None:
         self.db.execute(
@@ -195,17 +256,7 @@ class AIDB:
 
     def list_sessions(self) -> list[Session]:
         rows = self.db.execute("SELECT * FROM sessions ORDER BY created_at DESC").fetchall()
-        return [
-            Session(
-                r["session_id"],
-                r["title"],
-                r["description"],
-                json.loads(r["metadata"]),
-                r["created_by"],
-                r["created_at"],
-            )
-            for r in rows
-        ]
+        return [self._session_from_row(row) for row in rows]
 
     def session_members(self, session_id: str) -> list[Agent]:
         rows = self.db.execute(
@@ -217,6 +268,8 @@ class AIDB:
                 r["name"],
                 r["description"] or "",
                 r["model"] or "",
+                r["role"],
+                json.loads(r["permissions"]),
                 json.loads(r["capabilities"]),
                 json.loads(r["metadata"]),
                 r["id"],
@@ -350,6 +403,38 @@ class AIDB:
             rows = self.db.execute("SELECT * FROM tool_calls ORDER BY id DESC").fetchall()
         return [self._tool_call_from_row(row) for row in rows]
 
+    def add_event(
+        self,
+        kind: str,
+        message: str = "",
+        agent_id: int | None = None,
+        task_id: int | None = None,
+        session_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> WorkflowEvent:
+        cur = self.db.execute(
+            "INSERT INTO workflow_events(kind, message, agent_id, task_id, session_id, metadata) VALUES (?, ?, ?, ?, ?, ?)",
+            (kind, message, agent_id, task_id, session_id, self._json(metadata or {})),
+        )
+        self.db.commit()
+        row = self.db.execute("SELECT * FROM workflow_events WHERE id=?", (cur.lastrowid,)).fetchone()
+        return self._event_from_row(row)
+
+    def list_events(self, task_id: int | None = None, session_id: str | None = None) -> list[WorkflowEvent]:
+        if task_id is not None:
+            rows = self.db.execute(
+                "SELECT * FROM workflow_events WHERE task_id=? ORDER BY id DESC",
+                (task_id,),
+            ).fetchall()
+        elif session_id is not None:
+            rows = self.db.execute(
+                "SELECT * FROM workflow_events WHERE session_id=? ORDER BY id DESC",
+                (session_id,),
+            ).fetchall()
+        else:
+            rows = self.db.execute("SELECT * FROM workflow_events ORDER BY id DESC").fetchall()
+        return [self._event_from_row(row) for row in rows]
+
     def create_task(
         self,
         title: str,
@@ -357,10 +442,12 @@ class AIDB:
         assigned_to: int | None = None,
         status: str = "queued",
         metadata: dict[str, Any] | None = None,
+        depends_on: int | None = None,
+        priority: int = 0,
     ) -> Task:
         cur = self.db.execute(
-            "INSERT INTO tasks(title, description, assigned_to, status, metadata, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
-            (title, description, assigned_to, status, self._json(metadata or {})),
+            "INSERT INTO tasks(title, description, assigned_to, status, metadata, depends_on, priority, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+            (title, description, assigned_to, status, self._json(metadata or {}), depends_on, priority),
         )
         self.db.commit()
         row = self.db.execute("SELECT * FROM tasks WHERE id=?", (cur.lastrowid,)).fetchone()
@@ -377,10 +464,10 @@ class AIDB:
 
     def list_tasks(self, assigned_to: int | None = None) -> list[Task]:
         if assigned_to is None:
-            rows = self.db.execute("SELECT * FROM tasks ORDER BY updated_at DESC").fetchall()
+            rows = self.db.execute("SELECT * FROM tasks ORDER BY priority DESC, updated_at DESC").fetchall()
         else:
             rows = self.db.execute(
-                "SELECT * FROM tasks WHERE assigned_to=? ORDER BY updated_at DESC",
+                "SELECT * FROM tasks WHERE assigned_to=? ORDER BY priority DESC, updated_at DESC",
                 (assigned_to,),
             ).fetchall()
         return [self._task_from_row(row) for row in rows]
@@ -449,6 +536,17 @@ class AIDB:
         ).fetchall()
         return [self._message_from_row(row) for row in rows]
 
+    def _session_from_row(self, row: sqlite3.Row) -> Session:
+        return Session(
+            row["session_id"],
+            row["title"],
+            row["description"],
+            json.loads(row["metadata"]),
+            row["created_by"],
+            row["created_at"],
+            row["status"],
+        )
+
     def _task_from_row(self, row: sqlite3.Row) -> Task:
         return Task(
             title=row["title"],
@@ -459,6 +557,8 @@ class AIDB:
             id=row["id"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+            depends_on=row["depends_on"],
+            priority=row["priority"],
         )
 
     def _tool_call_from_row(self, row: sqlite3.Row) -> ToolCall:
@@ -469,6 +569,18 @@ class AIDB:
             result=json.loads(row["result"]),
             status=row["status"],
             session_id=row["session_id"],
+            id=row["id"],
+            created_at=row["created_at"],
+        )
+
+    def _event_from_row(self, row: sqlite3.Row) -> WorkflowEvent:
+        return WorkflowEvent(
+            kind=row["kind"],
+            message=row["message"],
+            agent_id=row["agent_id"],
+            task_id=row["task_id"],
+            session_id=row["session_id"],
+            metadata=json.loads(row["metadata"]),
             id=row["id"],
             created_at=row["created_at"],
         )

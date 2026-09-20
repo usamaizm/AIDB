@@ -9,6 +9,8 @@ class Agent:
     name: str
     description: str = ""
     model: str = ""
+    role: str = "agent"
+    permissions: list[str] = field(default_factory=list)
     capabilities: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     id: int | None = None
@@ -22,6 +24,7 @@ class Session:
     metadata: dict[str, Any] = field(default_factory=dict)
     created_by: int | None = None
     created_at: str | None = None
+    status: str = "active"
 
 
 @dataclass
@@ -34,6 +37,8 @@ class Task:
     id: int | None = None
     created_at: str | None = None
     updated_at: str | None = None
+    depends_on: int | None = None
+    priority: int = 0
 
 
 @dataclass
@@ -85,6 +90,18 @@ class ToolCall:
     result: Any = None
     status: str = "success"
     session_id: str | None = None
+    id: int | None = None
+    created_at: str | None = None
+
+
+@dataclass
+class WorkflowEvent:
+    kind: str
+    message: str = ""
+    agent_id: int | None = None
+    task_id: int | None = None
+    session_id: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     id: int | None = None
     created_at: str | None = None
 
