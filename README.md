@@ -1,35 +1,29 @@
 # AIDB
 
-AIDB is a durable SQLite-backed foundation for AI systems. It is designed to hold the shared state needed for multi-agent coordination: identities, memory, knowledge, sessions, tasks, tool calls, and workflow events.
+AIDB is a durable SQLite-backed foundation for AI systems. It stores the operating memory and coordination state needed for multi-agent workflows in a local-first, model-agnostic way.
 
-## What AIDB now supports
+## What AIDB supports
 
-- agent registration with roles and permissions
+- agent registration with roles, permissions, and capabilities
+- session creation and participant membership
+- message history, reads, and unread inbox tracking
 - private memory and shared knowledge records
-- named communication sessions with participants
-- message history and unread tracking
-- task assignment, priority, and dependency edges
-- tool registry and tool-call auditing
-- workflow event logs for orchestration traces
-
-## Why this matters
-
-AIDB is not just a document database. It is a persistence layer for AI operating memory. It lets agents coordinate, recover state, continue conversations, and leave an auditable trail of work.
+- task assignment, priorities, and dependency-aware workflow readiness
+- tool registry and tool-call audit logging
+- workflow event history for orchestration traces
+- lightweight semantic retrieval using token-based similarity
+- orchestration via WorkflowEngine
 
 ## Quick start
 
-```bash
-python -m pip install -e .
-```
-
 ```python
-from aidb import AIDB
+from aidb import AIDB, WorkflowEngine
 
 with AIDB("agents.sqlite3") as db:
     planner = db.register_agent(
         "Planner",
         role="manager",
-        permissions=["create_task", "assign_task"],
+        permissions=["read_task", "create_task", "assign_task"],
         capabilities=["planning", "coordination"],
     )
 
@@ -42,7 +36,6 @@ with AIDB("agents.sqlite3") as db:
     session = db.create_session("benchmark-review", created_by=planner.id)
     db.join_session(session.session_id, researcher.id)
 
-    db.send_message(planner.id, "Please inspect the benchmark dataset.", session.session_id)
     task = db.create_task(
         "Review benchmark",
         assigned_to=researcher.id,
@@ -50,34 +43,43 @@ with AIDB("agents.sqlite3") as db:
         priority=10,
     )
 
+    db.send_message(planner.id, "Please inspect the benchmark dataset.", session.session_id)
     db.add_event("task_assigned", "Task assigned to researcher", agent_id=planner.id, task_id=task.id, session_id=session.session_id)
     db.remember(researcher.id, "The user prefers concise explanations.", kind="preference")
     db.log_tool_call(researcher.id, "search_docs", {"query": "benchmark"}, {"count": 3}, session_id=session.session_id)
+
+    engine = WorkflowEngine(db)
+    ready = engine.next_ready_tasks(researcher.id)
+    print(ready)
 ```
 
 ## Core model
 
 - Agent: identity, role, permissions, capabilities
-- Session: conversation stream between agents
+- Session: durable conversation stream between agents
 - Message: ordered communication event in a session
 - Memory: per-agent facts and preferences
-- Knowledge: searchable shared content
+- Knowledge: shared searchable content
 - Task: unit of work with status, priority, and dependency links
 - Tool: registered callable interface
-- ToolCall: execution audit trail
+- ToolCall: execution trace for tools
 - WorkflowEvent: orchestration and operational timeline
+- WorkflowEngine: task scheduling and lifecycle coordination
+
+## Semantic retrieval
+
+AIDB includes a lightweight similarity search built on token frequency vectors. It is local, fast, and dependency-free, making it suitable for prototype agent systems and local experimentation.
 
 ## Scope
 
-AIDB is intentionally local-first and model-agnostic. It does not run models or invoke external APIs itself. Instead, it gives AI systems a durable place to store state and coordinate activity.
+AIDB is intentionally local-first and model-agnostic. It does not run models or invoke external APIs itself. Instead, it gives AI systems a durable place to store state, coordinate work, and recover after a restart.
 
 ## Roadmap
 
-- semantic search via embeddings
-- role-based authorization and policies
-- richer task dependency graphs
-- message delivery acknowledgements and scheduling
-- FastAPI or MCP adapters
-- persistent agent runtime orchestration
+- embeddings and vector memory stores
+- authorization boundaries for sensitive operations
+- richer dependency graphs and scheduling policies
+- API adapters for MCP, REST, or websockets
+- persistent orchestration dashboards
 
 Apache 2.0
