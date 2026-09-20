@@ -2,49 +2,57 @@
 
 AIDB is a collection of collections of ideas.
 
-AIDB is a durable, local-first SQLite-backed foundation for AI systems. It gives agents a place to store operational memory, session state, shared knowledge, tasks, and workflow events without requiring a central cloud dependency.
+AIDB is a living archive for AI memory, knowledge, and concept design. The repository is intentionally fluid: it captures ideas before they become strict requirements, fixed schemas, or implementation commitments.
 
-AIDB is intentionally model-agnostic and repository-native. It does not run models or call external AI services by itself. Instead, it provides a durable coordination layer for AI workflows, agent memory, and knowledge capture.
+## What AIDB is
 
-## Living structure taxonomy
+AIDB is not just a database. It is a flexible knowledge substrate for:
 
-AIDB should remain able to hold many kinds of structured knowledge, not just documents and rows. Some useful categories include:
+- concepts and categories
+- memory and provenance
+- collections and archives
+- maps and spatial records
+- workflows and events
+- distributed idea systems
+- AI-native coordination and review
 
-- x: a single value, anchor, or scalar idea
-- x,y: a pair, coordinate, relationship, or correlation
-- x,y,z: a triad, positional relation, or spatial/causal structure
-- x,y,z,t: a spacetime state, trajectory, process, or event record
-- world map: a geospatial layer assembled from coordinates and trajectories
-- dictionary: named fields or key-value memory
+## Structure system
+
+AIDB is designed to work with multiple kinds of structure, not only rows in a table.
+
+- x: single scalar value
+- x,y: relationship or coordinate pair
+- x,y,z: triad or positional structure
+- x,y,z,t: spacetime or process state
+- dictionary: named key-value memory
 - list: ordered sequence
-- set: unordered collection of related ideas
+- set: unordered collection
 - graph: nodes and edges
-- tree: hierarchy or ancestry
-- matrix: rows and columns of structured data
-- document: prose, notes, or narrative knowledge
-- event: something that happened at a point in time
-- workflow: ordered actions and transitions
-- conversation: messages, turns, and transcript state
+- tree: hierarchy
+- matrix: structured grid
+- document: narrative knowledge
+- world map: geospatial layer
+- event: time-based record
+- workflow: process or action stream
 
-The important distinction is:
+The distinction matters:
 
 - shape / category = how the information is structured
 - meaning / tags = what the information is about
 
-A single item may be represented in multiple ways. For example, a migration record may be a point, a route, a geospatial event, or a map layer depending on context.
+## Encyclopedia
 
-This makes AIDB usable as both:
+The project now includes a living encyclopedia of concept entries and shared vocabulary.
 
-- a conceptual archive for ideas and proposals
-- a spatial-temporal memory model for connected knowledge
+See: `encyclopedia/README.md`
 
-See `docs/idea-taxonomy.md` for a deeper treatment of this structure system.
+## Current direction
 
-## The final operating model
+AIDB is currently exploring a model where knowledge can be:
 
-AIDB is designed around a clear responsibility split:
+- conceptual and symbolic
+- spatial and temporal
+- distributed and self-referential
+- archived and revisited over time
 
-- GitHub Copilot handles implementation work
-- AIDB stores the memory, policy, protocol, and task context
-- GitHub provides the public coordination surface and audit trail
-- you remain the final reviewer and decision-maker
+The important thing is not to lock the system too early. The repo should stay open enough to support new directions without forcing premature decisions.
