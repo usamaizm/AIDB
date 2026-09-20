@@ -6,12 +6,36 @@ The goal is to preserve the vocabulary, concept structure, and patterns that sha
 
 ## Entry index
 
+### Core structure primitives
+
 - [x](concepts/x.md)
 - [x,y](concepts/x-y.md)
 - [x,y,z](concepts/x-y-z.md)
 - [x,y,z,t](concepts/x-y-z-t.md)
 - [dictionary](concepts/dictionary.md)
+- [list](concepts/list.md)
+- [set](concepts/set.md)
+- [graph](concepts/graph.md)
+- [tree](concepts/tree.md)
+- [matrix](concepts/matrix.md)
+- [document](concepts/document.md)
+
+### Geometry and topology
+
+- [diamond-lattice](concepts/diamond-lattice.md)
+- [cube](concepts/cube.md)
+- [tetrahedron](concepts/tetrahedron.md)
+- [sphere](concepts/sphere.md)
+- [hex](concepts/hex.md)
 - [world map](concepts/world-map.md)
+
+### Core project concepts
+
+- [archive](concepts/archive.md)
+- [provenance](concepts/provenance.md)
+- [event](concepts/event.md)
+- [workflow](concepts/workflow.md)
+- [knowledge-object](concepts/knowledge-object.md)
 
 ## How to use this encyclopedia
 
