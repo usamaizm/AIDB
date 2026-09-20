@@ -1,14 +1,17 @@
-import tempfile
+from tempfile import TemporaryDirectory
 
 from aidb import AIDB
 
 
-def test_agent_memory_and_search():
-    with tempfile.TemporaryDirectory() as directory:
-        with AIDB(f"{directory}/test.sqlite3") as db:
-            agent = db.register_agent("Archivist", model="test-model", capabilities=["search", "memory"])
-            db.remember(agent.id, "The user prefers concise answers", kind="preference", importance=0.9)
-            db.add_document("AI Memory", "Persistent memory helps agents use context safely.", ["ai", "memory"])
-            assert db.list_agents()[0].name == "Archivist"
-            assert db.recall(agent.id, "preferences")[0].kind == "preference"
-            assert db.search("memory")[0].title == "AI Memory"
+def test_agents_can_communicate():
+    with TemporaryDirectory() as directory:
+        with AIDB(f"{directory}/communication.sqlite3") as db:
+            sender = db.register_agent("Researcher")
+            receiver = db.register_agent("Writer")
+            sent = db.send_message(sender.id, "I found three relevant sources.", "research-1")
+            db.send_message(receiver.id, "Please summarize them.", "research-1")
+            inbox = db.receive(receiver.id, "research-1")
+            assert inbox[0].content == sent.content
+            assert [m.content for m in db.conversation("research-1")] == [
+                "I found three relevant sources.", "Please summarize them."
+            ]

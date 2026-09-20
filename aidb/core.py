@@ -47,3 +47,14 @@ class Tool:
     schema: dict[str, Any] = field(default_factory=dict)
     endpoint: str | None = None
     id: int | None = None
+
+
+@dataclass
+class Message:
+    role: str
+    content: str
+    agent_id: int | None = None
+    session_id: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    id: int | None = None
+    created_at: str | None = None

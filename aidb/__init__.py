@@ -1,7 +1,7 @@
-"""AIDB: a small SQLite database for AI agents, memory, tools, and knowledge."""
+"""AIDB package exports."""
 
-from .core import Agent, KnowledgeRecord, Memory, Tool
+from .core import Agent, KnowledgeRecord, Memory, Message, Tool
 from .store import AIDB
 
-__all__ = ["AIDB", "Agent", "KnowledgeRecord", "Memory", "Tool"]
-__version__ = "0.2.0"
+__all__ = ["AIDB", "Agent", "KnowledgeRecord", "Memory", "Message", "Tool"]
+__version__ = "0.3.0"
