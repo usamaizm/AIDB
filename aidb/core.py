@@ -78,6 +78,18 @@ class Tool:
 
 
 @dataclass
+class ToolCall:
+    agent_id: int | None
+    tool_name: str
+    arguments: dict[str, Any] = field(default_factory=dict)
+    result: Any = None
+    status: str = "success"
+    session_id: str | None = None
+    id: int | None = None
+    created_at: str | None = None
+
+
+@dataclass
 class Message:
     role: str
     content: str
