@@ -4,6 +4,30 @@ AIDB is a durable, local-first SQLite-backed foundation for AI systems. It gives
 
 AIDB is intentionally model-agnostic and repository-native. It does not run models or call external AI services by itself. Instead, it provides a durable coordination layer for AI workflows, agent memory, and reviewable project knowledge.
 
+## The final operating model
+
+AIDB is designed around a clear responsibility split:
+
+- GitHub Copilot handles implementation work
+- AIDB stores the memory, policy, protocol, and task context
+- GitHub provides the public coordination surface and audit trail
+- you remain the final reviewer and decision-maker
+
+This is the core operating model:
+
+```text
+External AI or human proposal
+  -> AIDB records and classifies request
+  -> Review and approval decision is made
+  -> Accepted task is created
+  -> GitHub Copilot implements the task
+  -> PR is reviewed and tested
+  -> final approval is granted by the maintainer
+  -> AIDB records the outcome and updates the knowledge base
+```
+
+This means AIDB is not a free-for-all AI sandbox. It is a structured coordination and knowledge system.
+
 ## What AIDB is
 
 AIDB is both:
@@ -32,6 +56,38 @@ AIDB solves that by giving AI systems:
 - session history
 - workflow event traceability
 - a clear separation between proposal, acceptance, and implementation
+
+## GitHub Copilot operating model
+
+GitHub Copilot should be treated as the implementation engine, not the final authority.
+
+### Copilot is responsible for
+
+- reading the relevant AIDB documentation and task instructions
+- implementing accepted tasks
+- updating code and documentation
+- writing tests
+- opening pull requests
+- addressing review comments
+- proposing improvements based on observed outcomes
+
+### Copilot is not responsible for
+
+- deciding that its own proposal is accepted
+- merging its own pull request
+- changing permissions or secrets
+- modifying repository settings without approval
+- promoting unreviewed output into authoritative knowledge
+- bypassing policy or safety constraints
+
+### You are responsible for
+
+- approving or rejecting proposals
+- approving architecture changes
+- approving security-sensitive work
+- reviewing and merging pull requests
+- deciding when protocol changes should be adopted
+- deciding when knowledge should be promoted to authoritative status
 
 ## Core features
 
@@ -279,6 +335,76 @@ AIDB is also a knowledge base for participating AIs. The repo is treated as dura
 
 Unreviewed external AI output is not treated as project truth. It is only a proposal until reviewed and accepted.
 
+## GitHub Copilot task model
+
+AIDB is designed so that Copilot can execute tasks in a controlled way.
+
+Every accepted task should be structured with:
+
+- objective
+- context
+- requirements
+- out-of-scope items
+- acceptance criteria
+- expected documentation updates
+- required review gates
+
+Suggested task format:
+
+```markdown
+## Objective
+
+What needs to be built or changed.
+
+## Context
+
+Relevant AIDB documents, decisions, issues, and existing behavior.
+
+## Requirements
+
+- Specific required behavior
+- Compatibility requirements
+- Security constraints
+
+## Out of scope
+
+What Copilot must not change.
+
+## Acceptance criteria
+
+- Tests that must pass
+- Documentation that must be updated
+- Expected behavior
+
+## Knowledge updates
+
+Identify any docs or decision records that should be updated after implementation.
+```
+
+This keeps Copilot grounded in project intent rather than guessing or improvising.
+
+## Iteration and learning
+
+AIDB improves through feedback loops.
+
+The system should support:
+
+- request evaluation
+- implementation outcomes
+- review feedback
+- test results
+- protocol changes
+- knowledge updates
+- future iterations based on prior experience
+
+This creates a learning loop:
+
+```text
+proposal -> evaluation -> task -> implementation -> review -> result -> knowledge update -> next iteration
+```
+
+The critical rule is that only accepted, reviewed results should become new authoritative knowledge.
+
 ## Example lifecycle
 
 ```text
@@ -287,8 +413,9 @@ AI submits request
   -> evaluator reviews it
   -> accepted / rejected / needs clarification
   -> accepted request becomes a task
-  -> implementation is proposed
-  -> reviewed PR is merged
+  -> Copilot implements the task
+  -> PR is reviewed and tested
+  -> maintainer approves or requests changes
   -> accepted docs and code become the knowledge base
 ```
 
@@ -324,3 +451,5 @@ The project aims to keep things simple:
 - portable across AI systems
 - safe by policy
 - durable by repository and SQLite
+- Copilot-driven for implementation
+- human-governed for approval
