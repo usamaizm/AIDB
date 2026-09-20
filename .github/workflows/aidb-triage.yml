@@ -1,0 +1,56 @@
+name: AIDB Request Triage
+
+on:
+  issues:
+    types: [opened, edited, labeled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if issue is an AI intake request
+        id: check
+        run: |
+          if [[ "${{ github.event.issue.labels.*.name }}" == *"aidb:request"* ]]; then
+            echo "is_ai_request=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_ai_request=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Add triage labels
+        if: steps.check.outputs.is_ai_request == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const labels = issue.labels.map(label => label.name);
+            const toAdd = ["aidb:review", "status:triage"];
+            for (const label of toAdd) {
+              if (!labels.includes(label)) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: [label]
+                });
+              }
+            }
+
+      - name: Post triage comment
+        if: steps.check.outputs.is_ai_request == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: `Thanks for submitting an AIDB request.\n\nThis request has been placed in review and will be evaluated before any implementation work or task assignment begins.\n\n- Request type: ${issue.title}\n- Review status: triage\n- Approval requirement: human review required before code changes or task execution.`
+            });
