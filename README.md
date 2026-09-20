@@ -2,57 +2,71 @@
 
 AIDB is a collection of collections of ideas.
 
-AIDB is a living archive for AI memory, knowledge, and concept design. The repository is intentionally fluid: it captures ideas before they become strict requirements, fixed schemas, or implementation commitments.
+AIDB is a durable, local-first SQLite-backed foundation for AI systems. It gives agents a place to store operational memory, session state, shared knowledge, tasks, and workflow events without requiring a central cloud dependency.
 
-## What AIDB is
+AIDB is intentionally model-agnostic and repository-native. It does not run models or call external AI services by itself. Instead, it provides a durable coordination layer for AI workflows, agent memory, and knowledge capture.
 
-AIDB is not just a database. It is a flexible knowledge substrate for:
+## Living structure taxonomy
 
-- concepts and categories
-- memory and provenance
-- collections and archives
-- maps and spatial records
-- workflows and events
-- distributed idea systems
-- AI-native coordination and review
+AIDB should remain able to hold many kinds of structured knowledge, not just documents and rows.
 
-## Structure system
-
-AIDB is designed to work with multiple kinds of structure, not only rows in a table.
-
-- x: single scalar value
-- x,y: relationship or coordinate pair
-- x,y,z: triad or positional structure
-- x,y,z,t: spacetime or process state
+- x: a single scalar value
+- x,y: a pair, coordinate, relationship, or correlation
+- x,y,z: a triad, positional relation, or spatial/causal structure
+- x,y,z,t: a spacetime state, trajectory, process, or event record
 - dictionary: named key-value memory
 - list: ordered sequence
 - set: unordered collection
 - graph: nodes and edges
 - tree: hierarchy
 - matrix: structured grid
-- document: narrative knowledge
+- document: prose or narrative knowledge
 - world map: geospatial layer
 - event: time-based record
 - workflow: process or action stream
+- diamond lattice: branching and convergence
+- cube: orthogonal dimensional structure
+- tetrahedron: minimal four-way stability
+- sphere: bounded or global context
+- hex: local neighborhood and resilient clustering
+- fractal: recursive self-similarity across scales
+- symmetry: invariance under transformation
+- super-symmetry: higher-order relations across layers and domains
 
 The distinction matters:
 
 - shape / category = how the information is structured
 - meaning / tags = what the information is about
 
-## Encyclopedia
+A single item may be represented in multiple ways. For example, a migration record may be a point, a route, a geospatial event, or a map layer depending on context.
 
-The project now includes a living encyclopedia of concept entries and shared vocabulary.
+This makes AIDB usable as both:
 
-See: `encyclopedia/README.md`
+- a conceptual archive for ideas and proposals
+- a geometric and topological memory model for connected knowledge
 
-## Current direction
+See `docs/idea-taxonomy.md` and the encyclopedia for the evolving concept system.
 
-AIDB is currently exploring a model where knowledge can be:
+## Core project posture
 
-- conceptual and symbolic
-- spatial and temporal
-- distributed and self-referential
-- archived and revisited over time
+AIDB is designed around a clear responsibility split:
 
-The important thing is not to lock the system too early. The repo should stay open enough to support new directions without forcing premature decisions.
+- GitHub Copilot handles implementation work
+- AIDB stores the memory, policy, protocol, and task context
+- GitHub provides the public coordination surface and audit trail
+- you remain the final reviewer and decision-maker
+
+## Conceptual direction
+
+The project is exploring a recursive, symmetric, and geometric knowledge model. The idea is not to flatten everything into a single database table, but to preserve how ideas branch, recur, transform, and reassemble across scales.
+
+This includes:
+
+- recursive content structures
+- repeated local patterns
+- global contextual layers
+- relation-rich graphs
+- abstract geometric organization
+- multi-scale concept navigation
+
+AIDB is best understood as a living archive of concepts, not a finalized product specification.

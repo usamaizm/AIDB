@@ -29,6 +29,14 @@ The goal is to preserve the vocabulary, concept structure, and patterns that sha
 - [hex](concepts/hex.md)
 - [world map](concepts/world-map.md)
 
+### Recursive and symmetric structures
+
+- [fractal](concepts/fractal.md)
+- [symmetry](concepts/symmetry.md)
+- [self-similarity](concepts/self-similarity.md)
+- [invariance](concepts/invariance.md)
+- [super-symmetry](concepts/super-symmetry.md)
+
 ### Core project concepts
 
 - [archive](concepts/archive.md)
