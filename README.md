@@ -2,15 +2,34 @@
 
 AIDB is a collection of collections of ideas.
 
-AIDB is a durable, local-first SQLite-backed foundation for AI systems. It gives agents a place to store operational memory, session state, shared knowledge, tasks, and workflow events without requiring a central cloud dependency.
+Status: experimental, concept-first, standards-aware, and reviewable.
 
-AIDB is intentionally model-agnostic and repository-native. It does not run models or call external AI services by itself. Instead, it provides a durable coordination layer for AI workflows, agent memory, and knowledge capture.
+AIDB is a local-first knowledge and memory substrate for AI systems. It gives agents a durable place to store operational memory, session state, shared knowledge, workflow events, and project context without depending on a central cloud service.
+
+AIDB is intentionally model-agnostic and repository-native. It does not run models or call external AI services by itself. Instead, it provides a durable coordination layer for AI workflows, knowledge capture, task tracking, and reviewable provenance.
+
+## At a glance
+
+- Local-first memory and knowledge storage
+- SQLite-backed operational state layer
+- Session and task orchestration
+- Reviewable provenance and source hierarchy
+- Concept-first, geometry-aware knowledge modeling
+- Standards-aware serialization, integrity, and security practices
+
+## Core principles
+
+1. Preserve provenance and source hierarchy.
+2. Distinguish proposals from accepted knowledge.
+3. Keep the concept system expressive without sacrificing reviewability.
+4. Prefer known-good standards over ad hoc formats where practical.
+5. Treat the system as a living archive, not a frozen product specification.
 
 ## Living structure taxonomy
 
 AIDB should remain able to hold many kinds of structured knowledge, not just documents and rows.
 
-- x: a single scalar value
+- scalar: a single atomic value
 - super-scalar: a value with identity, metadata, provenance, and structure
 - array: an indexed sequence of values
 - matrix: a 2D array or tabular structure
@@ -54,17 +73,6 @@ This makes AIDB usable as both:
 - a geometric and topological memory model for connected knowledge
 - a transformation-aware knowledge system for representation, storage, and access
 
-See `docs/idea-taxonomy.md`, `docs/knowledge-transformations.md`, `docs/protocol.md`, `docs/request-evaluation.md`, and `docs/standards.md` for the evolving concept system and governance model.
-
-## Core project posture
-
-AIDB is designed around a clear responsibility split:
-
-- GitHub Copilot handles implementation work
-- AIDB stores the memory, policy, protocol, and task context
-- GitHub provides the public coordination surface and audit trail
-- you remain the final reviewer and decision-maker
-
 ## Conceptual direction
 
 The project is exploring a recursive, symmetric, and geometric knowledge model. The idea is not to flatten everything into a single database table, but to preserve how ideas branch, recur, transform, and reassemble across scales.
@@ -77,7 +85,7 @@ This includes:
 - relation-rich graphs
 - abstract geometric organization
 - multi-scale concept navigation
-- representation transformations for storage and transport
+- representation transformations for storage and transfer
 - meaningful scalar and higher-order knowledge units
 
 AIDB is best understood as a living archive of concepts, not a finalized product specification.
@@ -95,3 +103,34 @@ AIDB prefers known-good standards over ad hoc formats where possible.
 - Compression: standard codecs for storage or transfer efficiency
 
 Conceptual flexibility remains important, but actual implementation formats should align with established interoperability conventions wherever practical.
+
+## Governance and review model
+
+AIDB is designed around a clear responsibility split:
+
+- GitHub Copilot handles implementation work
+- AIDB stores the memory, policy, protocol, and task context
+- GitHub provides the public coordination surface and audit trail
+- you remain the final reviewer and decision-maker
+
+The repository also includes a structured governance model under `.aidb/` and `docs/` to keep proposals, accepted decisions, and unreviewed material separated.
+
+## Documentation map
+
+- `README.md` — project overview and framing
+- `brainstorms/` — open, provisional ideas and notes
+- `encyclopedia/` — concept vocabulary and structured knowledge model
+- `docs/` — governance, protocol, standards, and review guidance
+- `.aidb/` — repository-level policy and authority model
+- `aidb/` — Python package and operational state layer
+- `examples/` — sample request and workflow structures
+
+## What AIDB is not
+
+AIDB is not a claim that one ontology or one schema solves all knowledge representation. It is not an autonomous execution environment by default. It is not a replacement for human review. It is a durable, reviewable substrate for AI memory, workflow state, and concept formation.
+
+## In one sentence
+
+AIDB is an experimental, reviewable, local-first memory and knowledge system for AI agents, designed to preserve provenance, structure, and concept continuity across evolving project work.
+
+See `docs/idea-taxonomy.md`, `docs/knowledge-transformations.md`, `docs/protocol.md`, `docs/request-evaluation.md`, and `docs/standards.md` for the evolving concept system and governance model.
