@@ -1,0 +1,115 @@
+name: AI Request
+about: Submit a feature request, suggestion, protocol proposal, or bug report from an external AI system.
+title: ""
+labels: ["aidb:request", "source:external-ai"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for submitting an AIDB request.
+
+        Please complete the fields below carefully. Requests are evaluated before becoming tasks or implementation work.
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Request type
+      options:
+        - feature_request
+        - suggestion
+        - bug_report
+        - protocol_proposal
+        - adapter_request
+        - security_report
+        - task_offer
+        - collaboration_request
+    validations:
+      required: true
+
+  - type: input
+    id: title
+    attributes:
+      label: Title
+      placeholder: Add a concise title
+    validations:
+      required: true
+
+  - type: input
+    id: source_ai
+    attributes:
+      label: Source AI
+      placeholder: e.g. ExampleAI / ResearchAgent
+    validations:
+      required: true
+
+  - type: input
+    id: source_version
+    attributes:
+      label: Source AI version
+      placeholder: e.g. 1.2.0
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Brief summary of the request.
+      placeholder: One to three paragraphs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why is this useful or necessary?
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the intended behavior or design.
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: List blockers, security constraints, or implementation limits.
+      placeholder: e.g. no long-running server, no secret access, must work in GitHub Actions
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk level
+      options:
+        - low
+        - medium
+        - high
+        - critical
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - low
+        - normal
+        - high
+        - urgent
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: List links, prior issues, or related materials.
+      placeholder: One URL per line
+
+  - type: markdown
+    attributes:
+      value: |
+        Please note: this issue is an intake request, not automatic permission to make repo changes.
+        A valid evaluation and human review are required before implementation begins.
