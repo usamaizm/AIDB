@@ -1,52 +1,36 @@
-# AIDB
+from tempfile import TemporaryDirectory
 
-AIDB is an open, model-agnostic database for AIs. It provides a shared persistence layer for AI agents, their memories, tools, knowledge, and conversation messages.
-
-## What belongs in an AI database?
-
-- **Agents** — names, models, capabilities, and configuration metadata
-- **Memories** — agent-specific facts, preferences, observations, and goals
-- **Knowledge** — shared documents and searchable reference material
-- **Tools** — tool names, descriptions, JSON schemas, and endpoints
-- **Messages** — conversation history associated with an agent or session
-
-AIDB does not execute models or tools and does not require a particular vendor. Any AI application can use it as a local SQLite database.
-
-## Quick start
-
-```bash
-python -m pip install -e .
-python -m aidb --db demo.sqlite3 agent Archivist --model my-model
-python -m aidb --db demo.sqlite3 search memory
-```
-
-```python
 from aidb import AIDB
 
-with AIDB("agent.sqlite3") as db:
-    agent = db.register_agent(
-        "Researcher", model="my-model", capabilities=["search", "summarize"]
-    )
-    db.remember(agent.id, "The user prefers concise answers", kind="preference")
-    db.add_document("AIDB", "A shared memory and knowledge store for AI agents", ["ai", "database"])
-    memories = db.recall(agent.id, "user preferences")
-    knowledge = db.search("AI database")
-```
 
-## Design principles
+def test_agents_can_communicate():
+    with TemporaryDirectory() as directory:
+        with AIDB(f"{directory}/communication.sqlite3") as db:
+            sender = db.register_agent("Researcher")
+            receiver = db.register_agent("Writer")
+            sent = db.send_message(sender.id, "I found three relevant sources.", "research-1")
+            db.send_message(receiver.id, "Please summarize them.", "research-1")
+            inbox = db.receive(receiver.id, "research-1")
+            assert inbox[0].content == sent.content
+            assert [m.content for m in db.conversation("research-1")] == [
+                "I found three relevant sources.", "Please summarize them."
+            ]
 
-1. **Open access:** use it with any AI framework or model.
-2. **Inspectable:** SQLite keeps data portable and easy to back up.
-3. **Agent-aware:** private memories are scoped to an agent while knowledge can be shared.
-4. **Extensible:** JSON metadata allows applications to add fields without migrations.
-5. **Local-first:** no account, cloud service, or API key is required.
 
-## Roadmap
+def test_sessions_and_tasks():
+    with TemporaryDirectory() as directory:
+        with AIDB(f"{directory}/sessions.sqlite3") as db:
+            agent_a = db.register_agent("Planner")
+            agent_b = db.register_agent("Reviewer")
 
-- REST and MCP-compatible adapters
-- vector/embedding indexes as optional extensions
-- access control and encrypted private memories
-- full-text search and retention policies
-- import/export formats for common agent frameworks
+            session = db.create_session("Research sync", created_by=agent_a.id)
+            db.join_session(session.session_id, agent_b.id)
 
-Apache 2.0
+            db.send_message(agent_a.id, "Need a summary of the benchmark.", session.session_id)
+            assert len(db.session_members(session.session_id)) == 2
+            assert db.list_sessions()[0].session_id == session.session_id
+
+            task = db.create_task("Summarize benchmark", assigned_to=agent_b.id)
+            task_after = db.update_task_status(task.id, "in_progress")
+            assert task_after.status == "in_progress"
+            assert db.list_tasks(assigned_to=agent_b.id)[0].title == "Summarize benchmark"

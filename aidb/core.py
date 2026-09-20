@@ -15,6 +15,28 @@ class Agent:
 
 
 @dataclass
+class Session:
+    session_id: str
+    title: str = ""
+    description: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
+    created_by: int | None = None
+    created_at: str | None = None
+
+
+@dataclass
+class Task:
+    title: str
+    description: str = ""
+    assigned_to: int | None = None
+    status: str = "queued"
+    metadata: dict[str, Any] = field(default_factory=dict)
+    id: int | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+@dataclass
 class KnowledgeRecord:
     title: str
     content: str
