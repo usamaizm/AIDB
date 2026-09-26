@@ -64,6 +64,42 @@ class KnowledgeRecord:
 
 
 @dataclass
+class Artifact:
+    name: str
+    media_type: str
+    size_bytes: int
+    checksum: str
+    checksum_algorithm: str = "sha-256"
+    provenance: dict[str, Any] = field(default_factory=dict)
+    status: str = "raw"
+    id: int | None = None
+    filename: str | None = None
+    encoding: str | None = None
+    parent_artifact_id: int | None = None
+    transformation_history: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "media_type": self.media_type,
+            "filename": self.filename,
+            "size_bytes": self.size_bytes,
+            "checksum": self.checksum,
+            "checksum_algorithm": self.checksum_algorithm,
+            "provenance": self.provenance,
+            "status": self.status,
+            "encoding": self.encoding,
+            "parent_artifact_id": self.parent_artifact_id,
+            "transformation_history": self.transformation_history,
+            "metadata": self.metadata,
+            "created_at": self.created_at,
+        }
+
+
+@dataclass
 class Memory:
     agent_id: int
     content: str

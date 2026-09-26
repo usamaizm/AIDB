@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import uuid
@@ -9,6 +10,7 @@ from typing import Any
 
 from .core import (
     Agent,
+    Artifact,
     KnowledgeRecord,
     Memory,
     Message,
@@ -21,7 +23,7 @@ from .core import (
 
 
 class AIDB:
-    """SQLite-backed state layer for AI agents, sessions, tasks, memory, tools, and workflow events."""
+    """SQLite-backed state layer for AI agents, sessions, tasks, memory, tools, workflow events, and artifacts."""
 
     def __init__(self, path: str | Path = "aidb.sqlite3"):
         self.path = str(path)
@@ -75,6 +77,24 @@ class AIDB:
                 metadata TEXT NOT NULL DEFAULT '{}',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE SET NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS artifacts (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                media_type TEXT NOT NULL,
+                filename TEXT,
+                size_bytes INTEGER NOT NULL DEFAULT 0,
+                checksum TEXT NOT NULL,
+                checksum_algorithm TEXT NOT NULL DEFAULT 'sha-256',
+                provenance TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL DEFAULT 'raw',
+                encoding TEXT,
+                parent_artifact_id INTEGER,
+                transformation_history TEXT NOT NULL DEFAULT '[]',
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(parent_artifact_id) REFERENCES artifacts(id) ON DELETE SET NULL
             );
 
             CREATE TABLE IF NOT EXISTS memories (
@@ -162,6 +182,8 @@ class AIDB:
             CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, id);
             CREATE INDEX IF NOT EXISTS idx_messages_agent ON messages(agent_id, id);
             CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status, updated_at);
+            CREATE INDEX IF NOT EXISTS idx_artifacts_media_type ON artifacts(media_type, id);
+            CREATE INDEX IF NOT EXISTS idx_artifacts_parent ON artifacts(parent_artifact_id, id);
             """
         )
         self.db.commit()
@@ -192,6 +214,13 @@ class AIDB:
         if mag_a == 0 or mag_b == 0:
             return 0.0
         return dot / (mag_a * mag_b)
+
+    @staticmethod
+    def _checksum_bytes(data: bytes, algorithm: str = "sha-256") -> str:
+        normalized = (algorithm or "sha-256").lower()
+        if normalized not in {"sha-256", "sha1", "md5"}:
+            raise ValueError(f"unsupported checksum algorithm: {algorithm}")
+        return hashlib.new(normalized, data).hexdigest()
 
     def register_agent(
         self,
@@ -319,6 +348,134 @@ class AIDB:
         )
         self.db.commit()
         return KnowledgeRecord(title, content, tags or [], metadata or {}, 0.0, cur.lastrowid, agent_id)
+
+    def register_artifact(
+        self,
+        name: str,
+        media_type: str,
+        size_bytes: int,
+        checksum: str,
+        provenance: dict[str, Any] | None = None,
+        filename: str | None = None,
+        status: str = "raw",
+        encoding: str | None = None,
+        parent_artifact_id: int | None = None,
+        transformation_history: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        checksum_algorithm: str = "sha-256",
+    ) -> Artifact:
+        cur = self.db.execute(
+            "INSERT INTO artifacts(name, media_type, filename, size_bytes, checksum, checksum_algorithm, provenance, status, encoding, parent_artifact_id, transformation_history, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                name,
+                media_type,
+                filename,
+                size_bytes,
+                checksum,
+                checksum_algorithm,
+                self._json(provenance or {}),
+                status,
+                encoding,
+                parent_artifact_id,
+                self._json(transformation_history or []),
+                self._json(metadata or {}),
+            ),
+        )
+        self.db.commit()
+        row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (cur.lastrowid,)).fetchone()
+        return self._artifact_from_row(row)
+
+    def register_artifact_from_bytes(
+        self,
+        name: str,
+        data: bytes,
+        media_type: str,
+        filename: str | None = None,
+        provenance: dict[str, Any] | None = None,
+        status: str = "raw",
+        encoding: str | None = None,
+        parent_artifact_id: int | None = None,
+        transformation_history: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        checksum_algorithm: str = "sha-256",
+        checksum: str | None = None,
+    ) -> Artifact:
+        actual_checksum = checksum or self._checksum_bytes(data, checksum_algorithm)
+        if checksum is not None and checksum != actual_checksum:
+            raise ValueError("checksum does not match provided bytes")
+        return self.register_artifact(
+            name=name,
+            media_type=media_type,
+            size_bytes=len(data),
+            checksum=actual_checksum,
+            provenance=provenance,
+            filename=filename,
+            status=status,
+            encoding=encoding,
+            parent_artifact_id=parent_artifact_id,
+            transformation_history=transformation_history,
+            metadata=metadata,
+            checksum_algorithm=checksum_algorithm,
+        )
+
+    def derive_artifact(
+        self,
+        parent_artifact_id: int,
+        name: str,
+        media_type: str,
+        content: bytes,
+        transformation_step: str,
+        provenance: dict[str, Any] | None = None,
+        filename: str | None = None,
+        status: str = "derived",
+        encoding: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        checksum_algorithm: str = "sha-256",
+    ) -> Artifact:
+        parent = self.get_artifact(parent_artifact_id)
+        if parent is None:
+            raise ValueError(f"artifact {parent_artifact_id} does not exist")
+        history = list(parent.transformation_history)
+        history.append(transformation_step)
+        return self.register_artifact_from_bytes(
+            name=name,
+            data=content,
+            media_type=media_type,
+            filename=filename,
+            provenance=provenance or {"source_artifact_id": parent_artifact_id},
+            status=status,
+            encoding=encoding,
+            parent_artifact_id=parent_artifact_id,
+            transformation_history=history,
+            metadata=metadata or {},
+            checksum_algorithm=checksum_algorithm,
+        )
+
+    def get_artifact(self, artifact_id: int) -> Artifact | None:
+        row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (artifact_id,)).fetchone()
+        if row is None:
+            return None
+        return self._artifact_from_row(row)
+
+    def list_artifacts(self, media_type: str | None = None, parent_artifact_id: int | None = None) -> list[Artifact]:
+        if media_type is not None and parent_artifact_id is not None:
+            rows = self.db.execute(
+                "SELECT * FROM artifacts WHERE media_type = ? AND parent_artifact_id = ? ORDER BY id DESC",
+                (media_type, parent_artifact_id),
+            ).fetchall()
+        elif media_type is not None:
+            rows = self.db.execute(
+                "SELECT * FROM artifacts WHERE media_type = ? ORDER BY id DESC",
+                (media_type,),
+            ).fetchall()
+        elif parent_artifact_id is not None:
+            rows = self.db.execute(
+                "SELECT * FROM artifacts WHERE parent_artifact_id = ? ORDER BY id DESC",
+                (parent_artifact_id,),
+            ).fetchall()
+        else:
+            rows = self.db.execute("SELECT * FROM artifacts ORDER BY id DESC").fetchall()
+        return [self._artifact_from_row(row) for row in rows]
 
     def search(self, query: str, limit: int = 10) -> list[KnowledgeRecord]:
         rows = self.db.execute("SELECT * FROM knowledge ORDER BY id DESC").fetchall()
@@ -626,6 +783,24 @@ class AIDB:
             updated_at=row["updated_at"],
             depends_on=row["depends_on"],
             priority=row["priority"],
+        )
+
+    def _artifact_from_row(self, row: sqlite3.Row) -> Artifact:
+        return Artifact(
+            name=row["name"],
+            media_type=row["media_type"],
+            size_bytes=row["size_bytes"],
+            checksum=row["checksum"],
+            checksum_algorithm=row["checksum_algorithm"],
+            provenance=json.loads(row["provenance"] or "{}"),
+            status=row["status"],
+            id=row["id"],
+            filename=row["filename"],
+            encoding=row["encoding"],
+            parent_artifact_id=row["parent_artifact_id"],
+            transformation_history=json.loads(row["transformation_history"] or "[]"),
+            metadata=json.loads(row["metadata"] or "{}"),
+            created_at=row["created_at"],
         )
 
     def _tool_call_from_row(self, row: sqlite3.Row) -> ToolCall:
