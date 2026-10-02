@@ -4,6 +4,7 @@ import hashlib
 import json
 import sqlite3
 import uuid
+import warnings
 from math import sqrt
 from pathlib import Path
 from typing import Any
@@ -260,6 +261,21 @@ class AIDB:
                 FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE CASCADE
             );
 
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_artifacts_checksum_unique
+                ON artifacts(checksum_algorithm, checksum);
+
+            CREATE TRIGGER IF NOT EXISTS artifacts_immutable_update
+            BEFORE UPDATE ON artifacts
+            BEGIN
+                SELECT RAISE(ABORT, 'artifacts are immutable');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS artifacts_immutable_delete
+            BEFORE DELETE ON artifacts
+            BEGIN
+                SELECT RAISE(ABORT, 'artifacts are immutable');
+            END;
+
             CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, id);
             CREATE INDEX IF NOT EXISTS idx_messages_agent ON messages(agent_id, id);
             CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status, updated_at);
@@ -318,6 +334,68 @@ class AIDB:
             raise ValueError(f"{label} confidence must be between 0.0 and 1.0")
         return confidence
 
+    def _append_workflow_event(
+        self,
+        kind: str,
+        message: str = "",
+        agent_id: int | None = None,
+        task_id: int | None = None,
+        session_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> WorkflowEvent:
+        cur = self.db.execute(
+            "INSERT INTO workflow_events(kind, message, agent_id, task_id, session_id, metadata) VALUES (?, ?, ?, ?, ?, ?)",
+            (kind, message, agent_id, task_id, session_id, self._json(metadata or {})),
+        )
+        row = self.db.execute("SELECT * FROM workflow_events WHERE id = ?", (cur.lastrowid,)).fetchone()
+        return self._event_from_row(row)
+
+    def _assert_no_duplicate_checksum(self, checksum_algorithm: str, checksum: str) -> None:
+        existing = self.db.execute(
+            "SELECT id FROM artifacts WHERE checksum_algorithm = ? AND checksum = ? LIMIT 1",
+            (checksum_algorithm, checksum),
+        ).fetchone()
+        if existing is not None:
+            raise ValueError(
+                f"duplicate artifact checksum for algorithm={checksum_algorithm} checksum={checksum}"
+            )
+
+    def _metadata_claims_derived(self, artifact: Artifact) -> bool:
+        if artifact.parent_artifact_id is not None:
+            return True
+        if artifact.status == "derived":
+            return True
+        metadata = artifact.metadata or {}
+        if not isinstance(metadata, dict):
+            return False
+        claim = metadata.get("evidence_kind")
+        if isinstance(claim, str) and claim.lower() in {"extraction", "derived"}:
+            return True
+        return bool(metadata.get("derived_from"))
+
+    def _artifact_has_valid_extraction_link(self, artifact_id: int) -> bool:
+        row = self.db.execute(
+            "SELECT 1 FROM extraction_outputs WHERE output_artifact_id = ? LIMIT 1",
+            (artifact_id,),
+        ).fetchone()
+        return row is not None
+
+    def _validate_artifact_lineage_chain(self, artifact_id: int, seen: set[int] | None = None) -> None:
+        if seen is None:
+            seen = set()
+        current_id = artifact_id
+        while current_id is not None:
+            if current_id in seen:
+                raise ValueError("cycle detected in artifact lineage")
+            seen.add(current_id)
+            row = self.db.execute(
+                "SELECT parent_artifact_id FROM artifacts WHERE id = ?",
+                (current_id,),
+            ).fetchone()
+            if row is None:
+                break
+            current_id = row["parent_artifact_id"]
+
     def register_agent(
         self,
         name: str,
@@ -352,13 +430,24 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> Extraction:
         self._require_confidence(confidence, "extraction")
-        cur = self.db.execute(
-            "INSERT INTO extractions(input_artifact_id, method, status, confidence, metadata) VALUES (?, ?, ?, ?, ?)",
-            (input_artifact_id, method, status, confidence, self._json(metadata or {})),
-        )
-        self.db.commit()
-        row = self.db.execute("SELECT * FROM extractions WHERE id = ?", (cur.lastrowid,)).fetchone()
-        return self._extraction_from_row(row)
+        try:
+            self.db.execute("BEGIN")
+            cur = self.db.execute(
+                "INSERT INTO extractions(input_artifact_id, method, status, confidence, metadata) VALUES (?, ?, ?, ?, ?)",
+                (input_artifact_id, method, status, confidence, self._json(metadata or {})),
+            )
+            row = self.db.execute("SELECT * FROM extractions WHERE id = ?", (cur.lastrowid,)).fetchone()
+            extraction = self._extraction_from_row(row)
+            self._append_workflow_event(
+                "extraction_created",
+                f"extraction {extraction.id} created",
+                metadata={"extraction_id": extraction.id, "input_artifact_id": input_artifact_id},
+            )
+            self.db.commit()
+            return extraction
+        except Exception:
+            self.db.rollback()
+            raise
 
     def record_extraction_output(
         self,
@@ -369,13 +458,28 @@ class AIDB:
         if sequence is None:
             rows = self.db.execute("SELECT COUNT(*) AS n FROM extraction_outputs WHERE extraction_id = ?", (extraction_id,)).fetchone()
             sequence = int(rows["n"]) if rows is not None else 0
-        cur = self.db.execute(
-            "INSERT INTO extraction_outputs(extraction_id, output_artifact_id, sequence) VALUES (?, ?, ?)",
-            (extraction_id, output_artifact_id, sequence),
-        )
-        self.db.commit()
-        row = self.db.execute("SELECT * FROM extraction_outputs WHERE id = ?", (cur.lastrowid,)).fetchone()
-        return self._extraction_output_from_row(row)
+        try:
+            self.db.execute("BEGIN")
+            cur = self.db.execute(
+                "INSERT INTO extraction_outputs(extraction_id, output_artifact_id, sequence) VALUES (?, ?, ?)",
+                (extraction_id, output_artifact_id, sequence),
+            )
+            row = self.db.execute("SELECT * FROM extraction_outputs WHERE id = ?", (cur.lastrowid,)).fetchone()
+            extraction_output = self._extraction_output_from_row(row)
+            self._append_workflow_event(
+                "extraction_output_recorded",
+                f"output artifact {output_artifact_id} recorded for extraction {extraction_id}",
+                metadata={
+                    "extraction_id": extraction_id,
+                    "output_artifact_id": output_artifact_id,
+                    "sequence": sequence,
+                },
+            )
+            self.db.commit()
+            return extraction_output
+        except Exception:
+            self.db.rollback()
+            raise
 
     def create_interpretation(
         self,
@@ -386,13 +490,24 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> Interpretation:
         self._require_confidence(confidence, "interpretation")
-        cur = self.db.execute(
-            "INSERT INTO interpretations(output_artifact_id, claim, interpreter, confidence, metadata) VALUES (?, ?, ?, ?, ?)",
-            (output_artifact_id, claim, interpreter, confidence, self._json(metadata or {})),
-        )
-        self.db.commit()
-        row = self.db.execute("SELECT * FROM interpretations WHERE id = ?", (cur.lastrowid,)).fetchone()
-        return self._interpretation_from_row(row)
+        try:
+            self.db.execute("BEGIN")
+            cur = self.db.execute(
+                "INSERT INTO interpretations(output_artifact_id, claim, interpreter, confidence, metadata) VALUES (?, ?, ?, ?, ?)",
+                (output_artifact_id, claim, interpreter, confidence, self._json(metadata or {})),
+            )
+            row = self.db.execute("SELECT * FROM interpretations WHERE id = ?", (cur.lastrowid,)).fetchone()
+            interpretation = self._interpretation_from_row(row)
+            self._append_workflow_event(
+                "interpretation_created",
+                f"interpretation {interpretation.id} created",
+                metadata={"interpretation_id": interpretation.id, "output_artifact_id": output_artifact_id},
+            )
+            self.db.commit()
+            return interpretation
+        except Exception:
+            self.db.rollback()
+            raise
 
     def create_knowledge(
         self,
@@ -402,13 +517,24 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> Knowledge:
         self._require_confidence(confidence, "knowledge")
-        cur = self.db.execute(
-            "INSERT INTO epistemic_knowledge(interpretation_id, status, confidence, metadata) VALUES (?, ?, ?, ?)",
-            (interpretation_id, status, confidence, self._json(metadata or {})),
-        )
-        self.db.commit()
-        row = self.db.execute("SELECT * FROM epistemic_knowledge WHERE id = ?", (cur.lastrowid,)).fetchone()
-        return self._knowledge_from_row(row)
+        try:
+            self.db.execute("BEGIN")
+            cur = self.db.execute(
+                "INSERT INTO epistemic_knowledge(interpretation_id, status, confidence, metadata) VALUES (?, ?, ?, ?)",
+                (interpretation_id, status, confidence, self._json(metadata or {})),
+            )
+            row = self.db.execute("SELECT * FROM epistemic_knowledge WHERE id = ?", (cur.lastrowid,)).fetchone()
+            knowledge = self._knowledge_from_row(row)
+            self._append_workflow_event(
+                "knowledge_created",
+                f"knowledge {knowledge.id} created",
+                metadata={"knowledge_id": knowledge.id, "interpretation_id": interpretation_id, "status": status},
+            )
+            self.db.commit()
+            return knowledge
+        except Exception:
+            self.db.rollback()
+            raise
 
     def create_knowledge_relation(
         self,
@@ -421,13 +547,29 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> KnowledgeRelation:
         self._require_confidence(confidence, "knowledge relation")
-        cur = self.db.execute(
-            "INSERT INTO epistemic_knowledge_relations(source_knowledge_id, target_knowledge_id, relation, confidence, evidence_artifact_id, created_by, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (source_knowledge_id, target_knowledge_id, relation, confidence, evidence_artifact_id, created_by, self._json(metadata or {})),
-        )
-        self.db.commit()
-        row = self.db.execute("SELECT * FROM epistemic_knowledge_relations WHERE id = ?", (cur.lastrowid,)).fetchone()
-        return self._knowledge_relation_from_row(row)
+        try:
+            self.db.execute("BEGIN")
+            cur = self.db.execute(
+                "INSERT INTO epistemic_knowledge_relations(source_knowledge_id, target_knowledge_id, relation, confidence, evidence_artifact_id, created_by, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (source_knowledge_id, target_knowledge_id, relation, confidence, evidence_artifact_id, created_by, self._json(metadata or {})),
+            )
+            row = self.db.execute("SELECT * FROM epistemic_knowledge_relations WHERE id = ?", (cur.lastrowid,)).fetchone()
+            relation_obj = self._knowledge_relation_from_row(row)
+            self._append_workflow_event(
+                "knowledge_relation_created",
+                f"relation {relation_obj.id} created",
+                metadata={
+                    "relation_id": relation_obj.id,
+                    "source_knowledge_id": source_knowledge_id,
+                    "target_knowledge_id": target_knowledge_id,
+                    "relation": relation,
+                },
+            )
+            self.db.commit()
+            return relation_obj
+        except Exception:
+            self.db.rollback()
+            raise
 
     def remember_knowledge(
         self,
@@ -440,25 +582,38 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> Memory:
         self._require_confidence(confidence, "memory")
-        cur = self.db.execute(
-            "INSERT INTO epistemic_memory(agent_id, knowledge_id, kind, confidence, status, context, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (agent_id, knowledge_id, kind, confidence, status, self._json(context or {}), self._json(metadata or {})),
-        )
-        self.db.commit()
-        row = self.db.execute("SELECT * FROM epistemic_memory WHERE id = ?", (cur.lastrowid,)).fetchone()
-        return self._memory_from_row(row)
+        try:
+            self.db.execute("BEGIN")
+            cur = self.db.execute(
+                "INSERT INTO epistemic_memory(agent_id, knowledge_id, kind, confidence, status, context, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (agent_id, knowledge_id, kind, confidence, status, self._json(context or {}), self._json(metadata or {})),
+            )
+            row = self.db.execute("SELECT * FROM epistemic_memory WHERE id = ?", (cur.lastrowid,)).fetchone()
+            memory = self._memory_from_row(row)
+            self._append_workflow_event(
+                "memory_created",
+                f"memory {memory.id} created",
+                metadata={"memory_id": memory.id, "agent_id": agent_id, "knowledge_id": knowledge_id},
+            )
+            self.db.commit()
+            return memory
+        except Exception:
+            self.db.rollback()
+            raise
 
     def trace_artifact_lineage(self, artifact_id: int) -> list[Artifact]:
         seen: set[int] = set()
         chain: list[Artifact] = []
         current_id = artifact_id
-        while current_id is not None and current_id not in seen:
+        while current_id is not None:
+            if current_id in seen:
+                raise ValueError("cycle detected in artifact lineage")
+            seen.add(current_id)
             row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (current_id,)).fetchone()
             if row is None:
                 break
             artifact = self._artifact_from_row(row)
             chain.append(artifact)
-            seen.add(current_id)
             current_id = artifact.parent_artifact_id
         return chain
 
@@ -485,23 +640,35 @@ class AIDB:
             )
         output_artifact = self._artifact_from_row(output_artifact_row)
 
+        # direct-origin artifacts are valid only when they are truly source artifacts.
+        if output_artifact.parent_artifact_id is None and not self._metadata_claims_derived(output_artifact):
+            return EpistemicChain(memory, knowledge, interpretation, output_artifact, None, output_artifact)
+
+        if output_artifact.parent_artifact_id is not None:
+            self._validate_artifact_lineage_chain(output_artifact.id)
+
+        if self._metadata_claims_derived(output_artifact) and not self._artifact_has_valid_extraction_link(output_artifact.id):
+            raise EpistemicChainBrokenError(
+                "artifact metadata claims extraction provenance but no valid extraction/output relationship exists"
+            )
+
         extraction_row = self.db.execute(
             "SELECT e.* FROM extractions e JOIN extraction_outputs eo ON eo.extraction_id = e.id WHERE eo.output_artifact_id = ? ORDER BY eo.sequence, e.id LIMIT 1",
             (output_artifact.id,),
         ).fetchone()
+        if extraction_row is None:
+            raise EpistemicChainBrokenError(
+                f"artifact {output_artifact.id} is derived but has no valid extraction lineage"
+            )
 
-        if extraction_row is not None:
-            extraction = self._extraction_from_row(extraction_row)
-            source_row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (extraction.input_artifact_id,)).fetchone()
-            if source_row is None:
-                raise EpistemicChainBrokenError(
-                    f"extraction {extraction.id} references input_artifact_id {extraction.input_artifact_id}, which does not exist"
-                )
-            source_artifact = self._artifact_from_row(source_row)
-            return EpistemicChain(memory, knowledge, interpretation, output_artifact, extraction, source_artifact)
-
-        # Direct-origin path is valid; no extraction required.
-        return EpistemicChain(memory, knowledge, interpretation, output_artifact, None, output_artifact)
+        extraction = self._extraction_from_row(extraction_row)
+        source_row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (extraction.input_artifact_id,)).fetchone()
+        if source_row is None:
+            raise EpistemicChainBrokenError(
+                f"extraction {extraction.id} references input_artifact_id {extraction.input_artifact_id}, which does not exist"
+            )
+        source_artifact = self._artifact_from_row(source_row)
+        return EpistemicChain(memory, knowledge, interpretation, output_artifact, extraction, source_artifact)
 
     def get_artifact(self, artifact_id: int) -> Artifact | None:
         row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (artifact_id,)).fetchone()
@@ -524,26 +691,38 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
         checksum_algorithm: str = "sha-256",
     ) -> Artifact:
-        cur = self.db.execute(
-            "INSERT INTO artifacts(name, media_type, filename, size_bytes, checksum, checksum_algorithm, provenance, status, encoding, parent_artifact_id, transformation_history, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                name,
-                media_type,
-                filename,
-                size_bytes,
-                checksum,
-                checksum_algorithm,
-                self._json(provenance or {}),
-                status,
-                encoding,
-                parent_artifact_id,
-                self._json(transformation_history or []),
-                self._json(metadata or {}),
-            ),
-        )
-        self.db.commit()
-        row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (cur.lastrowid,)).fetchone()
-        return self._artifact_from_row(row)
+        self._assert_no_duplicate_checksum(checksum_algorithm, checksum)
+        try:
+            self.db.execute("BEGIN")
+            cur = self.db.execute(
+                "INSERT INTO artifacts(name, media_type, filename, size_bytes, checksum, checksum_algorithm, provenance, status, encoding, parent_artifact_id, transformation_history, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    name,
+                    media_type,
+                    filename,
+                    size_bytes,
+                    checksum,
+                    checksum_algorithm,
+                    self._json(provenance or {}),
+                    status,
+                    encoding,
+                    parent_artifact_id,
+                    self._json(transformation_history or []),
+                    self._json(metadata or {}),
+                ),
+            )
+            row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (cur.lastrowid,)).fetchone()
+            artifact = self._artifact_from_row(row)
+            self._append_workflow_event(
+                "artifact_created",
+                f"artifact {artifact.id} created",
+                metadata={"artifact_id": artifact.id, "checksum": checksum, "checksum_algorithm": checksum_algorithm},
+            )
+            self.db.commit()
+            return artifact
+        except Exception:
+            self.db.rollback()
+            raise
 
     def register_artifact_from_bytes(
         self,
@@ -620,13 +799,7 @@ class AIDB:
         session_id: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> WorkflowEvent:
-        cur = self.db.execute(
-            "INSERT INTO workflow_events(kind, message, agent_id, task_id, session_id, metadata) VALUES (?, ?, ?, ?, ?, ?)",
-            (kind, message, agent_id, task_id, session_id, self._json(metadata or {})),
-        )
-        self.db.commit()
-        row = self.db.execute("SELECT * FROM workflow_events WHERE id = ?", (cur.lastrowid,)).fetchone()
-        return self._event_from_row(row)
+        return self._append_workflow_event(kind, message, agent_id, task_id, session_id, metadata)
 
     def list_artifacts(self, media_type: str | None = None, parent_artifact_id: int | None = None) -> list[Artifact]:
         if media_type is not None and parent_artifact_id is not None:
@@ -656,6 +829,11 @@ class AIDB:
         importance: float = 0.5,
         metadata: dict[str, Any] | None = None,
     ) -> Memory:
+        warnings.warn(
+            "AIDB.remember() is legacy compatibility code and is not the canonical epistemic API. Use remember_knowledge() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         cur = self.db.execute(
             "INSERT INTO memories(agent_id, content, kind, importance, metadata) VALUES (?, ?, ?, ?, ?)",
             (agent_id, content, kind, importance, self._json(metadata or {})),
@@ -664,6 +842,11 @@ class AIDB:
         return Memory(agent_id=agent_id, knowledge_id=0, kind=kind, confidence=importance, status="active", context={}, metadata=metadata or {}, id=cur.lastrowid)
 
     def recall(self, agent_id: int, query: str = "", limit: int = 20) -> list[Memory]:
+        warnings.warn(
+            "AIDB.recall() is legacy compatibility code. Use epistemic lineage and memory queries instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         rows = self.db.execute(
             "SELECT * FROM memories WHERE agent_id=? ORDER BY importance DESC, id DESC",
             (agent_id,),
@@ -673,7 +856,16 @@ class AIDB:
         for row in rows:
             if not tokens or tokens & set(row["content"].lower().split()):
                 results.append(
-                    Memory(agent_id=row["agent_id"], knowledge_id=0, kind=row["kind"], confidence=float(row["importance"]), status="active", context={}, metadata=json.loads(row["metadata"]), id=row["id"])
+                    Memory(
+                        agent_id=row["agent_id"],
+                        knowledge_id=0,
+                        kind=row["kind"],
+                        confidence=float(row["importance"]),
+                        status="active",
+                        context={},
+                        metadata=json.loads(row["metadata"]),
+                        id=row["id"],
+                    )
                 )
             if len(results) >= limit:
                 break
@@ -837,6 +1029,11 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
         agent_id: int | None = None,
     ) -> KnowledgeRecord:
+        warnings.warn(
+            "AIDB.add_document() is legacy compatibility code and is not the canonical epistemic API. Use create_knowledge() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         cur = self.db.execute(
             "INSERT INTO knowledge(agent_id, title, content, tags, metadata) VALUES (?, ?, ?, ?, ?)",
             (agent_id, title, content, self._json(tags or []), self._json(metadata or {})),
@@ -845,6 +1042,11 @@ class AIDB:
         return KnowledgeRecord(title, content, tags or [], metadata or {}, 0.0, cur.lastrowid, agent_id)
 
     def search(self, query: str, limit: int = 10) -> list[KnowledgeRecord]:
+        warnings.warn(
+            "AIDB.search() is legacy compatibility code and is not the canonical retrieval API.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         rows = self.db.execute("SELECT * FROM knowledge ORDER BY id DESC").fetchall()
         tokens = set(query.lower().split())
         scored: list[KnowledgeRecord] = []
