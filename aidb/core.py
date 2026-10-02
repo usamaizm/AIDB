@@ -100,13 +100,83 @@ class Artifact:
 
 
 @dataclass
+class Extraction:
+    input_artifact_id: int
+    method: str
+    status: str = "pending"
+    confidence: float = 0.5
+    id: int | None = None
+    created_at: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ExtractionOutput:
+    extraction_id: int
+    output_artifact_id: int
+    sequence: int | None = None
+    id: int | None = None
+
+
+@dataclass
+class Interpretation:
+    output_artifact_id: int
+    claim: str
+    interpreter: str
+    confidence: float = 0.5
+    id: int | None = None
+    created_at: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class Knowledge:
+    interpretation_id: int
+    status: str = "proposed"
+    confidence: float = 0.5
+    id: int | None = None
+    created_at: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class KnowledgeRelation:
+    source_knowledge_id: int
+    target_knowledge_id: int
+    relation: str
+    confidence: float = 0.5
+    evidence_artifact_id: int | None = None
+    created_by: str | None = None
+    id: int | None = None
+    created_at: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class Memory:
     agent_id: int
-    content: str
+    knowledge_id: int
     kind: str = "fact"
-    importance: float = 0.5
-    metadata: dict[str, Any] = field(default_factory=dict)
+    confidence: float = 0.5
+    status: str = "active"
+    context: dict[str, Any] = field(default_factory=dict)
     id: int | None = None
+    created_at: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class EpistemicChain:
+    memory: Memory
+    knowledge: Knowledge
+    interpretation: Interpretation
+    output_artifact: Artifact
+    extraction: Extraction | None
+    source_artifact: Artifact
+
+
+class EpistemicChainBrokenError(RuntimeError):
+    """Raised when an epistemic lineage invariant cannot be satisfied."""
 
 
 @dataclass
@@ -151,3 +221,24 @@ class Message:
     metadata: dict[str, Any] = field(default_factory=dict)
     id: int | None = None
     created_at: str | None = None
+
+
+__all__ = [
+    "Agent",
+    "Artifact",
+    "EpistemicChain",
+    "EpistemicChainBrokenError",
+    "Extraction",
+    "ExtractionOutput",
+    "Interpretation",
+    "Knowledge",
+    "KnowledgeRecord",
+    "KnowledgeRelation",
+    "Memory",
+    "Message",
+    "Session",
+    "Task",
+    "Tool",
+    "ToolCall",
+    "WorkflowEvent",
+]
