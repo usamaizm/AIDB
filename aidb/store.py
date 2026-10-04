@@ -973,6 +973,15 @@ class AIDB:
         s=self.current_specification()
         return {"id":s.id,"version":s.version,"node":{"id":s.node_id},"visibility":s.visibility,"capabilities":s.capabilities,"resources":s.resource_types,"transports":s.transports,"extensions":s.extensions,"constraints":s.constraints,"issued_at":s.issued_at}
 
+    def verify_home(self):
+        issues=[]
+        for row in self.db.execute("SELECT id,resource_id,operation,previous_revision,new_revision FROM home_changes ORDER BY id").fetchall():
+            if row["operation"] in {"create","update","publish"} and row["resource_id"]:
+                resource=self.db.execute("SELECT revision FROM home_resources WHERE id=?", (row["resource_id"],)).fetchone()
+                if resource is None: issues.append("missing resource:"+row["resource_id"])
+                if row["new_revision"] is not None and resource is not None and row["new_revision"] > resource["revision"]: issues.append("future revision:"+str(row["id"]))
+        return {"ok": not issues, "issues": issues}
+
     def export_home(self, include_private=True):
         tables = ["node_identity", "node_specifications", "home_resources", "notes", "resource_relations", "home_changes"]
         payload = {"format": "aidb-home-v1", "tables": {}}
@@ -982,6 +991,7 @@ class AIDB:
             else:
                 rows = self.db.execute(f"SELECT * FROM {table}").fetchall()
             payload["tables"][table] = [dict(row) for row in rows]
+        payload["verification"] = self.verify_home()
         return payload
 
     def import_home(self, payload):
