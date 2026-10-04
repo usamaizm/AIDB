@@ -11,7 +11,7 @@ def test_public_http_surface_exposes_spec_and_notes():
     db=AIDB(":memory:")
     db.initialize_home(visibility="public")
     db.create_note("public","hello",visibility="public")
-    server=ThreadingHTTPServer(("127.0.0.1",0),create_handler(db))
+    server=ThreadingHTTPServer(("127.0.0.1",0),create_handler(db,"test-token"))
     Thread(target=server.serve_forever,daemon=True).start()
     base="http://127.0.0.1:"+str(server.server_port)
     try:
