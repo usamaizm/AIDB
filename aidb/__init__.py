@@ -2,6 +2,9 @@
 
 from .core import (
     Agent,
+    Note,
+    Resource,
+    Specification,
     Artifact,
     KnowledgeRecord,
     Memory,
@@ -18,6 +21,9 @@ from .store import AIDB
 __all__ = [
     "AIDB",
     "Agent",
+    "Note",
+    "Resource",
+    "Specification",
     "Artifact",
     "KnowledgeRecord",
     "Memory",
