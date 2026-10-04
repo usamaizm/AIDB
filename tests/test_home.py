@@ -49,3 +49,11 @@ def test_home_change_history_is_ordered_and_incremental():
     assert changes[0]["resource_id"] == first.id
     assert changes[1]["resource_id"] == second.id
     assert db.list_changes(after_id=changes[0]["id"])[0]["id"] == changes[1]["id"]
+
+
+def test_publish_is_idempotent():
+    db=AIDB(":memory:")
+    note=db.create_note("n","c")
+    db.publish_resource(note.id)
+    db.publish_resource(note.id)
+    assert len([c for c in db.list_changes() if c["operation"]=="publish"]) == 1
