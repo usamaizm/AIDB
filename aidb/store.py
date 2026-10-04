@@ -970,7 +970,7 @@ class AIDB:
         return {"id":s.id,"version":s.version,"node":{"id":s.node_id},"visibility":s.visibility,"capabilities":s.capabilities,"resources":s.resource_types,"transports":s.transports,"extensions":s.extensions,"constraints":s.constraints,"issued_at":s.issued_at}
 
     def export_home(self, include_private=True):
-        tables = ["node_identity", "node_specifications", "home_resources", "notes"]
+        tables = ["node_identity", "node_specifications", "home_resources", "notes", "home_changes"]
         payload = {"format": "aidb-home-v1", "tables": {}}
         for table in tables:
             if table in {"home_resources", "notes"} and not include_private:
