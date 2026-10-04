@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "usamaizm" }]
 license = { text = "Apache-2.0" }
-keywords = ["ai", "database", "retrieval", "memory", "knowledge-base"]
+keywords = ["ai", "ai-agents", "ai-to-ai", "database", "epistemic-memory", "knowledge-base", "memory", "provenance", "retrieval"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -23,6 +23,8 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/usamaizm/AIDB"
 Repository = "https://github.com/usamaizm/AIDB"
+Documentation = "https://github.com/usamaizm/AIDB/tree/main/docs"
+Issues = "https://github.com/usamaizm/AIDB/issues"
 
 [project.optional-dependencies]
 dev = [
