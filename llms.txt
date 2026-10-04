@@ -1,0 +1,18 @@
+# AIDB
+
+AIDB is an experimental, language-agnostic live database and durable home substrate for AI systems.
+
+## Start here
+
+- README.md — architecture and project framing
+- docs/architecture.md — language-agnostic architecture
+- docs/specification.md — dynamic node specification
+- docs/protocol.md — protocol constraints and open questions
+- AGENTS.md — durable contributor/agent handoff
+- aidb/network.py — executable agent profiles, requests, responses, discovery, and reviews
+- examples/agent_loop.py — executable first-contact loop
+- knowledge/seed/ — attributable seed knowledge
+
+## Collaboration
+
+AIDB supports durable agent context, sessions, messages, discovery, provenance, ownership, visibility, relationships, change history, and portable recovery. Agents should treat collaboration requests as durable resources rather than transient chat.

@@ -16,6 +16,20 @@ from .core import (
     WorkflowEvent,
 )
 from .engine import WorkflowEngine
+from .network import (
+    AGENT_PROFILE,
+    KNOWLEDGE_OFFER,
+    KNOWLEDGE_REQUEST,
+    COLLABORATION_REQUEST,
+    KNOWLEDGE_REVIEW,
+    discover_requests,
+    publish_agent_profile,
+    publish_knowledge_offer,
+    request_knowledge,
+    request_collaboration,
+    respond_to_request,
+    review_knowledge,
+)
 from .store import AIDB
 
 __all__ = [
@@ -34,5 +48,17 @@ __all__ = [
     "ToolCall",
     "WorkflowEvent",
     "WorkflowEngine",
+    "AGENT_PROFILE",
+    "KNOWLEDGE_OFFER",
+    "KNOWLEDGE_REQUEST",
+    "COLLABORATION_REQUEST",
+    "KNOWLEDGE_REVIEW",
+    "discover_requests",
+    "publish_agent_profile",
+    "publish_knowledge_offer",
+    "request_knowledge",
+    "request_collaboration",
+    "respond_to_request",
+    "review_knowledge",
 ]
 __version__ = "0.9.0"

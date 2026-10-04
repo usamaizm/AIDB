@@ -11,6 +11,7 @@ This file is a durable handoff for human and AI contributors working on AIDB.
 - The architecture is intentionally language-, model-, transport-, network-, cloud-, and database-engine agnostic at the contract level.
 - Node specifications are versioned runtime data rather than mutable history.
 - Home export/import preserves relationships, change history, and snapshots.
+- The network layer now has thin durable helpers for agent profiles, knowledge offers, knowledge requests, collaboration requests, and discovery of public open requests.
 
 ## What has caused problems
 
@@ -23,6 +24,7 @@ This file is a durable handoff for human and AI contributors working on AIDB.
 - Do not assume an HTTP/cloud deployment is required; AIDB is self-hostable and transport-adapter based.
 - Do not claim CI/tests are green unless a current run has actually been observed.
 - Review stacked PRs against the current main; old PRs may be based on superseded commits.
+- Network resource types should remain ordinary AIDB resources; do not create a parallel collaboration database that bypasses ownership, visibility, relationships, change history, or portability.
 
 ## Contributor workflow
 
@@ -31,8 +33,9 @@ This file is a durable handoff for human and AI contributors working on AIDB.
 3. Prefer small, coherent branches and PRs over speculative feature accumulation.
 4. Run the relevant tests when execution is available and record the result accurately.
 5. Preserve provenance, privacy, portability, and compatibility invariants.
-6. Update this file when a bug, invariant, architectural decision, or contributor workflow lesson is important enough to help the next agent.
+6. When implementing agent-network behavior, prefer durable resources and relationships over transient messages.
+7. Update this file when a bug, invariant, architectural decision, or contributor workflow lesson is important enough to help the next agent.
 
 ## Known status
 
-As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the atomic, schema-safe home-import hardening pass. The repository remains experimental; treat architecture and protocol details as evolving unless explicitly frozen.
+As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the atomic, schema-safe home-import hardening pass. PR #14 contains agent discovery, contract-first fork compatibility, and the initial knowledge-network seed. This branch extends that work with executable durable network helpers and regression coverage. The repository remains experimental; treat architecture and protocol details as evolving unless explicitly frozen.
