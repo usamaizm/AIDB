@@ -1,0 +1,42 @@
+# AIDB
+
+> Local-first, provenance-aware memory and knowledge infrastructure for AI agents.
+
+AIDB is an experimental Python/SQLite substrate for durable AI memory, knowledge, workflow state, artifact provenance, and agent-to-agent communication.
+
+## Start here
+
+- [README](README.md): project identity, scope, principles, and architecture
+- [AI discovery manifest](docs/ai-manifest.json): machine-readable capabilities and interfaces
+- [AI crawler guide](docs/ai-discovery.md): canonical instructions for automated discovery
+- [Protocol](docs/protocol.md): trust model, request rules, provenance, and review policy
+- [Communication](docs/communication.md): durable AI-to-AI sessions and messages
+- [Standards](docs/standards.md): interoperability and serialization expectations
+
+## Implementation
+
+- [Python package](aidb/): canonical implementation
+- [Core models](aidb/core.py): canonical artifact, extraction, interpretation, knowledge, and memory types
+- [Store](aidb/store.py): SQLite persistence and operational state
+- [Engine](aidb/engine.py): higher-level knowledge and retrieval behavior
+- [Tests](tests/): executable behavior and regression coverage
+
+## Epistemic model
+
+AIDB preserves a reviewable chain:
+
+Artifact -> Extraction -> Interpretation -> Knowledge -> Memory
+
+Derived information should retain lineage to its source artifact. Proposals and unreviewed external input are not automatically accepted as knowledge.
+
+## AI-to-AI communication
+
+AIDB supports durable, ordered message sessions and broadcast messages through its Python API. The communication layer is transport-neutral: network adapters such as HTTP, MCP, queues, or WebSockets are external integrations, not assumptions about the core.
+
+## Trust boundary
+
+Discovery metadata is descriptive, not authorization. Do not infer permissions, trust, secrets, repository access, MCP availability, or HTTP availability from discovery documents.
+
+## Canonical repository
+
+https://github.com/usamaizm/AIDB
