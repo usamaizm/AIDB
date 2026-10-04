@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 from .store import AIDB
 
-def create_handler(db: AIDB):
+def create_handler(db: AIDB, auth_token: str | None = None):
     class Handler(BaseHTTPRequestHandler):
         def _send(self, status: int, payload) -> None:
             data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
@@ -32,8 +33,11 @@ def create_handler(db: AIDB):
 
         def do_POST(self):
             path = urlparse(self.path).path
-            if self.headers.get('Authorization') is None:
-                return self._send(403, {'error': 'writes require authorization'})
+            if auth_token is None:
+                return self._send(503, {'error': 'network writes are disabled until an authorization token is configured'})
+            expected = 'Bearer ' + auth_token
+            if not secrets.compare_digest(self.headers.get('Authorization', ''), expected):
+                return self._send(401, {'error': 'unauthorized'})
             try:
                 body = self._json_body()
                 if path == '/v1/notes':
@@ -48,8 +52,8 @@ def create_handler(db: AIDB):
         def log_message(self, *_args): return
     return Handler
 
-def serve(db_path: str='aidb.sqlite3', host: str='127.0.0.1', port: int=8765) -> None:
+def serve(db_path: str='aidb.sqlite3', host: str='127.0.0.1', port: int=8765, auth_token: str | None = None) -> None:
     db=AIDB(db_path); db.initialize_home(visibility='public')
-    server=ThreadingHTTPServer((host,port), create_handler(db))
+    server=ThreadingHTTPServer((host,port), create_handler(db, auth_token))
     try: server.serve_forever()
     finally: server.server_close(); db.close()
