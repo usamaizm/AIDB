@@ -57,3 +57,19 @@ def test_publish_is_idempotent():
     db.publish_resource(note.id)
     db.publish_resource(note.id)
     assert len([c for c in db.list_changes() if c["operation"]=="publish"]) == 1
+
+
+def test_relationships_and_optimistic_updates():
+    db=AIDB(":memory:")
+    a=db.create_note("a","A")
+    b=db.create_note("b","B")
+    db.relate_resources(a.id,b.id,"supports")
+    assert db.resource_relations(a.id)[0]["relation"]=="supports"
+    updated=db.update_resource(a.id,content="A2",owner=None,expected_revision=1)
+    assert updated.revision==2
+    try:
+        db.update_resource(a.id,content="stale",expected_revision=1)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("stale revision must be rejected")
