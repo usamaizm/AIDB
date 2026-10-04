@@ -957,6 +957,29 @@ class AIDB:
         s=self.current_specification()
         return {"id":s.id,"version":s.version,"node":{"id":s.node_id},"visibility":s.visibility,"capabilities":s.capabilities,"resources":s.resource_types,"transports":s.transports,"extensions":s.extensions,"constraints":s.constraints,"issued_at":s.issued_at}
 
+    def export_home(self, include_private=True):
+        tables = ["node_identity", "node_specifications", "home_resources", "notes"]
+        payload = {"format": "aidb-home-v1", "tables": {}}
+        for table in tables:
+            if table in {"home_resources", "notes"} and not include_private:
+                rows = self.db.execute(f"SELECT * FROM {table} WHERE visibility='public'").fetchall()
+            else:
+                rows = self.db.execute(f"SELECT * FROM {table}").fetchall()
+            payload["tables"][table] = [dict(row) for row in rows]
+        return payload
+
+    def import_home(self, payload):
+        if payload.get("format") != "aidb-home-v1":
+            raise ValueError("unsupported home format")
+        tables = payload.get("tables", {})
+        for table in ("node_identity", "node_specifications", "home_resources", "notes"):
+            for row in tables.get(table, []):
+                columns=list(row)
+                placeholders=",".join("?" for _ in columns)
+                self.db.execute("INSERT OR IGNORE INTO "+table+" ("+",".join(columns)+") VALUES ("+placeholders+")", [row[k] for k in columns])
+        self.db.commit()
+        return self.current_specification()
+
     def close(self) -> None:
         self.db.close()
 
