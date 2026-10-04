@@ -490,6 +490,18 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> Interpretation:
         self._require_confidence(confidence, "interpretation")
+        artifact = self.db.execute(
+            "SELECT parent_artifact_id FROM artifacts WHERE id = ?",
+            (output_artifact_id,),
+        ).fetchone()
+        if artifact is None:
+            raise ValueError(f"artifact {output_artifact_id} does not exist")
+        if artifact["parent_artifact_id"] is not None:
+            self._validate_artifact_lineage_chain(output_artifact_id)
+            if not self._artifact_has_valid_extraction_link(output_artifact_id):
+                raise EpistemicChainBrokenError(
+                    f"artifact {output_artifact_id} is derived but has no valid extraction lineage"
+                )
         try:
             self.db.execute("BEGIN")
             cur = self.db.execute(
