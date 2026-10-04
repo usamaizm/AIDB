@@ -9,7 +9,7 @@ description = "A lightweight AI knowledge base for local memory and retrieval"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "usamaizm" }]
-license = { text = "Apache-2.0" }
+license = { file = "LICENSE" }
 keywords = ["ai", "database", "retrieval", "memory", "knowledge-base"]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -28,6 +28,9 @@ Repository = "https://github.com/usamaizm/AIDB"
 dev = [
     "pytest>=8.0",
 ]
+
+[tool.setuptools]
+packages = ["aidb"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
