@@ -269,7 +269,10 @@ class Message:
 
 
 __all__ = [
-    "Agent",\n    "Note",\n    "Resource",\n    "Specification",
+    "Agent",
+    "Note",
+    "Resource",
+    "Specification",
     "Artifact",
     "EpistemicChain",
     "EpistemicChainBrokenError",
