@@ -26,3 +26,21 @@ def test_create_interpretation_rejects_unlinked_derived_artifact(tmp_path) -> No
             claim="claim",
             interpreter="test",
         )
+
+
+def test_create_interpretation_rejects_derived_status_without_extraction(tmp_path) -> None:
+    db = AIDB(tmp_path / "derived-status.sqlite3")
+    artifact = db.register_artifact(
+        name="derived.txt",
+        media_type="text/plain",
+        size_bytes=7,
+        checksum="checksum-1",
+        status="derived",
+    )
+
+    with pytest.raises(ValueError, match="no valid extraction lineage"):
+        db.create_interpretation(
+            output_artifact_id=artifact.id,
+            claim="claim",
+            interpreter="test",
+        )
