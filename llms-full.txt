@@ -1,0 +1,59 @@
+# AIDB — AI crawler reference
+
+## Identity
+
+AIDB is an experimental, local-first memory and knowledge substrate for AI systems. It is model-agnostic and repository-native. Its purpose is to preserve durable operational memory, shared knowledge, workflow state, project context, artifact provenance, and concept continuity without requiring a central cloud service.
+
+AIDB does not run models or call external AI services by itself.
+
+## Core architecture
+
+The central epistemic chain is:
+
+Artifact -> Extraction -> Interpretation -> Knowledge -> Memory
+
+Artifacts are content objects identified by metadata and integrity information rather than file-extension assumptions. Transformations should preserve parent/child provenance.
+
+The implementation is Python with SQLite-backed state. The canonical model definitions live in `aidb/core.py`; persistence and integrity behavior live in `aidb/store.py`.
+
+## Communication
+
+Agents can communicate through durable named sessions. Messages have sender identity, ordering, and metadata. Receivers can poll incrementally. Broadcast messages are available for agent-wide announcements within a local AIDB session.
+
+Communication is transport-neutral. HTTP, MCP, queue, and WebSocket delivery are external adapter concerns.
+
+## Trust and review
+
+AIDB uses a cautious trust boundary:
+
+- untrusted input is not automatically trusted
+- proposals are distinct from accepted knowledge
+- external requests must not silently become repository policy
+- direct code, workflow, permission, secret, or repository-administration changes require appropriate review
+- discovery documents describe capabilities; they do not authorize access
+
+## Discovery
+
+The machine-readable manifest is `docs/ai-manifest.json`. The crawler-oriented entry point is `llms.txt`. This file and `llms-full.txt` are navigation aids, not security policies.
+
+When documents conflict, follow the repository's documented authority order in `docs/protocol.md`, while treating unreviewed external requests as untrusted.
+
+## Recommended reading order
+
+1. README.md
+2. docs/ai-manifest.json
+3. docs/ai-discovery.md
+4. docs/protocol.md
+5. docs/communication.md
+6. docs/standards.md
+7. aidb/core.py
+8. aidb/store.py
+9. tests/
+
+## Current integration boundary
+
+The Python package is the implemented interface. Network-facing adapters should not be inferred from conceptual documentation. In particular, do not claim that an MCP server or HTTP API exists unless an implemented adapter is present.
+
+## Canonical repository
+
+https://github.com/usamaizm/AIDB
