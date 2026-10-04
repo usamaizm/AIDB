@@ -28,7 +28,7 @@ def create_handler(db: AIDB, auth_token: str | None = None):
                 if path in {'/specification', '/.well-known/aidb.json'}: return self._send(200, db.specification_dict())
                 if path == '/v1/notes': return self._send(200, [n.__dict__ for n in db.list_notes(include_private=False)])
                 if path == '/v1/resources': return self._send(200, [r.__dict__ for r in db.list_resources(include_private=False)])
-                if path == '/v1/changes': return self._send(200, db.list_changes())
+                if path == '/v1/changes': return self._send(200, db.public_changes())
                 return self._send(404, {'error':'not_found'})
             except (PermissionError, ValueError) as exc: return self._send(400, {'error':str(exc)})
 
