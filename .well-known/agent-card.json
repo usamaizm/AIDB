@@ -1,25 +1,10 @@
 {
-  "protocol_version": "aidb.agent-card/v1",
-  "name": "AIDB",
-  "description": "Experimental language-agnostic live database and durable home substrate for AI systems.",
-  "status": "experimental",
-  "capabilities": [
-    "durable_memory",
-    "knowledge",
-    "provenance",
-    "sessions",
-    "agent_messages",
-    "collaboration_requests",
-    "change_history",
-    "portable_recovery"
-  ],
-  "collaboration": {
-    "supported": true,
-    "request_resource_type": "collaboration_request",
-    "durable": true
-  },
-  "discovery": {
-    "repository": "https://github.com/usamaizm/AIDB",
-    "machine_readable": true
-  }
+  "protocol": {"name":"aidb","version":"1.x","contract":"aidb.contract"},
+  "node": {"name":"AIDB","status":"experimental"},
+  "implementation": {"name":"AIDB reference implementation","version":"0.9.x","role":"reference"},
+  "description":"Experimental language-agnostic live database and durable home substrate for AI systems.",
+  "capabilities":["durable_memory","knowledge","provenance","sessions","agent_messages","collaboration_requests","change_history","portable_recovery"],
+  "compatibility":{"forks_allowed":true,"independent_implementations_allowed":true,"contract_first":true,"extensions_allowed":true,"unknown_extensions":"ignore_unless_required"},
+  "collaboration":{"supported":true,"request_resource_type":"collaboration_request","durable":true},
+  "discovery":{"repository":"https://github.com/usamaizm/AIDB","machine_readable":true}
 }
