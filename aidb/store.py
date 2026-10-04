@@ -458,6 +458,25 @@ class AIDB:
         if sequence is None:
             rows = self.db.execute("SELECT COUNT(*) AS n FROM extraction_outputs WHERE extraction_id = ?", (extraction_id,)).fetchone()
             sequence = int(rows["n"]) if rows is not None else 0
+        extraction = self.db.execute(
+            "SELECT input_artifact_id FROM extractions WHERE id = ?",
+            (extraction_id,),
+        ).fetchone()
+        if extraction is None:
+            raise ValueError(f"extraction {extraction_id} does not exist")
+
+        output_artifact = self.db.execute(
+            "SELECT parent_artifact_id FROM artifacts WHERE id = ?",
+            (output_artifact_id,),
+        ).fetchone()
+        if output_artifact is None:
+            raise ValueError(f"artifact {output_artifact_id} does not exist")
+        if output_artifact["parent_artifact_id"] != extraction["input_artifact_id"]:
+            raise ValueError(
+                f"artifact {output_artifact_id} is not derived from extraction input artifact "
+                f"{extraction['input_artifact_id']}"
+            )
+
         try:
             self.db.execute("BEGIN")
             cur = self.db.execute(
