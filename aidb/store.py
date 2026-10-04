@@ -54,6 +54,10 @@ class AIDB:
 
             CREATE TABLE IF NOT EXISTS node_identity (id INTEGER PRIMARY KEY CHECK(id=1), node_id TEXT NOT NULL UNIQUE, owner TEXT, visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('public','private')), metadata TEXT NOT NULL DEFAULT '{}');
 
+            CREATE TABLE IF NOT EXISTS home_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, change_id TEXT NOT NULL UNIQUE, resource_id TEXT, operation TEXT NOT NULL, actor TEXT, previous_revision INTEGER, new_revision INTEGER, payload TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+            CREATE INDEX IF NOT EXISTS idx_home_changes_resource ON home_changes(resource_id, id);
+            CREATE INDEX IF NOT EXISTS idx_home_changes_actor ON home_changes(actor, id);
+
             CREATE TABLE IF NOT EXISTS node_specifications (version INTEGER PRIMARY KEY AUTOINCREMENT, specification_id TEXT NOT NULL UNIQUE, node_id TEXT NOT NULL, visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public','private')), capabilities TEXT NOT NULL DEFAULT '[]', resource_types TEXT NOT NULL DEFAULT '[]', transports TEXT NOT NULL DEFAULT '[]', extensions TEXT NOT NULL DEFAULT '[]', constraints TEXT NOT NULL DEFAULT '{}', issued_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 
             CREATE TABLE IF NOT EXISTS agents (
@@ -980,6 +984,15 @@ class AIDB:
                 self.db.execute("INSERT OR IGNORE INTO "+table+" ("+",".join(columns)+") VALUES ("+placeholders+")", [row[k] for k in columns])
         self.db.commit()
         return self.current_specification()
+
+    def list_changes(self, after_id=0, limit=100, resource_id=None):
+        if limit < 1:
+            raise ValueError("limit must be positive")
+        if resource_id is None:
+            rows = self.db.execute("SELECT * FROM home_changes WHERE id>? ORDER BY id ASC LIMIT ?", (after_id, limit)).fetchall()
+        else:
+            rows = self.db.execute("SELECT * FROM home_changes WHERE id>? AND resource_id=? ORDER BY id ASC LIMIT ?", (after_id, resource_id, limit)).fetchall()
+        return [dict(r) for r in rows]
 
     def close(self) -> None:
         self.db.close()
