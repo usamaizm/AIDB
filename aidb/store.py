@@ -992,40 +992,46 @@ class AIDB:
         return payload
 
     def import_home(self, payload):
-        if payload.get("format") != "aidb-home-v1":
+        if not isinstance(payload, dict) or payload.get("format") != "aidb-home-v1":
             raise ValueError("unsupported home format")
         tables = payload.get("tables", {})
-        allowed = {
-            "node_identity",
-            "node_specifications",
-            "home_resources",
-            "notes",
-            "resource_relations",
-            "home_changes",
-            "home_snapshots",
+        if not isinstance(tables, dict):
+            raise ValueError("invalid home tables")
+
+        columns_by_table = {
+            "node_identity": {"id", "node_id", "owner", "visibility", "metadata"},
+            "node_specifications": {"version", "specification_id", "node_id", "visibility", "capabilities", "resource_types", "transports", "extensions", "constraints", "issued_at"},
+            "home_resources": {"id", "resource_type", "content", "owner", "visibility", "metadata", "revision", "created_at", "updated_at"},
+            "notes": {"id", "resource_id", "title", "content", "owner", "visibility", "kind", "metadata", "revision", "created_at", "updated_at"},
+            "resource_relations": {"id", "source_resource_id", "target_resource_id", "relation", "metadata", "created_at"},
+            "home_changes": {"id", "change_id", "resource_id", "operation", "actor", "previous_revision", "new_revision", "payload", "created_at"},
+            "home_snapshots": {"id", "snapshot_id", "home_format", "content", "content_hash", "created_at"},
         }
-        # Restore in dependency order so foreign keys are valid.  Existing rows
-        # are preserved, making imports idempotent for the same home snapshot.
-        for table in (
-            "node_identity",
-            "node_specifications",
-            "home_resources",
-            "notes",
-            "resource_relations",
-            "home_changes",
-            "home_snapshots",
-        ):
-            for row in tables.get(table, []):
-                if table not in allowed or not isinstance(row, dict):
-                    raise ValueError("invalid home import row")
-                columns = list(row)
-                placeholders = ",".join("?" for _ in columns)
-                self.db.execute(
-                    "INSERT OR IGNORE INTO " + table + " (" + ",".join(columns) +
-                    ") VALUES (" + placeholders + ")",
-                    [row[k] for k in columns],
-                )
-        self.db.commit()
+
+        try:
+            # Restore in dependency order so foreign keys are valid. Existing rows
+            # are preserved, making imports idempotent for the same home snapshot.
+            for table, allowed_columns in columns_by_table.items():
+                rows = tables.get(table, [])
+                if not isinstance(rows, list):
+                    raise ValueError(f"invalid rows for table: {table}")
+                for row in rows:
+                    if not isinstance(row, dict) or not row:
+                        raise ValueError(f"invalid home import row for table: {table}")
+                    columns = list(row)
+                    if any(column not in allowed_columns for column in columns):
+                        raise ValueError(f"invalid column in home import row for table: {table}")
+                    placeholders = ",".join("?" for _ in columns)
+                    self.db.execute(
+                        "INSERT OR IGNORE INTO " + table + " (" + ",".join(columns) +
+                        ") VALUES (" + ",".join("?" for _ in columns) + ")",
+                        [row[k] for k in columns],
+                    )
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
         return self.current_specification()
 
     def relate_resources(self, source_resource_id, target_resource_id, relation, metadata=None):
