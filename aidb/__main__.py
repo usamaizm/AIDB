@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 
 from .store import AIDB
+from .server import serve
 
 
 def main() -> None:
@@ -31,10 +32,18 @@ def main() -> None:
     message_parser.add_argument("session_id")
     message_parser.add_argument("content")
 
+    serve_parser = subparsers.add_parser("serve", help="run the self-hosted AIDB node")
+    serve_parser.add_argument("--host", default="127.0.0.1")
+    serve_parser.add_argument("--port", type=int, default=8765)
+
     search_parser = subparsers.add_parser("search", help="search shared knowledge")
     search_parser.add_argument("query")
 
     args = parser.parse_args()
+
+    if args.command == "serve":
+        serve(args.db, args.host, args.port)
+        return
 
     with AIDB(args.db) as db:
         if args.command == "agent":
