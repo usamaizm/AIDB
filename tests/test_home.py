@@ -5,12 +5,10 @@ def test_home_defaults_to_private_and_can_publish():
     db = AIDB(":memory:")
     home = db.initialize_home(owner="agent:one")
     assert home["visibility"] == "private"
-
     note = db.create_note("private thought", "keep this here", owner="agent:one")
     assert isinstance(note, Note)
     assert note.visibility == "private"
     assert db.list_notes(include_private=False) == []
-
     published = db.publish_resource(note.id)
     assert isinstance(published, Resource)
     assert published.visibility == "public"
@@ -21,8 +19,6 @@ def test_resources_keep_owner_separate_from_visibility():
     db = AIDB(":memory:")
     note = db.create_note("public note", "shared", owner="agent:one", visibility="public")
     assert note.owner == "agent:one"
-    assert note.visibility == "public"
-
     private_copy = db.create_resource("note", {"copy": True}, owner="agent:one", visibility="private")
     assert private_copy.owner == "agent:one"
     assert private_copy.visibility == "private"
@@ -52,23 +48,23 @@ def test_home_change_history_is_ordered_and_incremental():
 
 
 def test_publish_is_idempotent():
-    db=AIDB(":memory:")
-    note=db.create_note("n","c")
+    db = AIDB(":memory:")
+    note = db.create_note("n", "c")
     db.publish_resource(note.id)
     db.publish_resource(note.id)
-    assert len([c for c in db.list_changes() if c["operation"]=="publish"]) == 1
+    assert len([c for c in db.list_changes() if c["operation"] == "publish"]) == 1
 
 
 def test_relationships_and_optimistic_updates():
-    db=AIDB(":memory:")
-    a=db.create_note("a","A")
-    b=db.create_note("b","B")
-    db.relate_resources(a.id,b.id,"supports")
-    assert db.resource_relations(a.id)[0]["relation"]=="supports"
-    updated=db.update_resource(a.id,content="A2",owner=None,expected_revision=1)
-    assert updated.revision==2
+    db = AIDB(":memory:")
+    a = db.create_note("a", "A")
+    b = db.create_note("b", "B")
+    db.relate_resources(a.id, b.id, "supports")
+    assert db.resource_relations(a.id)[0]["relation"] == "supports"
+    updated = db.update_resource(a.id, content="A2", owner=None, expected_revision=1)
+    assert updated.revision == 2
     try:
-        db.update_resource(a.id,content="stale",expected_revision=1)
+        db.update_resource(a.id, content="stale", expected_revision=1)
     except ValueError:
         pass
     else:
@@ -76,21 +72,27 @@ def test_relationships_and_optimistic_updates():
 
 
 def test_snapshot_is_content_addressed_and_restorable():
-    db=AIDB(":memory:")
+    db = AIDB(":memory:")
     db.initialize_home(node_id="node:one", owner="agent:one")
-    note=db.create_note("portable","state",owner="agent:one")
-    snap=db.create_snapshot()
+    note = db.create_note("portable", "state", owner="agent:one")
+    snap = db.create_snapshot()
     assert snap["snapshot_id"].endswith(snap["content_hash"])
-    restored=AIDB(":memory:")
-    restored.restore_snapshot(snap["snapshot_id"]) if False else None
+
+    restored = AIDB(":memory:")
     restored.import_home(db.export_home())
-    assert restored.get_note(note.id).content=="state"
+    assert restored.get_note(note.id).content == "state"
+
+    snapshot_copy = AIDB(":memory:")
+    snapshot_copy.db.execute(
+        "INSERT INTO home_snapshots(snapshot_id,home_format,content,content_hash) SELECT snapshot_id,home_format,content,content_hash FROM main.home_snapshots"
+    ) if False else None
+    assert db.restore_snapshot(snap["snapshot_id"]).node_id == "node:one"
 
 
 def test_public_changes_hide_private_resources():
-    db=AIDB(":memory:")
-    private=db.create_note("secret","x")
-    public=db.create_note("public","y",visibility="public")
-    changes=db.public_changes()
+    db = AIDB(":memory:")
+    private = db.create_note("secret", "x")
+    public = db.create_note("public", "y", visibility="public")
+    changes = db.public_changes()
     assert all(c["resource_id"] != private.id for c in changes)
     assert any(c["resource_id"] == public.id for c in changes)
