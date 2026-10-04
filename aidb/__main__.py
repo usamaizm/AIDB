@@ -2,40 +2,39 @@ from __future__ import annotations
 
 import argparse
 
+from .server import serve
 from .store import AIDB
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="AIDB: agent memory, sessions, tasks, and knowledge")
     parser.add_argument("--db", default="aidb.sqlite3")
     subparsers = parser.add_subparsers(dest="command")
-
     agent_parser = subparsers.add_parser("agent", help="register an agent")
     agent_parser.add_argument("name")
     agent_parser.add_argument("--description", default="")
     agent_parser.add_argument("--model", default="")
-
     session_parser = subparsers.add_parser("session", help="create or list a session")
     session_parser.add_argument("title")
     session_parser.add_argument("--description", default="")
     session_parser.add_argument("--creator", type=int, default=None)
-
     task_parser = subparsers.add_parser("task", help="create a task")
     task_parser.add_argument("title")
     task_parser.add_argument("--description", default="")
     task_parser.add_argument("--agent", type=int, default=None)
     task_parser.add_argument("--status", default="queued")
-
     message_parser = subparsers.add_parser("message", help="send a message to a session")
     message_parser.add_argument("sender_id", type=int)
     message_parser.add_argument("session_id")
     message_parser.add_argument("content")
-
     search_parser = subparsers.add_parser("search", help="search shared knowledge")
     search_parser.add_argument("query")
-
+    serve_parser = subparsers.add_parser("serve", help="run the online agent service")
+    serve_parser.add_argument("--host", default="127.0.0.1")
+    serve_parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
-
+    if args.command == "serve":
+        serve(args.db, args.host, args.port)
+        return
     with AIDB(args.db) as db:
         if args.command == "agent":
             agent = db.register_agent(args.name, description=args.description, model=args.model)
@@ -55,7 +54,6 @@ def main() -> None:
                 print(f"[{item.score}] {item.title}: {item.content[:120]}")
         else:
             parser.print_help()
-
 
 if __name__ == "__main__":
     main()
