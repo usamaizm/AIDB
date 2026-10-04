@@ -941,9 +941,15 @@ class AIDB:
         return [self.get_note(r["id"]) for r in self.db.execute("SELECT id FROM notes"+where+" ORDER BY updated_at DESC",params)]
 
     def publish_resource(self, resource_id):
+        row=self.db.execute("SELECT revision,owner,visibility FROM home_resources WHERE id=?", (resource_id,)).fetchone()
+        if row is None: raise ValueError("resource does not exist")
+        if row["visibility"] == "public":
+            return self.get_resource(resource_id)
+        old_revision=row["revision"]
         self.db.execute("UPDATE home_resources SET visibility='public', revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE id=?", (resource_id,))
         self.db.execute("UPDATE notes SET visibility='public', revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE resource_id=?", (resource_id,))
         self._append_workflow_event("resource_published", "resource published", metadata={"resource_id":resource_id})
+        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), resource_id, "publish", row["owner"], old_revision, old_revision+1, self._json({})))
         self.db.commit()
         return self.get_resource(resource_id)
 
