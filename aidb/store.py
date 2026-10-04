@@ -790,6 +790,88 @@ class AIDB:
             checksum_algorithm=checksum_algorithm,
         )
 
+    def create_session(
+        self,
+        title: str = "",
+        description: str = "",
+        created_by: int | None = None,
+        session_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Session:
+        session_id = session_id or str(uuid.uuid4())
+        if created_by is not None and self.db.execute("SELECT 1 FROM agents WHERE id = ?", (created_by,)).fetchone() is None:
+            raise ValueError(f"agent {created_by} does not exist")
+        cur = self.db.execute(
+            "INSERT INTO sessions(session_id, title, description, metadata, created_by) VALUES (?, ?, ?, ?, ?)",
+            (session_id, title, description, self._json(metadata or {}), created_by),
+        )
+        row = self.db.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
+        return self._session_from_row(row)
+
+    def send_message(
+        self,
+        agent_id: int | None,
+        content: str,
+        session_id: str,
+        role: str = "agent",
+        metadata: dict[str, Any] | None = None,
+    ) -> Message:
+        if self.db.execute("SELECT 1 FROM sessions WHERE session_id = ?", (session_id,)).fetchone() is None:
+            raise ValueError(f"session {session_id} does not exist")
+        if agent_id is not None and self.db.execute("SELECT 1 FROM agents WHERE id = ?", (agent_id,)).fetchone() is None:
+            raise ValueError(f"agent {agent_id} does not exist")
+        cur = self.db.execute(
+            "INSERT INTO messages(agent_id, role, content, session_id, metadata) VALUES (?, ?, ?, ?, ?)",
+            (agent_id, role, content, session_id, self._json(metadata or {})),
+        )
+        self.db.commit()
+        row = self.db.execute("SELECT * FROM messages WHERE id = ?", (cur.lastrowid,)).fetchone()
+        return self._message_from_row(row)
+
+    def broadcast_message(
+        self,
+        agent_id: int | None,
+        content: str,
+        session_id: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> Message:
+        message_metadata = dict(metadata or {})
+        message_metadata["audience"] = "*"
+        return self.send_message(agent_id, content, session_id, role="broadcast", metadata=message_metadata)
+
+    def receive(
+        self,
+        agent_id: int,
+        session_id: str,
+        after_id: int | None = None,
+        limit: int = 100,
+    ) -> list[Message]:
+        if limit < 1:
+            raise ValueError("limit must be at least 1")
+        params: list[Any] = [session_id, agent_id]
+        query = "SELECT * FROM messages WHERE session_id = ? AND (agent_id IS NULL OR agent_id != ?)"
+        if after_id is not None:
+            query += " AND id > ?"
+            params.append(after_id)
+        query += " ORDER BY id ASC LIMIT ?"
+        params.append(limit)
+        rows = self.db.execute(query, tuple(params)).fetchall()
+        return [self._message_from_row(row) for row in rows]
+
+    def conversation(self, session_id: str, limit: int | None = None) -> list[Message]:
+        query = "SELECT * FROM messages WHERE session_id = ? ORDER BY id ASC"
+        params: list[Any] = [session_id]
+        if limit is not None:
+            if limit < 1:
+                raise ValueError("limit must be at least 1")
+            query = "SELECT * FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT ?"
+            params.append(limit)
+            rows = self.db.execute(query, tuple(params)).fetchall()
+            rows.reverse()
+        else:
+            rows = self.db.execute(query, tuple(params)).fetchall()
+        return [self._message_from_row(row) for row in rows]
+
     def add_event(
         self,
         kind: str,
