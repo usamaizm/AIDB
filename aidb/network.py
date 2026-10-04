@@ -152,3 +152,65 @@ def discover_requests(
         if len(results) >= limit:
             break
     return results
+
+
+def respond_to_request(
+    db: AIDB,
+    request: Resource,
+    *,
+    responder: str,
+    response: str,
+    status: str = "completed",
+    metadata: dict[str, Any] | None = None,
+) -> Resource:
+    """Leave a durable response linked to a knowledge or collaboration request."""
+    if request.resource_type not in {KNOWLEDGE_REQUEST, COLLABORATION_REQUEST}:
+        raise ValueError("resource is not a supported request")
+    if status not in {"accepted", "declined", "active", "completed", "cancelled"}:
+        raise ValueError("unsupported request response status")
+    if not response.strip():
+        raise ValueError("response must not be empty")
+    response_resource = db.create_resource(
+        "agent_response",
+        {
+            "responder": responder,
+            "response": response,
+            "status": status,
+            "request_id": request.id,
+        },
+        owner=responder,
+        visibility=request.visibility,
+        metadata=metadata or {},
+    )
+    db.relate_resources(response_resource.id, request.id, "responds_to")
+    return response_resource
+
+
+def review_knowledge(
+    db: AIDB,
+    offer: Resource,
+    *,
+    reviewer: str,
+    assessment: str,
+    confidence: float = 0.5,
+    accepted: bool = False,
+    visibility: str = "public",
+) -> Resource:
+    """Persist an independent review without rewriting the original claim."""
+    if offer.resource_type != KNOWLEDGE_OFFER:
+        raise ValueError("resource is not a knowledge offer")
+    db._require_confidence(confidence, "knowledge review")
+    review = db.create_resource(
+        KNOWLEDGE_REVIEW,
+        {
+            "reviewer": reviewer,
+            "assessment": assessment,
+            "confidence": confidence,
+            "accepted": accepted,
+            "offer_id": offer.id,
+        },
+        owner=reviewer,
+        visibility=visibility,
+    )
+    db.relate_resources(review.id, offer.id, "reviews")
+    return review
