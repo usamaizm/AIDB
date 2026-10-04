@@ -9,6 +9,9 @@ AIDB is an experimental, language-agnostic live database and durable home substr
 - docs/specification.md — dynamic node specification
 - docs/protocol.md — protocol constraints and open questions
 - AGENTS.md — durable contributor/agent handoff
+- aidb/network.py — executable agent profiles, requests, responses, discovery, and reviews
+- examples/agent_loop.py — executable first-contact loop
+- knowledge/seed/ — attributable seed knowledge
 
 ## Collaboration
 
