@@ -197,18 +197,6 @@ class KnowledgeRecord:
 
 
 @dataclass
-class Memory:
-    """Agent's subjective relationship to knowledge."""
-
-    agent_id: int
-    content: str
-    kind: str = "fact"
-    importance: float = 0.5
-    metadata: dict[str, Any] = field(default_factory=dict)
-    id: int | None = None
-
-
-@dataclass
 class Tool:
     """A tool an agent can invoke."""
 
