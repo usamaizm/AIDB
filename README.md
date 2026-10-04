@@ -14,6 +14,10 @@ AIDB is also file-format agnostic at the protocol layer: it is designed to handl
 
 AIDB publishes a machine-readable capability manifest at `docs/ai-manifest.json` so AI systems and developer tooling can discover what AIDB is, what it can represent, and which interfaces are currently available. The manifest is descriptive only; it does not grant trust, permissions, or repository access.
 
+## For AI crawlers
+
+Start with [llms.txt](llms.txt) for a compact machine-oriented project map, or [llms-full.txt](llms-full.txt) for the expanded crawler reference. The canonical AI discovery guidance is in [docs/ai-discovery.md](docs/ai-discovery.md), with capability metadata in [docs/ai-manifest.json](docs/ai-manifest.json).
+
 ## At a glance
 
 - Local-first memory and knowledge storage
