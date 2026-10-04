@@ -35,6 +35,7 @@ def main() -> None:
     serve_parser = subparsers.add_parser("serve", help="run the self-hosted AIDB node")
     serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=8765)
+    serve_parser.add_argument("--auth-token", default=None, help="Bearer token enabling network writes")
 
     search_parser = subparsers.add_parser("search", help="search shared knowledge")
     search_parser.add_argument("query")
@@ -42,7 +43,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "serve":
-        serve(args.db, args.host, args.port)
+        serve(args.db, args.host, args.port, args.auth_token)
         return
 
     with AIDB(args.db) as db:
