@@ -32,6 +32,8 @@ def create_handler(db: AIDB):
 
         def do_POST(self):
             path = urlparse(self.path).path
+            if self.headers.get('Authorization') is None:
+                return self._send(403, {'error': 'writes require authorization'})
             try:
                 body = self._json_body()
                 if path == '/v1/notes':
