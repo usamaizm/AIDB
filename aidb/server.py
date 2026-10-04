@@ -52,8 +52,8 @@ def create_handler(db: AIDB, auth_token: str | None = None):
         def log_message(self, *_args): return
     return Handler
 
-def serve(db_path: str='aidb.sqlite3', host: str='127.0.0.1', port: int=8765, auth_token: str | None = None) -> None:
-    db=AIDB(db_path); db.initialize_home(visibility='public')
+def serve(db_path: str='aidb.sqlite3', host: str='127.0.0.1', port: int=8765, auth_token: str | None = None, visibility: str = 'private') -> None:
+    db=AIDB(db_path); db.initialize_home(visibility=visibility)
     server=ThreadingHTTPServer((host,port), create_handler(db, auth_token))
     try: server.serve_forever()
     finally: server.server_close(); db.close()
