@@ -15,6 +15,9 @@ def test_public_http_surface_exposes_spec_and_notes():
     Thread(target=server.serve_forever,daemon=True).start()
     base="http://127.0.0.1:"+str(server.server_port)
     try:
+        unauth=Request(base+"/v1/notes",data=b"{}",headers={"Content-Type":"application/json"},method="POST")
+        try: urlopen(unauth)
+        except Exception as exc: assert getattr(exc, "code", None) == 503
         spec=json.load(urlopen(base+"/specification"))
         assert "notes" in spec["capabilities"]
         notes=json.load(urlopen(base+"/v1/notes"))
