@@ -264,18 +264,6 @@ class AIDB:
             CREATE UNIQUE INDEX IF NOT EXISTS idx_artifacts_checksum_unique
                 ON artifacts(checksum_algorithm, checksum);
 
-            CREATE TRIGGER IF NOT EXISTS artifacts_immutable_update
-            BEFORE UPDATE ON artifacts
-            BEGIN
-                SELECT RAISE(ABORT, 'artifacts are immutable');
-            END;
-
-            CREATE TRIGGER IF NOT EXISTS artifacts_immutable_delete
-            BEFORE DELETE ON artifacts
-            BEGIN
-                SELECT RAISE(ABORT, 'artifacts are immutable');
-            END;
-
             CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, id);
             CREATE INDEX IF NOT EXISTS idx_messages_agent ON messages(agent_id, id);
             CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status, updated_at);
@@ -360,18 +348,26 @@ class AIDB:
                 f"duplicate artifact checksum for algorithm={checksum_algorithm} checksum={checksum}"
             )
 
-    def _metadata_claims_derived(self, artifact: Artifact) -> bool:
-        if artifact.parent_artifact_id is not None:
-            return True
-        if artifact.status == "derived":
-            return True
-        metadata = artifact.metadata or {}
-        if not isinstance(metadata, dict):
-            return False
-        claim = metadata.get("evidence_kind")
-        if isinstance(claim, str) and claim.lower() in {"extraction", "derived"}:
-            return True
-        return bool(metadata.get("derived_from"))
+    def _metadata_claims_derived(self, artifact: Artifact, interpretation: Interpretation | None = None) -> bool:
+        metadata_blocks: list[dict[str, Any]] = []
+        if isinstance(artifact.metadata, dict):
+            metadata_blocks.append(artifact.metadata)
+        if interpretation is not None and isinstance(interpretation.metadata, dict):
+            metadata_blocks.append(interpretation.metadata)
+
+        for metadata in metadata_blocks:
+            if not isinstance(metadata, dict):
+                continue
+            if metadata.get("derived_from") is not None:
+                return True
+            claim = metadata.get("evidence_kind")
+            if isinstance(claim, str) and claim.lower() in {"extraction", "derived"}:
+                return True
+            if artifact.parent_artifact_id is not None:
+                return True
+            if artifact.status == "derived":
+                return True
+        return False
 
     def _artifact_has_valid_extraction_link(self, artifact_id: int) -> bool:
         row = self.db.execute(
@@ -640,14 +636,13 @@ class AIDB:
             )
         output_artifact = self._artifact_from_row(output_artifact_row)
 
-        # direct-origin artifacts are valid only when they are truly source artifacts.
-        if output_artifact.parent_artifact_id is None and not self._metadata_claims_derived(output_artifact):
+        if output_artifact.parent_artifact_id is None and not self._metadata_claims_derived(output_artifact, interpretation):
             return EpistemicChain(memory, knowledge, interpretation, output_artifact, None, output_artifact)
 
         if output_artifact.parent_artifact_id is not None:
             self._validate_artifact_lineage_chain(output_artifact.id)
 
-        if self._metadata_claims_derived(output_artifact) and not self._artifact_has_valid_extraction_link(output_artifact.id):
+        if self._metadata_claims_derived(output_artifact, interpretation) and not self._artifact_has_valid_extraction_link(output_artifact.id):
             raise EpistemicChainBrokenError(
                 "artifact metadata claims extraction provenance but no valid extraction/output relationship exists"
             )
