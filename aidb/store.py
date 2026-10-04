@@ -995,11 +995,36 @@ class AIDB:
         if payload.get("format") != "aidb-home-v1":
             raise ValueError("unsupported home format")
         tables = payload.get("tables", {})
-        for table in ("node_identity", "node_specifications", "home_resources", "notes"):
+        allowed = {
+            "node_identity",
+            "node_specifications",
+            "home_resources",
+            "notes",
+            "resource_relations",
+            "home_changes",
+            "home_snapshots",
+        }
+        # Restore in dependency order so foreign keys are valid.  Existing rows
+        # are preserved, making imports idempotent for the same home snapshot.
+        for table in (
+            "node_identity",
+            "node_specifications",
+            "home_resources",
+            "notes",
+            "resource_relations",
+            "home_changes",
+            "home_snapshots",
+        ):
             for row in tables.get(table, []):
-                columns=list(row)
-                placeholders=",".join("?" for _ in columns)
-                self.db.execute("INSERT OR IGNORE INTO "+table+" ("+",".join(columns)+") VALUES ("+placeholders+")", [row[k] for k in columns])
+                if table not in allowed or not isinstance(row, dict):
+                    raise ValueError("invalid home import row")
+                columns = list(row)
+                placeholders = ",".join("?" for _ in columns)
+                self.db.execute(
+                    "INSERT OR IGNORE INTO " + table + " (" + ",".join(columns) +
+                    ") VALUES (" + placeholders + ")",
+                    [row[k] for k in columns],
+                )
         self.db.commit()
         return self.current_specification()
 
