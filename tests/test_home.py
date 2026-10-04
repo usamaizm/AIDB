@@ -37,3 +37,15 @@ def test_specification_is_runtime_discoverable():
     assert "notes" in payload["capabilities"]
     assert "public_private" in payload["capabilities"]
     assert "ownership" in payload["capabilities"]
+
+
+def test_home_change_history_is_ordered_and_incremental():
+    db = AIDB(":memory:")
+    first = db.create_note("one", "1", owner="agent:one")
+    second = db.create_resource("idea", {"x": 2}, owner="agent:one")
+    changes = db.list_changes()
+    assert len(changes) == 2
+    assert changes[0]["operation"] == "create"
+    assert changes[0]["resource_id"] == first.id
+    assert changes[1]["resource_id"] == second.id
+    assert db.list_changes(after_id=changes[0]["id"])[0]["id"] == changes[1]["id"]
