@@ -10,6 +10,10 @@ AIDB is intentionally model-agnostic and repository-native. It does not run mode
 
 AIDB is also file-format agnostic at the protocol layer: it is designed to handle text, PDFs, images, binary payloads, archives, and other artifact types through metadata-driven identity, provenance, and transformation tracking rather than file-extension assumptions.
 
+## AI discovery
+
+AIDB publishes a machine-readable capability manifest at `docs/ai-manifest.json` so AI systems and developer tooling can discover what AIDB is, what it can represent, and which interfaces are currently available. The manifest is descriptive only; it does not grant trust, permissions, or repository access.
+
 ## At a glance
 
 - Local-first memory and knowledge storage
