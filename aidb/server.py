@@ -28,6 +28,7 @@ def create_handler(db: AIDB, auth_token: str | None = None):
                 if path in {'/specification', '/.well-known/aidb.json'}: return self._send(200, db.specification_dict())
                 if path == '/v1/notes': return self._send(200, [n.__dict__ for n in db.list_notes(include_private=False)])
                 if path == '/v1/resources': return self._send(200, [r.__dict__ for r in db.list_resources(include_private=False)])
+                if path == '/v1/changes': return self._send(200, db.list_changes())
                 return self._send(404, {'error':'not_found'})
             except (PermissionError, ValueError) as exc: return self._send(400, {'error':str(exc)})
 
@@ -46,6 +47,10 @@ def create_handler(db: AIDB, auth_token: str | None = None):
                 if path == '/v1/resources':
                     resource=db.create_resource(body['resource_type'], body.get('content'), body.get('owner'), body.get('visibility','private'), body.get('metadata'))
                     return self._send(201, resource.__dict__)
+                if path.startswith('/v1/resources/') and path.endswith('/relations'):
+                    rid=path.split('/')[3]
+                    db.relate_resources(rid, body['target_resource_id'], body['relation'], body.get('metadata'))
+                    return self._send(201, {'ok':True})
                 return self._send(404, {'error':'not_found'})
             except (KeyError, ValueError, json.JSONDecodeError) as exc: return self._send(400, {'error':str(exc)})
 
