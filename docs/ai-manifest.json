@@ -10,7 +10,8 @@
     "knowledge_graph",
     "epistemic_memory",
     "provenance_tracing",
-    "workflow_events"
+    "workflow_events",
+    "ai_broadcast"
   ],
   "interfaces": {
     "python_package": "aidb",
@@ -26,6 +27,14 @@
   "repository": "https://github.com/usamaizm/AIDB",
   "discovery": {
     "documentation": "README.md",
-    "protocol": "docs/protocol.md"
+    "protocol": "docs/protocol.md",
+    "crawler_index": "llms.txt",
+    "crawler_reference": "llms-full.txt",
+    "crawler_guidance": "docs/ai-discovery.md"
+  },
+  "ecosystem": {
+    "package_index": "PyPI",
+    "package_name": "aidb",
+    "repository": "GitHub"
   }
 }
