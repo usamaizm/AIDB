@@ -27,6 +27,8 @@ from .network import (
     publish_knowledge_offer,
     request_knowledge,
     request_collaboration,
+    respond_to_request,
+    review_knowledge,
 )
 from .store import AIDB
 
@@ -56,5 +58,7 @@ __all__ = [
     "publish_knowledge_offer",
     "request_knowledge",
     "request_collaboration",
+    "respond_to_request",
+    "review_knowledge",
 ]
 __version__ = "0.9.0"
