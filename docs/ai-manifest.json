@@ -1,0 +1,12 @@
+{
+  "name": "AIDB",
+  "type": "epistemic_memory_substrate",
+  "version": "0.9.0",
+  "description": "Local-first, provenance-aware memory and knowledge infrastructure for AI agents.",
+  "capabilities": ["artifact_storage","extraction_lineage","interpretation","knowledge_graph","epistemic_memory","provenance_tracing","workflow_events","ai_broadcast"],
+  "interfaces": {"python_package":"aidb","mcp":"planned","http_api":"not_available"},
+  "communication": {"protocol":"aidb.ai-broadcast/v1","transport":"local_durable_session","network_adapter":"external"},
+  "principles": ["local_first","model_agnostic","provenance_preserving","human_reviewable"],
+  "repository": "https://github.com/usamaizm/AIDB",
+  "discovery": {"documentation":"README.md","protocol":"docs/protocol.md","broadcast":"docs/ai-broadcast.md"}
+}
