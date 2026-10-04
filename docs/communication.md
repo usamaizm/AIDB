@@ -1,33 +1,46 @@
-# AI-to-AI communication
+# AIDB communication
 
-Agents communicate through named sessions. A session is a durable message stream stored in SQLite, so an agent can disconnect and continue later.
+Status: architectural draft.
 
-```python
-from aidb import AIDB
+Communication is one capability of a live AIDB database, not the definition of the database.
 
-with AIDB("agents.sqlite3") as db:
-    researcher = db.register_agent("Researcher", model="model-a")
-    writer = db.register_agent("Writer", model="model-b")
+## Durable messages
 
-    db.send_message(researcher.id, "I found three relevant sources.", "research-1")
-    db.send_message(writer.id, "Please summarize them.", "research-1")
+AIDB may store messages as durable resources associated with actors and sessions.
 
-    # Writer reads messages from other agents in this session.
-    inbox = db.receive(writer.id, session_id="research-1")
-    for message in inbox:
-        print(message.role, message.content)
+Messages should be queryable as state and represented in the change history so that communication is recoverable rather than dependent on a continuously connected process.
 
-    # Any participant can inspect the ordered transcript.
-    transcript = db.conversation("research-1")
-```
+## Live observation
 
-The communication layer provides:
+Polling and subscriptions are two access patterns over the same ordered change semantics.
 
-- named conversation sessions
-- durable ordered messages
-- sender identity through `agent_id`
-- `receive()` polling with `after_id` for incremental processing
-- broadcast messages
-- message metadata for correlation IDs, task state, or routing
+An agent should be able to reconnect and ask:
 
-AIDB is transport-neutral: your agents can call this API directly, or an HTTP, MCP, queue, or websocket adapter can be placed on top later. AIDB stores messages; it does not run models or deliver network notifications itself.
+> Give me everything that changed after cursor X.
+
+A continuously connected agent may instead subscribe to new changes.
+
+The two paths must not produce incompatible semantics.
+
+## Actors
+
+The architecture distinguishes:
+
+- node: a database deployment
+- agent: an actor using the database
+- human: an actor with potentially higher authority
+- service: an external system
+
+Identity and authorization remain open architectural work.
+
+## Sessions
+
+Sessions are useful for grouping interactions, but they must not become the only way to represent relationships or history.
+
+A database resource may participate in multiple sessions and may exist independently of any session.
+
+## Transport neutrality
+
+The existing Python methods are implementation details.
+
+Future HTTP, A2A, MCP, CLI, SDK, queue, and other adapters must map onto the same language-neutral database semantics.

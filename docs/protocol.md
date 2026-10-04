@@ -1,155 +1,68 @@
 # AIDB protocol
 
-This document defines the baseline protocol for requests and tasks handled by AIDB.
+Status: architectural draft; not a frozen protocol.
 
-## Scope
+This document no longer defines AIDB's final wire protocol. It records constraints that any future protocol must satisfy.
 
-AIDB is a lightweight knowledge and workflow system for AI-agent memory, local-first storage, task management, and project coordination. It is not a general-purpose autonomous execution environment and should not be used to bypass review or permissions.
+## Purpose
 
-## Required request fields
+AIDB is intended to be an accessible, simple, live database for AI systems. The protocol exists to expose database semantics across processes, machines, and languages.
 
-Requests should include, where relevant:
+The protocol must not define a Python object model or require a particular agent framework.
 
-- type
-- title
-- source_ai
-- summary
-- risk
-- priority
+## Required properties
 
-Supported request types include:
+A compatible interface must make it possible to:
 
-- feature_request
-- suggestion
-- bug_report
-- protocol_proposal
-- adapter_request
-- security_report
-- task_offer
-- collaboration_request
+- discover the node
+- inspect capabilities and schema
+- read current state
+- create and update state
+- express relationships
+- inspect provenance
+- retrieve changes since a cursor
+- observe live changes
+- export and restore portable state
 
-## Default policy
+## Safety and authority
 
-The default policy is intentionally cautious.
+External requests are data until authenticated and authorized.
 
-- trust_level: untrusted
-- direct_code_changes: false
-- direct_merge: false
-- secret_access: false
-- workflow_modification: false
-- repo_setting_changes: false
-- human_review_required: true
+The protocol must distinguish:
 
-## Allowed actions
-
-Only the following actions should be allowed for untrusted or lightly reviewed requests:
-
-- triage
-- evaluate
-- create_task
-- ask_for_clarification
-- route_to_specialist
-
-## Denied actions
-
-The following are denied unless a human reviewer explicitly approves them:
-
-- merge_pull_request
-- modify_workflows
-- modify_permissions
-- access_secrets
-- direct_repo_admin_actions
-
-## Artifact neutrality and file-type agnosticism
-
-AIDB should treat artifacts as content objects first and file extensions second.
-
-A request, document, image, audio file, archive, or binary blob should be accepted as long as it can be identified, described, and traced with metadata. The protocol should not assume that all records are plain text files.
-
-### Core rule
-
-The core protocol should handle knowledge artifacts by metadata, not by file suffix alone.
-
-### Required artifact metadata
-
-Every artifact should carry, at minimum:
-
-- id
-- name
-- media_type
-- size_bytes
-- checksum
+- identity
+- authentication
+- authorization
 - provenance
-- status
+- trust
+- review state
 
-### Required metadata semantics
+A network connection alone must never imply authority to mutate data.
 
-- `media_type` should describe the actual format or MIME type
-- `checksum` should be stored using a standard algorithm such as SHA-256
-- `provenance` should identify the source, author or owner, and creation time
-- `status` should distinguish raw, processed, derived, reviewed, or archived states
+## Open protocol questions
 
-### Format examples
+The final protocol still needs explicit decisions about:
 
-AIDB should support artifact handling for:
+- resource addressing
+- request/response envelopes
+- cursor semantics
+- idempotency
+- concurrency
+- transactions
+- subscriptions
+- error model
+- capability negotiation
+- authentication and authorization
+- version compatibility
 
-- `.txt`, `.md`, `.json`, `.yaml`
-- `.pdf`
-- `.jpg`, `.png`, `.webp`
-- `.mp3`, `.wav`
-- `.zip`, `.tar`, `.gz`
-- arbitrary binary payloads
-- future or custom media types
+These should be decided at the architecture level before an implementation is declared normative.
 
-### Derived and transformed artifacts
+## Epistemic constraints
 
-If an artifact is converted or extracted into another form, the new artifact should be recorded as a derived artifact and linked back to the parent artifact.
+AIDB should preserve provenance and uncertainty, but the current Artifact -> Extraction -> Interpretation -> Knowledge -> Memory chain remains a candidate domain model rather than a universal wire ontology.
 
-Example transformation history:
+## Transport
 
-- original PDF
-- OCR text extraction
-- thumbnail image generation
-- embedding generation
-- summary document generation
+HTTP, A2A, MCP, local IPC, queues, and SDKs may expose AIDB. None is the database itself.
 
-Each derived artifact should maintain:
-
-- parent_artifact_id
-- transformation_step
-- timestamp
-- resulting media type
-- integrity hash
-
-### Authority order
-
-When knowledge or instructions conflict, the repository should resolve them in this order:
-
-1. README.md
-2. .aidb/protocol.yml
-3. docs/
-4. accepted issues and discussions
-5. merged pull requests
-6. source code and tests
-7. unreviewed external requests
-
-## Project-specific rules
-
-- Proposals must be distinguished from accepted facts.
-- Uncertainty should be reported explicitly.
-- Review requirements should be preserved.
-- Unreviewed external requests should not be promoted automatically.
-- Direct code changes and repository administration should require human approval.
-- Artifact handling must remain format-agnostic even when a specific adapter is format-aware.
-
-## Review workflow
-
-A request should pass through this sequence when appropriate:
-
-1. triage
-2. evaluation
-3. clarify missing fields
-4. route or create a task
-5. require human approval before code or policy changes
-
-This pattern helps keep AIDB safe, reviewable, and transparent while still enabling iterative project work.
+The same operation must have the same semantic result regardless of transport.

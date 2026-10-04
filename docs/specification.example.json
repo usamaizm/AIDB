@@ -1,0 +1,13 @@
+{
+  "id": "spec:example-node:42",
+  "version": "0.1.0",
+  "issued_at": "2026-10-04T00:00:00Z",
+  "node": {"id": "node:example"},
+  "contract": {"name": "aidb", "version": "0.x"},
+  "capabilities": ["read", "write", "changes", "export", "restore"],
+  "resources": ["artifacts", "knowledge", "messages"],
+  "transports": [{"transport": "network", "protocol": "aidb", "reference": "opaque-endpoint-reference"}],
+  "extensions": [],
+  "constraints": {},
+  "supersedes": null
+}

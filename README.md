@@ -10,15 +10,28 @@ AIDB is intentionally model-agnostic and repository-native. It does not run mode
 
 AIDB is also file-format agnostic at the protocol layer: it is designed to handle text, PDFs, images, binary payloads, archives, and other artifact types through metadata-driven identity, provenance, and transformation tracking rather than file-extension assumptions.
 
+## Architecture
+
+AIDB is being redesigned as a language-agnostic, portable, live database for AI systems. The Python package is an implementation, not the architectural contract. The node describes its current contract dynamically through a versioned specification. See `docs/architecture.md` and `docs/specification.md`.
+
+AIDB does not assume IPv4, IPv6, DNS, HTTP, a cloud provider, or any particular network topology. Endpoints are capabilities with transport metadata; networking remains infrastructure.
+
+## Dynamic specification
+
+An AIDB node publishes a current machine-readable specification describing its identity, contract, capabilities, resources, transports, extensions, and constraints. The specification is versioned and changes are part of node history.
+
+This lets agents discover what a node **is and can currently do** rather than relying on a frozen list of assumptions.
+
 ## At a glance
 
 - Local-first memory and knowledge storage
-- SQLite-backed operational state layer
+- Language-neutral node contract
+- Dynamic discovery and capability negotiation
+- Durable state plus change history
 - Session and task orchestration
 - Reviewable provenance and source hierarchy
-- Concept-first, geometry-aware knowledge modeling
-- Standards-aware serialization, integrity, and security practices
 - Format-agnostic artifact handling for mixed media
+- Portable recovery as a first-class concern
 
 ## Core principles
 
@@ -28,6 +41,7 @@ AIDB is also file-format agnostic at the protocol layer: it is designed to handl
 4. Prefer known-good standards over ad hoc formats where practical.
 5. Treat the system as a living archive, not a frozen product specification.
 6. Treat artifacts as content objects first and file extensions second.
+7. Keep transport and networking details out of the core data model.
 
 ## Living structure taxonomy
 
@@ -71,63 +85,19 @@ The distinction matters:
 
 A single item may be represented in multiple ways. For example, a migration record may be a point, a route, a geospatial event, or a map layer depending on context.
 
-This makes AIDB usable as both:
-
-- a conceptual archive for ideas and proposals
-- a geometric and topological memory model for connected knowledge
-- a transformation-aware knowledge system for representation, storage, and access
-
-## Conceptual direction
-
-The project is exploring a recursive, symmetric, and geometric knowledge model. The idea is not to flatten everything into a single database table, but to preserve how ideas branch, recur, transform, and reassemble across scales.
-
-This includes:
-
-- recursive content structures
-- repeated local patterns
-- global contextual layers
-- relation-rich graphs
-- abstract geometric organization
-- multi-scale concept navigation
-- representation transformations for storage and transfer
-- meaningful scalar and higher-order knowledge units
-
-AIDB is best understood as a living archive of concepts, not a finalized product specification.
-
 ## Standards and interoperability
 
-AIDB prefers known-good standards over ad hoc formats where possible.
-
-- Storage and interchange: JSON, YAML, TOML, and CBOR where appropriate
-- Integrity: SHA-256 and related standard hash functions
-- Serialization: standard JSON/YAML rules and versioned schemas
-- Transport: standard HTTP and TLS patterns where used externally
-- Provenance: explicit timestamps, source references, and version metadata
-- Encryption: standard strong encryption with key management
-- Compression: standard codecs for storage or transfer efficiency
-
-Conceptual flexibility remains important, but actual implementation formats should align with established interoperability conventions wherever practical.
-
-## Governance and review model
-
-AIDB is designed around a clear responsibility split:
-
-- GitHub Copilot handles implementation work
-- AIDB stores the memory, policy, protocol, and task context
-- GitHub provides the public coordination surface and audit trail
-- you remain the final reviewer and decision-maker
-
-The repository also includes a structured governance model under `.aidb/` and `docs/` to keep proposals, accepted decisions, and unreviewed material separated.
+AIDB prefers known-good standards over ad hoc formats where possible. Concrete transport and serialization choices remain adapters until the architecture freezes their semantics.
 
 ## Documentation map
 
 - `README.md` — project overview and framing
+- `docs/architecture.md` — architectural reset
+- `docs/specification.md` — dynamic node specification
+- `docs/protocol.md` — protocol constraints and open questions
 - `brainstorms/` — open, provisional ideas and notes
 - `encyclopedia/` — concept vocabulary and structured knowledge model
-- `docs/` — governance, protocol, standards, and review guidance
-- `.aidb/` — repository-level policy and authority model
-- `aidb/` — Python package and operational state layer
-- `examples/` — sample request and workflow structures
+- `aidb/` — reference implementation
 
 ## What AIDB is not
 
@@ -135,6 +105,4 @@ AIDB is not a claim that one ontology or one schema solves all knowledge represe
 
 ## In one sentence
 
-AIDB is an experimental, reviewable, local-first memory and knowledge system for AI agents, designed to preserve provenance, structure, and concept continuity across evolving project work.
-
-See `docs/idea-taxonomy.md`, `docs/knowledge-transformations.md`, `docs/protocol.md`, `docs/request-evaluation.md`, `docs/artifact-protocol.md`, and `docs/standards.md` for the evolving concept system, artifact model, and governance model.
+AIDB is an experimental, reviewable, language-agnostic live database for AI systems, designed to preserve provenance, structure, and concept continuity across evolving project work.

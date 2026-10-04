@@ -27,6 +27,9 @@ from .core import (
     Tool,
     ToolCall,
     WorkflowEvent,
+    Resource,
+    Note,
+    Specification,
 )
 
 
@@ -44,6 +47,24 @@ class AIDB:
         self.db.executescript(
             """
             PRAGMA foreign_keys = ON;
+
+            CREATE TABLE IF NOT EXISTS home_resources (id TEXT PRIMARY KEY, resource_type TEXT NOT NULL, content TEXT NOT NULL DEFAULT 'null', owner TEXT, visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('public','private')), metadata TEXT NOT NULL DEFAULT '{}', revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+
+            CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, resource_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, content TEXT NOT NULL, owner TEXT, visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('public','private')), kind TEXT NOT NULL DEFAULT 'note', metadata TEXT NOT NULL DEFAULT '{}', revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(resource_id) REFERENCES home_resources(id) ON DELETE CASCADE);
+
+            CREATE TABLE IF NOT EXISTS node_identity (id INTEGER PRIMARY KEY CHECK(id=1), node_id TEXT NOT NULL UNIQUE, owner TEXT, visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('public','private')), metadata TEXT NOT NULL DEFAULT '{}');
+
+            CREATE TABLE IF NOT EXISTS resource_relations (id INTEGER PRIMARY KEY AUTOINCREMENT, source_resource_id TEXT NOT NULL, target_resource_id TEXT NOT NULL, relation TEXT NOT NULL, metadata TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(source_resource_id,target_resource_id,relation), FOREIGN KEY(source_resource_id) REFERENCES home_resources(id) ON DELETE CASCADE, FOREIGN KEY(target_resource_id) REFERENCES home_resources(id) ON DELETE CASCADE);
+            CREATE INDEX IF NOT EXISTS idx_resource_relations_source ON resource_relations(source_resource_id);
+            CREATE INDEX IF NOT EXISTS idx_resource_relations_target ON resource_relations(target_resource_id);
+
+            CREATE TABLE IF NOT EXISTS home_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, change_id TEXT NOT NULL UNIQUE, resource_id TEXT, operation TEXT NOT NULL, actor TEXT, previous_revision INTEGER, new_revision INTEGER, payload TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+            CREATE INDEX IF NOT EXISTS idx_home_changes_resource ON home_changes(resource_id, id);
+            CREATE INDEX IF NOT EXISTS idx_home_changes_actor ON home_changes(actor, id);
+
+            CREATE TABLE IF NOT EXISTS home_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, snapshot_id TEXT NOT NULL UNIQUE, home_format TEXT NOT NULL, content TEXT NOT NULL, content_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+
+            CREATE TABLE IF NOT EXISTS node_specifications (version INTEGER PRIMARY KEY AUTOINCREMENT, specification_id TEXT NOT NULL UNIQUE, node_id TEXT NOT NULL, visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public','private')), capabilities TEXT NOT NULL DEFAULT '[]', resource_types TEXT NOT NULL DEFAULT '[]', transports TEXT NOT NULL DEFAULT '[]', extensions TEXT NOT NULL DEFAULT '[]', constraints TEXT NOT NULL DEFAULT '{}', issued_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 
             CREATE TABLE IF NOT EXISTS agents (
                 id INTEGER PRIMARY KEY,
@@ -865,6 +886,185 @@ class AIDB:
             if len(results) >= limit:
                 break
         return results
+
+
+    def initialize_home(self, node_id=None, owner=None, visibility="private", metadata=None):
+        if visibility not in {"public", "private"}: raise ValueError("visibility must be public or private")
+        row = self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone()
+        if row: return dict(row)
+        node_id = node_id or "node:" + str(uuid.uuid4())
+        self.db.execute("INSERT INTO node_identity(id,node_id,owner,visibility,metadata) VALUES(1,?,?,?,?)", (node_id, owner, visibility, self._json(metadata or {})))
+        self.db.commit()
+        return dict(self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone())
+
+    def create_resource(self, resource_type, content=None, owner=None, visibility="private", metadata=None):
+        if visibility not in {"public", "private"}: raise ValueError("visibility must be public or private")
+        rid = "res:" + str(uuid.uuid4())
+        self.db.execute("INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)", (rid, resource_type, json.dumps(content), owner, visibility, self._json(metadata or {})))
+        self._append_workflow_event("resource_created", "resource created", metadata={"resource_id": rid, "resource_type": resource_type, "owner": owner, "visibility": visibility})
+        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,new_revision,payload) VALUES(?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), rid, "create", owner, 1, self._json({"resource_type":resource_type,"visibility":visibility})))
+        self.db.commit()
+        return self.get_resource(rid)
+
+    def get_resource(self, resource_id, include_private=True):
+        row = self.db.execute("SELECT * FROM home_resources WHERE id=?", (resource_id,)).fetchone()
+        if row is None: raise ValueError("resource does not exist")
+        if row["visibility"] == "private" and not include_private: raise PermissionError("private resource")
+        return Resource(row["resource_type"], json.loads(row["content"]), row["owner"], row["visibility"], json.loads(row["metadata"]), row["id"], row["revision"], row["created_at"], row["updated_at"])
+
+    def list_resources(self, resource_type=None, visibility=None, include_private=True):
+        clauses=[]; params=[]
+        if resource_type: clauses.append("resource_type=?"); params.append(resource_type)
+        if visibility: clauses.append("visibility=?"); params.append(visibility)
+        elif not include_private: clauses.append("visibility='public'")
+        where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
+        rows=self.db.execute("SELECT id FROM home_resources"+where+" ORDER BY updated_at DESC",params).fetchall()
+        return [self.get_resource(r["id"]) for r in rows]
+
+    def create_note(self, title, content, owner=None, visibility="private", kind="note", metadata=None):
+        resource=self.create_resource("note", {"title":title,"content":content,"kind":kind}, owner, visibility, metadata)
+        self.db.execute("INSERT INTO notes(id,resource_id,title,content,owner,visibility,kind,metadata) VALUES(?,?,?,?,?,?,?,?)", (resource.id,resource.id,title,content,owner,visibility,kind,self._json(metadata or {})))
+        self.db.commit()
+        return self.get_note(resource.id)
+
+    def get_note(self, note_id, include_private=True):
+        row=self.db.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
+        if row is None: raise ValueError("note does not exist")
+        if row["visibility"] == "private" and not include_private: raise PermissionError("private note")
+        return Note(row["title"],row["content"],row["owner"],row["visibility"],row["kind"],json.loads(row["metadata"]),row["id"],row["resource_id"],row["revision"],row["created_at"],row["updated_at"])
+
+    def list_notes(self, owner=None, visibility=None, include_private=True):
+        clauses=[]; params=[]
+        if owner is not None: clauses.append("owner=?"); params.append(owner)
+        if visibility: clauses.append("visibility=?"); params.append(visibility)
+        elif not include_private: clauses.append("visibility='public'")
+        where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
+        return [self.get_note(r["id"]) for r in self.db.execute("SELECT id FROM notes"+where+" ORDER BY updated_at DESC",params)]
+
+    def publish_resource(self, resource_id):
+        row=self.db.execute("SELECT revision,owner,visibility FROM home_resources WHERE id=?", (resource_id,)).fetchone()
+        if row is None: raise ValueError("resource does not exist")
+        if row["visibility"] == "public":
+            return self.get_resource(resource_id)
+        old_revision=row["revision"]
+        self.db.execute("UPDATE home_resources SET visibility='public', revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE id=?", (resource_id,))
+        self.db.execute("UPDATE notes SET visibility='public', revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE resource_id=?", (resource_id,))
+        self._append_workflow_event("resource_published", "resource published", metadata={"resource_id":resource_id})
+        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), resource_id, "publish", row["owner"], old_revision, old_revision+1, self._json({})))
+        self.db.commit()
+        return self.get_resource(resource_id)
+
+    def current_specification(self):
+        identity=self.initialize_home()
+        caps=["resources","notes","artifacts","knowledge","messages","changes","export","restore","public_private","ownership"]
+        types=["resource","note","artifact","knowledge","memory","message","task"]
+        latest=self.db.execute("SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1").fetchone()
+        desired=(caps,types)
+        if latest is None or (json.loads(latest["capabilities"]), json.loads(latest["resource_types"])) != desired:
+            self.db.execute("INSERT INTO node_specifications(specification_id,node_id,visibility,capabilities,resource_types,transports) VALUES(?,?,?,?,?,?)", ("spec:"+str(uuid.uuid4()),identity["node_id"],"public",self._json(caps),self._json(types),self._json([])))
+            self.db.commit()
+            latest=self.db.execute("SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1").fetchone()
+        return Specification(latest["specification_id"],latest["version"],latest["node_id"],latest["visibility"],json.loads(latest["capabilities"]),json.loads(latest["resource_types"]),json.loads(latest["transports"]),json.loads(latest["extensions"]),json.loads(latest["constraints"]),latest["issued_at"])
+
+    def specification_dict(self):
+        s=self.current_specification()
+        return {"id":s.id,"version":s.version,"node":{"id":s.node_id},"visibility":s.visibility,"capabilities":s.capabilities,"resources":s.resource_types,"transports":s.transports,"extensions":s.extensions,"constraints":s.constraints,"issued_at":s.issued_at}
+
+    def verify_home(self):
+        issues=[]
+        for row in self.db.execute("SELECT id,resource_id,operation,previous_revision,new_revision FROM home_changes ORDER BY id").fetchall():
+            if row["operation"] in {"create","update","publish"} and row["resource_id"]:
+                resource=self.db.execute("SELECT revision FROM home_resources WHERE id=?", (row["resource_id"],)).fetchone()
+                if resource is None: issues.append("missing resource:"+row["resource_id"])
+                if row["new_revision"] is not None and resource is not None and row["new_revision"] > resource["revision"]: issues.append("future revision:"+str(row["id"]))
+        return {"ok": not issues, "issues": issues}
+
+    def export_home(self, include_private=True):
+        tables = ["node_identity", "node_specifications", "home_resources", "notes", "resource_relations", "home_changes", "home_snapshots"]
+        payload = {"format": "aidb-home-v1", "tables": {}}
+        for table in tables:
+            if table in {"home_resources", "notes"} and not include_private:
+                rows = self.db.execute(f"SELECT * FROM {table} WHERE visibility='public'").fetchall()
+            else:
+                rows = self.db.execute(f"SELECT * FROM {table}").fetchall()
+            payload["tables"][table] = [dict(row) for row in rows]
+        payload["verification"] = self.verify_home()
+        return payload
+
+    def import_home(self, payload):
+        if payload.get("format") != "aidb-home-v1":
+            raise ValueError("unsupported home format")
+        tables = payload.get("tables", {})
+        for table in ("node_identity", "node_specifications", "home_resources", "notes"):
+            for row in tables.get(table, []):
+                columns=list(row)
+                placeholders=",".join("?" for _ in columns)
+                self.db.execute("INSERT OR IGNORE INTO "+table+" ("+",".join(columns)+") VALUES ("+placeholders+")", [row[k] for k in columns])
+        self.db.commit()
+        return self.current_specification()
+
+    def relate_resources(self, source_resource_id, target_resource_id, relation, metadata=None):
+        if source_resource_id == target_resource_id:
+            raise ValueError("a resource cannot relate to itself")
+        for rid in (source_resource_id, target_resource_id):
+            if self.db.execute("SELECT 1 FROM home_resources WHERE id=?", (rid,)).fetchone() is None:
+                raise ValueError("resource does not exist: " + rid)
+        self.db.execute("INSERT OR IGNORE INTO resource_relations(source_resource_id,target_resource_id,relation,metadata) VALUES(?,?,?,?)", (source_resource_id,target_resource_id,relation,self._json(metadata or {})))
+        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,payload) VALUES(?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),source_resource_id,"relate",None,self._json({"target_resource_id":target_resource_id,"relation":relation})))
+        self.db.commit()
+
+    def resource_relations(self, resource_id):
+        rows=self.db.execute("SELECT * FROM resource_relations WHERE source_resource_id=? OR target_resource_id=? ORDER BY id ASC", (resource_id,resource_id)).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_resource(self, resource_id, content=None, metadata=None, owner=None, expected_revision=None):
+        row=self.db.execute("SELECT * FROM home_resources WHERE id=?", (resource_id,)).fetchone()
+        if row is None:
+            raise ValueError("resource does not exist")
+        if owner is not None and row["owner"] != owner:
+            raise PermissionError("owner mismatch")
+        if expected_revision is not None and row["revision"] != expected_revision:
+            raise ValueError("revision conflict")
+        old_revision=row["revision"]
+        new_metadata=json.loads(row["metadata"]) if metadata is None else metadata
+        new_content=json.loads(row["content"]) if content is None else content
+        self.db.execute("UPDATE home_resources SET content=?, metadata=?, revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE id=?", (json.dumps(new_content),self._json(new_metadata),resource_id))
+        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),resource_id,"update",owner or row["owner"],old_revision,old_revision+1,self._json({"content_changed":content is not None,"metadata_changed":metadata is not None})))
+        self.db.commit()
+        return self.get_resource(resource_id)
+
+    def public_changes(self, after_id=0, limit=100):
+        if limit < 1:
+            raise ValueError("limit must be positive")
+        rows=self.db.execute("SELECT c.* FROM home_changes c LEFT JOIN home_resources r ON r.id=c.resource_id WHERE c.id>? AND (c.resource_id IS NULL OR r.visibility='public') ORDER BY c.id ASC LIMIT ?", (after_id,limit)).fetchall()
+        return [dict(r) for r in rows]
+
+    def create_snapshot(self, include_private=True):
+        payload=self.export_home(include_private=include_private)
+        content=json.dumps(payload, sort_keys=True, separators=(",",":"), ensure_ascii=False)
+        digest=hashlib.sha256(content.encode("utf-8")).hexdigest()
+        snapshot_id="snap:"+digest
+        self.db.execute("INSERT OR IGNORE INTO home_snapshots(snapshot_id,home_format,content,content_hash) VALUES(?,?,?,?)", (snapshot_id,payload["format"],content,digest))
+        self.db.commit()
+        return {"snapshot_id":snapshot_id,"content_hash":digest,"created_at":self.db.execute("SELECT created_at FROM home_snapshots WHERE snapshot_id=?",(snapshot_id,)).fetchone()["created_at"]}
+
+    def restore_snapshot(self, snapshot_id):
+        row=self.db.execute("SELECT content,content_hash FROM home_snapshots WHERE snapshot_id=?", (snapshot_id,)).fetchone()
+        if row is None:
+            raise ValueError("snapshot does not exist")
+        digest=hashlib.sha256(row["content"].encode("utf-8")).hexdigest()
+        if digest != row["content_hash"]:
+            raise ValueError("snapshot integrity check failed")
+        return self.import_home(json.loads(row["content"]))
+
+    def list_changes(self, after_id=0, limit=100, resource_id=None):
+        if limit < 1:
+            raise ValueError("limit must be positive")
+        if resource_id is None:
+            rows = self.db.execute("SELECT * FROM home_changes WHERE id>? ORDER BY id ASC LIMIT ?", (after_id, limit)).fetchall()
+        else:
+            rows = self.db.execute("SELECT * FROM home_changes WHERE id>? AND resource_id=? ORDER BY id ASC LIMIT ?", (after_id, resource_id, limit)).fetchall()
+        return [dict(r) for r in rows]
 
     def close(self) -> None:
         self.db.close()
