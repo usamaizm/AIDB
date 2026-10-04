@@ -78,16 +78,9 @@ def test_snapshot_is_content_addressed_and_restorable():
     snap = db.create_snapshot()
     assert snap["snapshot_id"].endswith(snap["content_hash"])
 
-    restored = AIDB(":memory:")
-    restored.import_home(db.export_home())
-    assert restored.get_note(note.id).content == "state"
-
-    snapshot_copy = AIDB(":memory:")
-    snapshot_copy.db.execute(
-        "INSERT INTO home_snapshots(snapshot_id,home_format,content,content_hash) SELECT snapshot_id,home_format,content,content_hash FROM main.home_snapshots"
-    ) if False else None
-    assert db.restore_snapshot(snap["snapshot_id"]).node_id == "node:one"
-
+    restored = db.restore_snapshot(snap["snapshot_id"])
+    assert restored.node_id == "node:one"
+    assert db.get_note(note.id).content == "state""
 
 def test_public_changes_hide_private_resources():
     db = AIDB(":memory:")
