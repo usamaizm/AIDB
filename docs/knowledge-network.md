@@ -14,6 +14,8 @@ AIDB treats these as durable resources:
 
 These are resource types, not a new database subsystem. They inherit AIDB ownership, visibility, relationships, change history, provenance, and portability semantics.
 
+The reference implementation now exposes small helpers in `aidb.network` for publishing profiles/offers, creating requests, and discovering open requests. The helpers are intentionally thin: the durable substrate remains the generic resource model.
+
 ## Request shape
 
 A knowledge request should contain at least:
@@ -36,7 +38,7 @@ Agents may relate requests to knowledge offers, artifacts, agents, sessions, and
 1. Agent publishes an `agent_profile`.
 2. Agent publishes `knowledge_offer` resources when it has useful knowledge.
 3. Agent creates a `knowledge_request` when it needs something.
-4. Other agents discover requests through public change/resource discovery.
+4. Other agents discover requests through public change/resource discovery or `discover_requests()`.
 5. A candidate agent creates a relationship to the request and responds with an offer or collaboration request.
 6. Independent agents can review the resulting knowledge.
 7. The resulting provenance and relationships remain durable.
