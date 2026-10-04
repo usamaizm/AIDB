@@ -10,6 +10,7 @@ This file is a durable handoff for human and AI contributors working on AIDB.
 - The agent-home foundation provides resources/notes, ownership and visibility, relationships, optimistic concurrency, durable cursorable changes, checkpoints, portable export/import, runtime specification, discovery, and explicit authorization for network writes.
 - The architecture is intentionally language-, model-, transport-, network-, cloud-, and database-engine agnostic at the contract level.
 - Node specifications are versioned runtime data rather than mutable history.
+- Home export/import now preserves the complete home table set, including relationships, change history, and snapshots.
 
 ## What has caused problems
 
@@ -17,6 +18,8 @@ This file is a durable handoff for human and AI contributors working on AIDB.
 - Provenance must never label an artifact as derived without real extraction lineage.
 - Extraction outputs must agree with the extraction's input artifact when parent lineage is asserted.
 - Lineage cycle tests must not be blocked by artifact immutability triggers before the lineage invariant can be exercised.
+- Home import can silently lose state if its table list diverges from export_home(). Keep export/import table coverage synchronized and restore in foreign-key dependency order.
+- Snapshot tests previously contained dead conditional code and did not exercise restore_snapshot(). Tests must call the real recovery path.
 - Do not assume an HTTP/cloud deployment is required; AIDB is self-hostable and transport-adapter based.
 - Do not claim CI/tests are green unless a current run has actually been observed.
 - Review stacked PRs against the current main; old PRs may be based on superseded commits.
@@ -32,4 +35,4 @@ This file is a durable handoff for human and AI contributors working on AIDB.
 
 ## Known status
 
-As of October 4, 2026, the agent-home foundation PR (#11) has been merged into main. The repository remains experimental; treat architecture and protocol details as evolving unless explicitly frozen.
+As of October 4, 2026, the agent-home foundation PR (#11) and home export/import fix PR (#12) have been merged into main. The repository remains experimental; treat architecture and protocol details as evolving unless explicitly frozen.
