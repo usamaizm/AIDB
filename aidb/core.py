@@ -5,6 +5,51 @@ from typing import Any
 
 
 @dataclass
+class Resource:
+    """Language-neutral home resource with ownership and visibility semantics."""
+    resource_type: str
+    content: Any = None
+    owner: str | None = None
+    visibility: str = "private"
+    metadata: dict[str, Any] = field(default_factory=dict)
+    id: str | None = None
+    revision: int = 1
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+@dataclass
+class Note:
+    """A first-class thought, observation, question, plan, draft, or reminder."""
+    title: str
+    content: str
+    owner: str | None = None
+    visibility: str = "private"
+    kind: str = "note"
+    metadata: dict[str, Any] = field(default_factory=dict)
+    id: str | None = None
+    resource_id: str | None = None
+    revision: int = 1
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+@dataclass
+class Specification:
+    """Runtime description of a node's current contract and capabilities."""
+    id: str
+    version: int
+    node_id: str
+    visibility: str
+    capabilities: list[str]
+    resource_types: list[str]
+    transports: list[dict[str, Any]] = field(default_factory=list)
+    extensions: list[dict[str, Any]] = field(default_factory=list)
+    constraints: dict[str, Any] = field(default_factory=dict)
+    issued_at: str | None = None
+
+
+@dataclass
 class Agent:
     name: str
     description: str = ""
@@ -224,7 +269,7 @@ class Message:
 
 
 __all__ = [
-    "Agent",
+    "Agent",\n    "Note",\n    "Resource",\n    "Specification",
     "Artifact",
     "EpistemicChain",
     "EpistemicChainBrokenError",
