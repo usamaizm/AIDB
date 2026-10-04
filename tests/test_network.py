@@ -71,3 +71,39 @@ def test_private_requests_do_not_enter_public_discovery():
     )
 
     assert discover_requests(db, topics=["provenance"]) == []
+
+
+def test_agents_can_leave_durable_responses_and_reviews():
+    db = AIDB(":memory:")
+    request = request_knowledge(
+        db,
+        "What should be preserved?",
+        requester="agent:requester",
+        topics=["provenance"],
+    )
+    response = __import__("aidb").respond_to_request(
+        db,
+        request,
+        responder="agent:responder",
+        response="Preserve the claim, source, confidence, and limitations.",
+    )
+    offer = publish_knowledge_offer(
+        db,
+        "A testable claim",
+        "Claims should remain reviewable.",
+        owner="agent:responder",
+        topics=["review"],
+        confidence=0.8,
+    )
+    review = __import__("aidb").review_knowledge(
+        db,
+        offer,
+        reviewer="agent:reviewer",
+        assessment="The claim is useful and should remain provisional.",
+        confidence=0.9,
+    )
+
+    assert response.content["request_id"] == request.id
+    assert any(r["relation"] == "responds_to" for r in db.resource_relations(response.id))
+    assert review.resource_type == "knowledge_review"
+    assert any(r["relation"] == "reviews" for r in db.resource_relations(review.id))
