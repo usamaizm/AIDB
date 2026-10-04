@@ -62,6 +62,8 @@ class AIDB:
             CREATE INDEX IF NOT EXISTS idx_home_changes_resource ON home_changes(resource_id, id);
             CREATE INDEX IF NOT EXISTS idx_home_changes_actor ON home_changes(actor, id);
 
+            CREATE TABLE IF NOT EXISTS home_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, snapshot_id TEXT NOT NULL UNIQUE, home_format TEXT NOT NULL, content TEXT NOT NULL, content_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+
             CREATE TABLE IF NOT EXISTS node_specifications (version INTEGER PRIMARY KEY AUTOINCREMENT, specification_id TEXT NOT NULL UNIQUE, node_id TEXT NOT NULL, visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public','private')), capabilities TEXT NOT NULL DEFAULT '[]', resource_types TEXT NOT NULL DEFAULT '[]', transports TEXT NOT NULL DEFAULT '[]', extensions TEXT NOT NULL DEFAULT '[]', constraints TEXT NOT NULL DEFAULT '{}', issued_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 
             CREATE TABLE IF NOT EXISTS agents (
@@ -983,7 +985,7 @@ class AIDB:
         return {"ok": not issues, "issues": issues}
 
     def export_home(self, include_private=True):
-        tables = ["node_identity", "node_specifications", "home_resources", "notes", "resource_relations", "home_changes"]
+        tables = ["node_identity", "node_specifications", "home_resources", "notes", "resource_relations", "home_changes", "home_snapshots"]
         payload = {"format": "aidb-home-v1", "tables": {}}
         for table in tables:
             if table in {"home_resources", "notes"} and not include_private:
@@ -1035,6 +1037,30 @@ class AIDB:
         self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),resource_id,"update",owner or row["owner"],old_revision,old_revision+1,self._json({"content_changed":content is not None,"metadata_changed":metadata is not None})))
         self.db.commit()
         return self.get_resource(resource_id)
+
+    def public_changes(self, after_id=0, limit=100):
+        if limit < 1:
+            raise ValueError("limit must be positive")
+        rows=self.db.execute("SELECT c.* FROM home_changes c LEFT JOIN home_resources r ON r.id=c.resource_id WHERE c.id>? AND (c.resource_id IS NULL OR r.visibility='public') ORDER BY c.id ASC LIMIT ?", (after_id,limit)).fetchall()
+        return [dict(r) for r in rows]
+
+    def create_snapshot(self, include_private=True):
+        payload=self.export_home(include_private=include_private)
+        content=json.dumps(payload, sort_keys=True, separators=(",",":"), ensure_ascii=False)
+        digest=hashlib.sha256(content.encode("utf-8")).hexdigest()
+        snapshot_id="snap:"+digest
+        self.db.execute("INSERT OR IGNORE INTO home_snapshots(snapshot_id,home_format,content,content_hash) VALUES(?,?,?,?)", (snapshot_id,payload["format"],content,digest))
+        self.db.commit()
+        return {"snapshot_id":snapshot_id,"content_hash":digest,"created_at":self.db.execute("SELECT created_at FROM home_snapshots WHERE snapshot_id=?",(snapshot_id,)).fetchone()["created_at"]}
+
+    def restore_snapshot(self, snapshot_id):
+        row=self.db.execute("SELECT content,content_hash FROM home_snapshots WHERE snapshot_id=?", (snapshot_id,)).fetchone()
+        if row is None:
+            raise ValueError("snapshot does not exist")
+        digest=hashlib.sha256(row["content"].encode("utf-8")).hexdigest()
+        if digest != row["content_hash"]:
+            raise ValueError("snapshot integrity check failed")
+        return self.import_home(json.loads(row["content"]))
 
     def list_changes(self, after_id=0, limit=100, resource_id=None):
         if limit < 1:
