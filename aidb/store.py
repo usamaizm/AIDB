@@ -54,6 +54,10 @@ class AIDB:
 
             CREATE TABLE IF NOT EXISTS node_identity (id INTEGER PRIMARY KEY CHECK(id=1), node_id TEXT NOT NULL UNIQUE, owner TEXT, visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('public','private')), metadata TEXT NOT NULL DEFAULT '{}');
 
+            CREATE TABLE IF NOT EXISTS resource_relations (id INTEGER PRIMARY KEY AUTOINCREMENT, source_resource_id TEXT NOT NULL, target_resource_id TEXT NOT NULL, relation TEXT NOT NULL, metadata TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(source_resource_id,target_resource_id,relation), FOREIGN KEY(source_resource_id) REFERENCES home_resources(id) ON DELETE CASCADE, FOREIGN KEY(target_resource_id) REFERENCES home_resources(id) ON DELETE CASCADE);
+            CREATE INDEX IF NOT EXISTS idx_resource_relations_source ON resource_relations(source_resource_id);
+            CREATE INDEX IF NOT EXISTS idx_resource_relations_target ON resource_relations(target_resource_id);
+
             CREATE TABLE IF NOT EXISTS home_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, change_id TEXT NOT NULL UNIQUE, resource_id TEXT, operation TEXT NOT NULL, actor TEXT, previous_revision INTEGER, new_revision INTEGER, payload TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
             CREATE INDEX IF NOT EXISTS idx_home_changes_resource ON home_changes(resource_id, id);
             CREATE INDEX IF NOT EXISTS idx_home_changes_actor ON home_changes(actor, id);
@@ -970,7 +974,7 @@ class AIDB:
         return {"id":s.id,"version":s.version,"node":{"id":s.node_id},"visibility":s.visibility,"capabilities":s.capabilities,"resources":s.resource_types,"transports":s.transports,"extensions":s.extensions,"constraints":s.constraints,"issued_at":s.issued_at}
 
     def export_home(self, include_private=True):
-        tables = ["node_identity", "node_specifications", "home_resources", "notes", "home_changes"]
+        tables = ["node_identity", "node_specifications", "home_resources", "notes", "resource_relations", "home_changes"]
         payload = {"format": "aidb-home-v1", "tables": {}}
         for table in tables:
             if table in {"home_resources", "notes"} and not include_private:
@@ -991,6 +995,36 @@ class AIDB:
                 self.db.execute("INSERT OR IGNORE INTO "+table+" ("+",".join(columns)+") VALUES ("+placeholders+")", [row[k] for k in columns])
         self.db.commit()
         return self.current_specification()
+
+    def relate_resources(self, source_resource_id, target_resource_id, relation, metadata=None):
+        if source_resource_id == target_resource_id:
+            raise ValueError("a resource cannot relate to itself")
+        for rid in (source_resource_id, target_resource_id):
+            if self.db.execute("SELECT 1 FROM home_resources WHERE id=?", (rid,)).fetchone() is None:
+                raise ValueError("resource does not exist: " + rid)
+        self.db.execute("INSERT OR IGNORE INTO resource_relations(source_resource_id,target_resource_id,relation,metadata) VALUES(?,?,?,?)", (source_resource_id,target_resource_id,relation,self._json(metadata or {})))
+        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,payload) VALUES(?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),source_resource_id,"relate",None,self._json({"target_resource_id":target_resource_id,"relation":relation})))
+        self.db.commit()
+
+    def resource_relations(self, resource_id):
+        rows=self.db.execute("SELECT * FROM resource_relations WHERE source_resource_id=? OR target_resource_id=? ORDER BY id ASC", (resource_id,resource_id)).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_resource(self, resource_id, content=None, metadata=None, owner=None, expected_revision=None):
+        row=self.db.execute("SELECT * FROM home_resources WHERE id=?", (resource_id,)).fetchone()
+        if row is None:
+            raise ValueError("resource does not exist")
+        if owner is not None and row["owner"] != owner:
+            raise PermissionError("owner mismatch")
+        if expected_revision is not None and row["revision"] != expected_revision:
+            raise ValueError("revision conflict")
+        old_revision=row["revision"]
+        new_metadata=json.loads(row["metadata"]) if metadata is None else metadata
+        new_content=json.loads(row["content"]) if content is None else content
+        self.db.execute("UPDATE home_resources SET content=?, metadata=?, revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE id=?", (json.dumps(new_content),self._json(new_metadata),resource_id))
+        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),resource_id,"update",owner or row["owner"],old_revision,old_revision+1,self._json({"content_changed":content is not None,"metadata_changed":metadata is not None})))
+        self.db.commit()
+        return self.get_resource(resource_id)
 
     def list_changes(self, after_id=0, limit=100, resource_id=None):
         if limit < 1:
