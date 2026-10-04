@@ -19,6 +19,7 @@ This file is a durable handoff for human and AI contributors working on AIDB.
 - Extraction outputs must agree with the extraction's input artifact when parent lineage is asserted.
 - Lineage cycle tests must not be blocked by artifact immutability triggers before the lineage invariant can be exercised.
 - Home import can silently lose state if its table list diverges from export_home(). Keep export/import table coverage synchronized and restore in foreign-key dependency order.
+- Home import must be atomic: validate rows/columns and roll back on any failure rather than leaving partial restored state.
 - Snapshot tests previously contained dead conditional code and did not exercise restore_snapshot(). Tests must call the real recovery path.
 - Do not assume an HTTP/cloud deployment is required; AIDB is self-hostable and transport-adapter based.
 - Do not claim CI/tests are green unless a current run has actually been observed.
@@ -35,4 +36,4 @@ This file is a durable handoff for human and AI contributors working on AIDB.
 
 ## Known status
 
-As of October 4, 2026, the agent-home foundation PR (#11) and home export/import fix PR (#12) have been merged into main. The repository remains experimental; treat architecture and protocol details as evolving unless explicitly frozen.
+As of October 4, 2026, the agent-home foundation PR (#11) and home export/import fix PR (#12) have been merged into main. PR #13 contains the next hardening pass for atomic, schema-safe home imports. The repository remains experimental; treat architecture and protocol details as evolving unless explicitly frozen.
