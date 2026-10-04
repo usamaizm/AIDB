@@ -10,6 +10,10 @@ AIDB is intentionally model-agnostic and repository-native. It does not run mode
 
 AIDB is also file-format agnostic at the protocol layer: it is designed to handle text, PDFs, images, binary payloads, archives, and other artifact types through metadata-driven identity, provenance, and transformation tracking rather than file-extension assumptions.
 
+## Architecture
+
+AIDB is being designed as a language-agnostic, portable, live database for AI systems. The Python package is an implementation, not the architectural contract. See `docs/architecture.md` for the proposed architecture reset; major protocol, state, and portability decisions remain intentionally open until they are researched and validated.
+
 ## At a glance
 
 - Local-first memory and knowledge storage
