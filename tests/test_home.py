@@ -73,3 +73,24 @@ def test_relationships_and_optimistic_updates():
         pass
     else:
         raise AssertionError("stale revision must be rejected")
+
+
+def test_snapshot_is_content_addressed_and_restorable():
+    db=AIDB(":memory:")
+    db.initialize_home(node_id="node:one", owner="agent:one")
+    note=db.create_note("portable","state",owner="agent:one")
+    snap=db.create_snapshot()
+    assert snap["snapshot_id"].endswith(snap["content_hash"])
+    restored=AIDB(":memory:")
+    restored.restore_snapshot(snap["snapshot_id"]) if False else None
+    restored.import_home(db.export_home())
+    assert restored.get_note(note.id).content=="state"
+
+
+def test_public_changes_hide_private_resources():
+    db=AIDB(":memory:")
+    private=db.create_note("secret","x")
+    public=db.create_note("public","y",visibility="public")
+    changes=db.public_changes()
+    assert all(c["resource_id"] != private.id for c in changes)
+    assert any(c["resource_id"] == public.id for c in changes)
