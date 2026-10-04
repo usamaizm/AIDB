@@ -943,15 +943,16 @@ class AIDB:
         return self.get_resource(resource_id)
 
     def current_specification(self):
-        row=self.db.execute("SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1").fetchone()
-        if row is None:
-            identity=self.initialize_home(visibility="public")
-            caps=["resources","notes","artifacts","knowledge","messages","changes","export","restore","public_private","ownership"]
-            types=["resource","note","artifact","knowledge","memory","message","task"]
-            self.db.execute("INSERT INTO node_specifications(specification_id,node_id,capabilities,resource_types,transports) VALUES(?,?,?,?,?)", ("spec:"+str(uuid.uuid4()),identity["node_id"],self._json(caps),self._json(types),self._json([])))
+        identity=self.initialize_home()
+        caps=["resources","notes","artifacts","knowledge","messages","changes","export","restore","public_private","ownership"]
+        types=["resource","note","artifact","knowledge","memory","message","task"]
+        latest=self.db.execute("SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1").fetchone()
+        desired=(caps,types)
+        if latest is None or (json.loads(latest["capabilities"]), json.loads(latest["resource_types"])) != desired:
+            self.db.execute("INSERT INTO node_specifications(specification_id,node_id,visibility,capabilities,resource_types,transports) VALUES(?,?,?,?,?,?)", ("spec:"+str(uuid.uuid4()),identity["node_id"],"public",self._json(caps),self._json(types),self._json([])))
             self.db.commit()
-            row=self.db.execute("SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1").fetchone()
-        return Specification(row["specification_id"],row["version"],row["node_id"],row["visibility"],json.loads(row["capabilities"]),json.loads(row["resource_types"]),json.loads(row["transports"]),json.loads(row["extensions"]),json.loads(row["constraints"]),row["issued_at"])
+            latest=self.db.execute("SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1").fetchone()
+        return Specification(latest["specification_id"],latest["version"],latest["node_id"],latest["visibility"],json.loads(latest["capabilities"]),json.loads(latest["resource_types"]),json.loads(latest["transports"]),json.loads(latest["extensions"]),json.loads(latest["constraints"]),latest["issued_at"])
 
     def specification_dict(self):
         s=self.current_specification()
