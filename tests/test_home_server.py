@@ -27,6 +27,8 @@ def test_public_http_surface_exposes_spec_and_notes():
         created=json.load(urlopen(request))
         assert created["visibility"]=="private"
         visible=json.load(urlopen(base+"/v1/notes"))
+        changes=json.load(urlopen(base+"/v1/changes"))
+        assert changes
         assert all(n["visibility"]=="public" for n in visible)
     finally:
         server.shutdown()
