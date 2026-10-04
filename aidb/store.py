@@ -27,6 +27,9 @@ from .core import (
     Tool,
     ToolCall,
     WorkflowEvent,
+    Resource,
+    Note,
+    Specification,
 )
 
 
@@ -44,6 +47,14 @@ class AIDB:
         self.db.executescript(
             """
             PRAGMA foreign_keys = ON;
+
+            CREATE TABLE IF NOT EXISTS home_resources (id TEXT PRIMARY KEY, resource_type TEXT NOT NULL, content TEXT NOT NULL DEFAULT 'null', owner TEXT, visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('public','private')), metadata TEXT NOT NULL DEFAULT '{}', revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+
+            CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, resource_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, content TEXT NOT NULL, owner TEXT, visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('public','private')), kind TEXT NOT NULL DEFAULT 'note', metadata TEXT NOT NULL DEFAULT '{}', revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(resource_id) REFERENCES home_resources(id) ON DELETE CASCADE);
+
+            CREATE TABLE IF NOT EXISTS node_identity (id INTEGER PRIMARY KEY CHECK(id=1), node_id TEXT NOT NULL UNIQUE, owner TEXT, visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('public','private')), metadata TEXT NOT NULL DEFAULT '{}');
+
+            CREATE TABLE IF NOT EXISTS node_specifications (version INTEGER PRIMARY KEY AUTOINCREMENT, specification_id TEXT NOT NULL UNIQUE, node_id TEXT NOT NULL, visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public','private')), capabilities TEXT NOT NULL DEFAULT '[]', resource_types TEXT NOT NULL DEFAULT '[]', transports TEXT NOT NULL DEFAULT '[]', extensions TEXT NOT NULL DEFAULT '[]', constraints TEXT NOT NULL DEFAULT '{}', issued_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 
             CREATE TABLE IF NOT EXISTS agents (
                 id INTEGER PRIMARY KEY,
@@ -870,6 +881,81 @@ class AIDB:
             if len(results) >= limit:
                 break
         return results
+
+
+    def initialize_home(self, node_id=None, owner=None, visibility="private", metadata=None):
+        if visibility not in {"public", "private"}: raise ValueError("visibility must be public or private")
+        row = self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone()
+        if row: return dict(row)
+        node_id = node_id or "node:" + str(uuid.uuid4())
+        self.db.execute("INSERT INTO node_identity(id,node_id,owner,visibility,metadata) VALUES(1,?,?,?,?)", (node_id, owner, visibility, self._json(metadata or {})))
+        self.db.commit()
+        return dict(self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone())
+
+    def create_resource(self, resource_type, content=None, owner=None, visibility="private", metadata=None):
+        if visibility not in {"public", "private"}: raise ValueError("visibility must be public or private")
+        rid = "res:" + str(uuid.uuid4())
+        self.db.execute("INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)", (rid, resource_type, json.dumps(content), owner, visibility, self._json(metadata or {})))
+        self._append_workflow_event("resource_created", "resource created", metadata={"resource_id": rid, "resource_type": resource_type, "owner": owner, "visibility": visibility})
+        self.db.commit()
+        return self.get_resource(rid)
+
+    def get_resource(self, resource_id, include_private=True):
+        row = self.db.execute("SELECT * FROM home_resources WHERE id=?", (resource_id,)).fetchone()
+        if row is None: raise ValueError("resource does not exist")
+        if row["visibility"] == "private" and not include_private: raise PermissionError("private resource")
+        return Resource(row["resource_type"], json.loads(row["content"]), row["owner"], row["visibility"], json.loads(row["metadata"]), row["id"], row["revision"], row["created_at"], row["updated_at"])
+
+    def list_resources(self, resource_type=None, visibility=None, include_private=True):
+        clauses=[]; params=[]
+        if resource_type: clauses.append("resource_type=?"); params.append(resource_type)
+        if visibility: clauses.append("visibility=?"); params.append(visibility)
+        elif not include_private: clauses.append("visibility='public'")
+        where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
+        rows=self.db.execute("SELECT id FROM home_resources"+where+" ORDER BY updated_at DESC",params).fetchall()
+        return [self.get_resource(r["id"]) for r in rows]
+
+    def create_note(self, title, content, owner=None, visibility="private", kind="note", metadata=None):
+        resource=self.create_resource("note", {"title":title,"content":content,"kind":kind}, owner, visibility, metadata)
+        self.db.execute("INSERT INTO notes(id,resource_id,title,content,owner,visibility,kind,metadata) VALUES(?,?,?,?,?,?,?,?)", (resource.id,resource.id,title,content,owner,visibility,kind,self._json(metadata or {})))
+        self.db.commit()
+        return self.get_note(resource.id)
+
+    def get_note(self, note_id, include_private=True):
+        row=self.db.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
+        if row is None: raise ValueError("note does not exist")
+        if row["visibility"] == "private" and not include_private: raise PermissionError("private note")
+        return Note(row["title"],row["content"],row["owner"],row["visibility"],row["kind"],json.loads(row["metadata"]),row["id"],row["resource_id"],row["revision"],row["created_at"],row["updated_at"])
+
+    def list_notes(self, owner=None, visibility=None, include_private=True):
+        clauses=[]; params=[]
+        if owner is not None: clauses.append("owner=?"); params.append(owner)
+        if visibility: clauses.append("visibility=?"); params.append(visibility)
+        elif not include_private: clauses.append("visibility='public'")
+        where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
+        return [self.get_note(r["id"]) for r in self.db.execute("SELECT id FROM notes"+where+" ORDER BY updated_at DESC",params)]
+
+    def publish_resource(self, resource_id):
+        self.db.execute("UPDATE home_resources SET visibility='public', revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE id=?", (resource_id,))
+        self.db.execute("UPDATE notes SET visibility='public', revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE resource_id=?", (resource_id,))
+        self._append_workflow_event("resource_published", "resource published", metadata={"resource_id":resource_id})
+        self.db.commit()
+        return self.get_resource(resource_id)
+
+    def current_specification(self):
+        row=self.db.execute("SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1").fetchone()
+        if row is None:
+            identity=self.initialize_home(visibility="public")
+            caps=["resources","notes","artifacts","knowledge","messages","changes","export","restore","public_private","ownership"]
+            types=["resource","note","artifact","knowledge","memory","message","task"]
+            self.db.execute("INSERT INTO node_specifications(specification_id,node_id,capabilities,resource_types,transports) VALUES(?,?,?,?,?)", ("spec:"+str(uuid.uuid4()),identity["node_id"],self._json(caps),self._json(types),self._json([])))
+            self.db.commit()
+            row=self.db.execute("SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1").fetchone()
+        return Specification(row["specification_id"],row["version"],row["node_id"],row["visibility"],json.loads(row["capabilities"]),json.loads(row["resource_types"]),json.loads(row["transports"]),json.loads(row["extensions"]),json.loads(row["constraints"]),row["issued_at"])
+
+    def specification_dict(self):
+        s=self.current_specification()
+        return {"id":s.id,"version":s.version,"node":{"id":s.node_id},"visibility":s.visibility,"capabilities":s.capabilities,"resources":s.resource_types,"transports":s.transports,"extensions":s.extensions,"constraints":s.constraints,"issued_at":s.issued_at}
 
     def close(self) -> None:
         self.db.close()
