@@ -22,7 +22,7 @@ def test_public_http_surface_exposes_spec_and_notes():
         assert "notes" in spec["capabilities"]
         notes=json.load(urlopen(base+"/v1/notes"))
         assert notes[0]["title"]=="public"
-        private=db.create_note("private","secret")
+        db.create_note("private","secret")
         request=Request(base+"/v1/notes",data=json.dumps({"title":"new","content":"secret","visibility":"private"}).encode(),headers={"Content-Type":"application/json","Authorization":"Bearer test-token"},method="POST")
         created=json.load(urlopen(request))
         assert created["visibility"]=="private"
