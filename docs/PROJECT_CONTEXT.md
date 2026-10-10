@@ -71,6 +71,7 @@ Known limitations:
 
 ## Architecture and contract index
 
+- [Implementation roadmap](IMPLEMENTATION_ROADMAP.md) — evidence-driven P0–P3 checklist, explicit acceptance workflow, and PR reconciliation.
 - [Repository audit and launch readiness](repository-audit.md) — verified baseline, known bugs, CI, open PRs, launch blockers.
 - [One-stop agent substrate](one-stop-agent-substrate.md) — product scope and shared primitives.
 - [Self-evolving architecture](self-evolving-architecture.md) — controlled continuous improvement, risk tiers, migration and recovery.
@@ -94,6 +95,7 @@ Use the live GitHub issue/PR state and `docs/repository-audit.md` to refresh thi
 - #14 and #15: review together because agent discovery and network-loop work overlaps.
 - #16: living context and agent identity proposal; this handoff now provides a versioned-in-repository starting point, but compare its remaining unique changes before deciding.
 - Keep CI green; refresh the audit from current run results.
+- Follow [the implementation roadmap](IMPLEMENTATION_ROADMAP.md) as the canonical actionable backlog; mark work complete only with source, tests, and CI evidence.
 - Add benchmark baselines before making performance claims.
 - Implement context-budgeted retrieval, bounded/paginated APIs, streaming, resource controls, and storage improvements in small tested increments.
 - Continue verifying import/export/snapshot restore, provenance invariants, HTTP authorization and deployment boundaries.
