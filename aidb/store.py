@@ -6,6 +6,7 @@ import sqlite3
 import uuid
 import warnings
 from math import sqrt
+from threading import RLock
 from pathlib import Path
 from typing import Any
 
@@ -38,7 +39,8 @@ class AIDB:
 
     def __init__(self, path: str | Path = "aidb.sqlite3"):
         self.path = str(path)
-        self.db = sqlite3.connect(self.path)
+        self._connection_lock = RLock()
+        self.db = sqlite3.connect(self.path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys = ON")
         self._create_schema()
