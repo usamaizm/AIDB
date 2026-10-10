@@ -1,6 +1,6 @@
 # Agent Maintenance Notes
 
-**Session bootstrap: read [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) first.** It is the concise, durable handoff for the project vision, decisions, implementation boundaries, key docs, current priorities, and the workflow for getting current. Then follow the instructions below and verify live source/CI/PR state. Do not depend on previous chat memory.
+**Fast bootstrap: read [.aidb/session-context.yml](.aidb/session-context.yml), then [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).** The YAML is the compact machine-readable map; the Markdown explains the reasoning and project state. Next follow this file and check live CI/PR state. Do not rely on chat history, old model memory, or design docs as proof that a feature is implemented.
 
 This file is a durable handoff for human and AI contributors working on AIDB.
 
