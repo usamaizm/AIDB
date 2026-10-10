@@ -94,3 +94,8 @@ knowledge_base:
       path: docs/storage-efficiency-and-numeric-data.md
       category: architecture
       status: proposed
+    - id: machine-readable-session-context
+      title: Machine-readable agent session context manifest
+      path: .aidb/session-context.yml
+      category: workflow
+      status: accepted
