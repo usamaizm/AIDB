@@ -67,3 +67,10 @@ As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the
 - Use UTF-8 at interoperable text boundaries, explicit lengths and ownership in C APIs, and stable machine-readable error codes independent of localized messages.
 - Test Chinese (Simplified and Traditional), Japanese, Arabic, mixed-language content, and right-to-left text before claiming multilingual compatibility.
 - Do not claim language-aware search quality for a language until an analyzer and representative tests exist.
+## Public API design
+
+- Follow `docs/api-design-principles.md` when proposing public API names, ownership rules, errors, versioning, and examples.
+- Optimize for predictability, consistency, safety, and discoverability rather than clever or minimal syntax.
+- Treat `include/aidb/aidb.h` as a draft ABI until a compiled implementation and ABI/conformance tests exist.
+- Keep API semantics language-neutral; provide idiomatic wrappers without changing contract behavior.
+- Document ownership, UTF-8 and binary handling, limits, concurrency, idempotency, authorization, and failure behavior for every public operation.
