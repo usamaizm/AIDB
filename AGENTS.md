@@ -36,3 +36,11 @@ This file is a durable handoff for human and AI contributors working on AIDB.
 ## Known status
 
 As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the atomic, schema-safe home-import hardening pass. The repository remains experimental; treat architecture and protocol details as evolving unless explicitly frozen.
+## Agent and file-format compatibility
+
+- Keep `AGENTS.md` as repository-level contributor instructions; keep `README.md` human-facing and `docs/` authoritative for architecture and contracts.
+- Default to Markdown for instructions and prose, but support plain text and other file formats as artifacts. Do not infer semantics from file extensions alone.
+- Follow `docs/agent-compatibility-and-file-formats.md` for the proposed artifact metadata, capability discovery, format adapters, and ingestion rules.
+- Follow `docs/binary-and-assembly.md` for the proposed binary and assembly artifact rules.
+- Preserve original bytes; treat extraction/conversion as explicit, provenance-tracked transformations. Never execute imported artifacts as a side effect of ingest, indexing, preview, or export.
+- Do not claim a format or agent protocol is implemented until capability discovery and relevant conformance tests demonstrate it.
