@@ -44,3 +44,10 @@ As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the
 - Follow `docs/binary-and-assembly.md` for the proposed binary and assembly artifact rules.
 - Preserve original bytes; treat extraction/conversion as explicit, provenance-tracked transformations. Never execute imported artifacts as a side effect of ingest, indexing, preview, or export.
 - Do not claim a format or agent protocol is implemented until capability discovery and relevant conformance tests demonstrate it.
+## Modularity
+
+- Treat `docs/modular-architecture.md` as the proposed guide for module boundaries, dependency direction, adapter/plugin contracts, and incremental refactoring.
+- Keep the core independent of concrete storage engines, transports, language bindings, agent frameworks, model providers, and file-format parsers.
+- Prefer documented interfaces and conformance tests over directory-only separation. Do not split modules into services/packages prematurely.
+- New optional capabilities must declare their contract version, dependencies, capabilities, configuration, and permissions; unsupported capabilities should return stable errors.
+- Refactor incrementally after inspecting current dependencies and tests. Do not claim the architecture is implemented or tests pass without evidence.
