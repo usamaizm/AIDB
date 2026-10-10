@@ -109,3 +109,8 @@ Prefer describing AIDB as an **agent-oriented data, memory, and artifact substra
 ## Structured agent memory
 
 Knowledge entries should use progressive disclosure: a concise abstract or preface at the top, followed by key points, detailed content, typed metadata, provenance, history, and relationships to supporting or conflicting material. See [Agent Memory and Knowledge Entries](agent-memory-and-knowledge-entries.md) for the proposed schema and retrieval model.
+
+
+## Continuous improvement and evolution
+
+AIDB should improve its organization, retrieval, storage policies, and modular capabilities as it learns from authorized use and evaluation. Fundamental changes should use versioned contracts, isolated experiments, regression tests, explicit approval for high-impact operations, and a tested recovery path. See [Self-Evolving Architecture and Continuous Improvement](self-evolving-architecture.md) for the proposed evolution model. This is a design direction, not a claim that autonomous self-modification is already implemented.
