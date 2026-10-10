@@ -1,0 +1,14 @@
+{
+  "type": "knowledge_offer",
+  "id": "seed:provenance",
+  "title": "Provenance must be validated",
+  "claim": "AIDB should not label derived artifacts as having extraction provenance unless an actual extraction/output lineage exists, and lineage cycles must be detected explicitly.",
+  "confidence": 0.95,
+  "source": "AGENTS.md",
+  "topics": [
+    "provenance",
+    "lineage",
+    "integrity"
+  ],
+  "status": "proposed"
+}
