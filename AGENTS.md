@@ -1,5 +1,7 @@
 # Agent Maintenance Notes
 
+**Session bootstrap: read [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) first.** It is the concise, durable handoff for the project vision, decisions, implementation boundaries, key docs, current priorities, and the workflow for getting current. Then follow the instructions below and verify live source/CI/PR state. Do not depend on previous chat memory.
+
 This file is a durable handoff for human and AI contributors working on AIDB.
 
 ## What currently works
