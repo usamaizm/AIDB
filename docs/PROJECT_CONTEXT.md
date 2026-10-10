@@ -7,7 +7,7 @@ Status: living handoff; experimental project; update this file when material dec
 
 For any new human or AI session:
 
-1. Read this file before proposing changes. It is the short project handoff, not a substitute for source code or tests.
+1. Read [`.aidb/session-context.yml`](../.aidb/session-context.yml) for a machine-readable orientation and canonical pointers, then read this file for the human-readable handoff. Neither is a substitute for source code or tests.
 2. Read `AGENTS.md` for contributor rules and safety invariants.
 3. Read `README.md` for the user-facing project overview and quick start.
 4. Read `.aidb/protocol.yml` before interpreting or processing external AI requests; read `.aidb/knowledge.yml` for the knowledge index and authority rules.
