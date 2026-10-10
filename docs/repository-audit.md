@@ -6,7 +6,7 @@ Audit snapshot: 2026-10-10. This is a living triage record, not a claim that eve
 
 - The default branch is `main`; the repository is experimental.
 - The Python reference implementation uses SQLite. The C ABI header remains a draft and is not a functioning implementation.
-- Before adding the Ruff gate, CI passed on Python 3.10, 3.11, and 3.12 with 24 tests.
+- The latest verified CI run, [38049935824](https://github.com/usamaizm/AIDB/actions/runs/38049935824), passed on Python 3.10, 3.11, and 3.12: compilation passed, Ruff reported “All checks passed”, and pytest passed all 28 tests on each version.
 - CI then exposed an HTTP integration failure: a threaded request used an SQLite connection created on another thread. The connection now permits cross-thread access, and HTTP handler database work is serialized with an instance lock.
 - CI also exposed stale HTTP test expectations: a configured auth token means an unauthenticated write should receive 401, and the valid request must use the configured token. These assertions were corrected.
 - The initial Ruff pass found a duplicate `Memory` class definition in `aidb/epistemic.py`; the legacy payload was renamed `LegacyMemoryRecord` so `Memory` refers to the canonical epistemic model. Regression tests cover both.
