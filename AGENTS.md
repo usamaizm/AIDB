@@ -59,3 +59,11 @@ As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the
 - Preserve access control, provenance, byte-safe artifacts, portability, revision checks, and explicit side-effect boundaries.
 - Avoid describing AIDB as a replacement for every database or specialized system. Integrate through explicit adapters when that is more appropriate.
 - Treat the document as intended direction, not a statement that all listed features are already implemented.
+## Programming-language and human-language agnosticism
+
+- Follow `docs/multilingual-and-language-agnostic.md` for Unicode, language metadata, RTL text, binding parity, and multilingual testing.
+- Distinguish implementation-language neutrality from human-language neutrality; satisfy both without requiring English for stored content.
+- Preserve original text and bytes. Treat translation, transliteration, normalization for search, OCR, and extraction as explicit derived transformations with provenance.
+- Use UTF-8 at interoperable text boundaries, explicit lengths and ownership in C APIs, and stable machine-readable error codes independent of localized messages.
+- Test Chinese (Simplified and Traditional), Japanese, Arabic, mixed-language content, and right-to-left text before claiming multilingual compatibility.
+- Do not claim language-aware search quality for a language until an analyzer and representative tests exist.
