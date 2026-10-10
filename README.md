@@ -4,6 +4,11 @@ AIDB is a collection of collections of ideas.
 
 Status: experimental, concept-first, standards-aware, and reviewable.
 
+
+## For AI agents and fresh sessions
+
+Start with [the project context and agent handoff](docs/PROJECT_CONTEXT.md). It summarizes the current mission, architecture decisions, implementation boundaries, key documents, and open priorities so a new session does not need to reconstruct the project from chat history. Then read [`AGENTS.md`](AGENTS.md) for contributor rules and [the living repository audit](docs/repository-audit.md) for current risks and verification status. Always refresh the files from the current default branch and verify live CI/PR state; design proposals are not proof of implementation.
+
 AIDB is a local-first knowledge and memory substrate for AI systems. It gives agents a durable place to store operational memory, session state, shared knowledge, workflow events, and project context without depending on a central cloud service.
 
 AIDB is intentionally model-agnostic and repository-native. It does not run models or call external AI services by itself. Instead, it provides a durable coordination layer for AI workflows, knowledge capture, task tracking, and reviewable provenance.
