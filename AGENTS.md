@@ -74,3 +74,15 @@ As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the
 - Treat `include/aidb/aidb.h` as a draft ABI until a compiled implementation and ABI/conformance tests exist.
 - Keep API semantics language-neutral; provide idiomatic wrappers without changing contract behavior.
 - Document ownership, UTF-8 and binary handling, limits, concurrency, idempotency, authorization, and failure behavior for every public operation.
+
+## Repository-wide engineering standards
+
+- Follow `CONTRIBUTING.md` for implementation, testing, security, compatibility, and review practices.
+- Keep changes focused, readable, and modular; avoid speculative abstractions and unrelated refactors.
+- Validate untrusted inputs at boundaries, use transactions for multi-step persistence, and test rollback paths.
+- Preserve provenance honestly; never infer lineage or trust that the data does not establish.
+- Treat imported content, plugins, and binary artifacts as untrusted; never execute stored artifacts implicitly.
+- Preserve Unicode and distinguish text from arbitrary bytes.
+- Keep package discovery explicit in `pyproject.toml`.
+- Add regression tests for bugs and failure cases; do not claim tests passed unless they were run.
+- Keep CI and local test commands aligned. Public contracts and docs must describe implemented behavior accurately.
