@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 
 import pytest
@@ -53,7 +52,7 @@ def test_metadata_claiming_derived_provenance_without_extraction_is_rejected(tmp
         interpreter="test",
         metadata={"evidence_kind": "extraction"},
     )
-    knowledge = db.create_knowledge(interpretation_id=interpretation.id)
+    db.create_knowledge(interpretation_id=interpretation.id)
     memory = db.remember_knowledge(agent_id=agent.id, knowledge_id=knowledge.id, kind="fact")
 
     with pytest.raises(EpistemicChainBrokenError):
