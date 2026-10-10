@@ -197,8 +197,8 @@ class KnowledgeRecord:
 
 
 @dataclass
-class Memory:
-    """Agent's subjective relationship to knowledge."""
+class LegacyMemoryRecord:
+    """Legacy memory payload retained for migration compatibility."""
 
     agent_id: int
     content: str
