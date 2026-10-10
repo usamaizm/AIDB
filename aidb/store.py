@@ -914,13 +914,21 @@ class AIDB:
         if row["visibility"] == "private" and not include_private: raise PermissionError("private resource")
         return Resource(row["resource_type"], json.loads(row["content"]), row["owner"], row["visibility"], json.loads(row["metadata"]), row["id"], row["revision"], row["created_at"], row["updated_at"])
 
-    def list_resources(self, resource_type=None, visibility=None, include_private=True):
+    def list_resources(self, resource_type=None, visibility=None, include_private=True, limit=None, offset=0):
         clauses=[]; params=[]
         if resource_type: clauses.append("resource_type=?"); params.append(resource_type)
         if visibility: clauses.append("visibility=?"); params.append(visibility)
         elif not include_private: clauses.append("visibility='public'")
         where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
-        rows=self.db.execute("SELECT id FROM home_resources"+where+" ORDER BY updated_at DESC",params).fetchall()
+        sql="SELECT id FROM home_resources"+where+" ORDER BY updated_at DESC, id ASC"
+        if limit is not None:
+            if not isinstance(limit, int) or limit < 1: raise ValueError("limit must be a positive integer")
+            sql += " LIMIT ?"; params.append(limit)
+        if not isinstance(offset, int) or offset < 0: raise ValueError("offset must be a non-negative integer")
+        if offset:
+            if limit is None: sql += " LIMIT -1"
+            sql += " OFFSET ?"; params.append(offset)
+        rows=self.db.execute(sql,params).fetchall()
         return [self.get_resource(r["id"]) for r in rows]
 
     def create_note(self, title, content, owner=None, visibility="private", kind="note", metadata=None):
@@ -935,13 +943,21 @@ class AIDB:
         if row["visibility"] == "private" and not include_private: raise PermissionError("private note")
         return Note(row["title"],row["content"],row["owner"],row["visibility"],row["kind"],json.loads(row["metadata"]),row["id"],row["resource_id"],row["revision"],row["created_at"],row["updated_at"])
 
-    def list_notes(self, owner=None, visibility=None, include_private=True):
+    def list_notes(self, owner=None, visibility=None, include_private=True, limit=None, offset=0):
         clauses=[]; params=[]
         if owner is not None: clauses.append("owner=?"); params.append(owner)
         if visibility: clauses.append("visibility=?"); params.append(visibility)
         elif not include_private: clauses.append("visibility='public'")
         where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
-        return [self.get_note(r["id"]) for r in self.db.execute("SELECT id FROM notes"+where+" ORDER BY updated_at DESC",params)]
+        sql="SELECT id FROM notes"+where+" ORDER BY updated_at DESC, id ASC"
+        if limit is not None:
+            if not isinstance(limit, int) or limit < 1: raise ValueError("limit must be a positive integer")
+            sql += " LIMIT ?"; params.append(limit)
+        if not isinstance(offset, int) or offset < 0: raise ValueError("offset must be a non-negative integer")
+        if offset:
+            if limit is None: sql += " LIMIT -1"
+            sql += " OFFSET ?"; params.append(offset)
+        return [self.get_note(r["id"]) for r in self.db.execute(sql,params)]
 
     def publish_resource(self, resource_id):
         row=self.db.execute("SELECT revision,owner,visibility FROM home_resources WHERE id=?", (resource_id,)).fetchone()
