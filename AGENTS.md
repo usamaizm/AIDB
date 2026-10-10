@@ -51,3 +51,11 @@ As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the
 - Prefer documented interfaces and conformance tests over directory-only separation. Do not split modules into services/packages prematurely.
 - New optional capabilities must declare their contract version, dependencies, capabilities, configuration, and permissions; unsupported capabilities should return stable errors.
 - Refactor incrementally after inspecting current dependencies and tests. Do not claim the architecture is implemented or tests pass without evidence.
+## Product direction: one-stop substrate for agents
+
+- Treat `docs/one-stop-agent-substrate.md` as the product-scope proposal: shared agent data/memory/artifacts with a small stable core and optional modules.
+- Prioritize reliable shared primitives and conformance tests before accumulating integrations or specialized features.
+- Keep search, embeddings, parsing, OCR, model providers, and agent-framework integrations optional; advertise support through capability discovery.
+- Preserve access control, provenance, byte-safe artifacts, portability, revision checks, and explicit side-effect boundaries.
+- Avoid describing AIDB as a replacement for every database or specialized system. Integrate through explicit adapters when that is more appropriate.
+- Treat the document as intended direction, not a statement that all listed features are already implemented.
