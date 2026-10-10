@@ -86,3 +86,12 @@ As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the
 - Keep package discovery explicit in `pyproject.toml`.
 - Add regression tests for bugs and failure cases; do not claim tests passed unless they were run.
 - Keep CI and local test commands aligned. Public contracts and docs must describe implemented behavior accurately.
+
+## Live build and emulation runtime
+
+- Follow `docs/live-build-and-emulation.md` when designing compilation, execution, emulation, disassembly, decompilation, or live agent feedback.
+- Keep orchestration contracts separate from toolchain adapters; advertise capabilities and limitations explicitly.
+- Model-generated plans are proposals, not execution evidence. Report actual exit status and separate execution success from verification.
+- Persist job state, bounded logs, toolchain versions, input/output hashes, and artifact lineage; do not rely on model context as durable state.
+- Never execute files during ingest, indexing, inspection, preview, or export. Treat code and binaries as untrusted.
+- Do not expose a real code-execution adapter until isolation, resource limits, cancellation, and permissions have tests.
