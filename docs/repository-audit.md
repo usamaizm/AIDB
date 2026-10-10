@@ -1,12 +1,12 @@
 # Repository Audit and Launch Readiness
 
-Audit snapshot: 2026-10-10. This is a living triage record, not a claim that every file has had a line-by-line security review.
+Audit snapshot: 2026-10-10, refreshed after adding the project-context handoff. This is a living triage record, not a claim that every file has had a line-by-line security review.
 
 ## Current verified baseline
 
 - The default branch is `main`; the repository is experimental.
 - The Python reference implementation uses SQLite. The C ABI header remains a draft and is not a functioning implementation.
-- The latest verified CI run, [38049935824](https://github.com/usamaizm/AIDB/actions/runs/38049935824), passed on Python 3.10, 3.11, and 3.12: compilation passed, Ruff reported “All checks passed”, and pytest passed all 28 tests on each version.
+- The latest verified full CI run observed during this audit, [38050871839](https://github.com/usamaizm/AIDB/actions/runs/38050871839), completed successfully on commit `5cba3621016a2c5c337da5bafa9eb933845be184` (the performance/context architecture link update). Earlier detailed matrix run [38049935824](https://github.com/usamaizm/AIDB/actions/runs/38049935824) passed on Python 3.10, 3.11, and 3.12: compilation passed, Ruff reported “All checks passed”, and pytest passed all 28 tests on each version. Subsequent commits add project-context documentation and knowledge-index entries; recheck CI for the current HEAD before claiming the current revision is green.
 - CI then exposed an HTTP integration failure: a threaded request used an SQLite connection created on another thread. The connection now permits cross-thread access, and HTTP handler database work is serialized with an instance lock.
 - CI also exposed stale HTTP test expectations: a configured auth token means an unauthenticated write should receive 401, and the valid request must use the configured token. These assertions were corrected.
 - The initial Ruff pass found a duplicate `Memory` class definition in `aidb/epistemic.py`; the legacy payload was renamed `LegacyMemoryRecord` so `Memory` refers to the canonical epistemic model. Regression tests cover both.
@@ -26,7 +26,7 @@ The following PRs were open when checked. GitHub reported `mergeable: false` for
 - [#13 — atomic, schema-safe home imports](https://github.com/usamaizm/AIDB/pull/13): its central safety fix has now been implemented directly on `main`, with additional validation and rollback tests. Reconcile or close the now-duplicated PR after confirming the branch diff.
 - [#14 — agent discovery and contract-first evolution](https://github.com/usamaizm/AIDB/pull/14): introduces discovery/compatibility documentation and a manifest.
 - [#15 — durable agent network loop](https://github.com/usamaizm/AIDB/pull/15): adds network/collaboration APIs and tests, and overlaps with #14 on the agent card, docs, seed knowledge, and discovery files. Review #14 and #15 together and consolidate shared files before merging either.
-- [#16 — living project context and agent identity](https://github.com/usamaizm/AIDB/pull/16): documentation-only context proposal. Its file is not yet on `main`; review the proposal and merge only after the maintainer's intent is clear.
+- [#16 — living project context and agent identity](https://github.com/usamaizm/AIDB/pull/16): documentation-only context proposal. `docs/PROJECT_CONTEXT.md` and the `AGENTS.md` bootstrap now exist on `main`; compare the PR's remaining unique changes before deciding whether to merge or close it.
 
 Closed PRs should remain part of the history; do not reopen or reapply their changes without identifying what is still missing from `main`.
 
