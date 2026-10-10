@@ -27,5 +27,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .[dev]
 
+      - name: Compile source and tests
+        run: python -m compileall -q aidb tests
+
       - name: Run pytest
-        run: pytest -q
+        run: python -m pytest -q
