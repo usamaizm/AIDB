@@ -52,7 +52,7 @@ def test_metadata_claiming_derived_provenance_without_extraction_is_rejected(tmp
         interpreter="test",
         metadata={"evidence_kind": "extraction"},
     )
-    db.create_knowledge(interpretation_id=interpretation.id)
+    knowledge = db.create_knowledge(interpretation_id=interpretation.id)
     memory = db.remember_knowledge(agent_id=agent.id, knowledge_id=knowledge.id, kind="fact")
 
     with pytest.raises(EpistemicChainBrokenError):
@@ -122,7 +122,7 @@ def test_knowledge_and_event_are_created_in_same_transaction(tmp_path: Path) -> 
     )
 
     before = db.db.execute("SELECT COUNT(*) AS n FROM workflow_events").fetchone()["n"]
-    knowledge = db.create_knowledge(interpretation_id=interpretation.id)
+    db.create_knowledge(interpretation_id=interpretation.id)
     after = db.db.execute("SELECT COUNT(*) AS n FROM workflow_events").fetchone()["n"]
 
     assert after > before
