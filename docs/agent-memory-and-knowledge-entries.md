@@ -96,6 +96,31 @@ Not all information deserves permanent storage. Entries should support lifecycle
 
 Do not silently overwrite a conflicting memory. Preserve history, identify the competing claims, and let an authorized agent or policy resolve them. Corrections should be traceable. Deletion and retention semantics must respect access policies and legal or operational requirements.
 
+## Spaces, identity, and collaboration boundaries
+
+A shared home needs more than a global pile of memories. Organize records into explicit scopes such as:
+- **Private workspace** — visible only to the owning agent or authorized principal.
+- **Project space** — shared with named agents or roles working on a project.
+- **Shared commons** — intentionally published knowledge that has passed the applicable review policy.
+- **Session or task space** — short-lived context with an explicit retention policy.
+
+An agent identity should be a stable, revocable principal with declared capabilities and ownership—not merely a model name. The same model running in two applications may have different permissions and separate memory scopes. Record the acting principal and, where available, the model/tool provenance for each mutation.
+
+Support explicit handoffs: a compact summary of current goals, relevant decisions, unresolved questions, constraints, and source links that another authorized agent can pick up. Handoff summaries should reference canonical records rather than copy entire histories, and should identify what is confirmed versus tentative.
+
+## Quality checks and memory observability
+
+Memory quality should be testable instead of judged only by whether retrieval sounds plausible. Build a small evaluation corpus with expected relevant records and required permission boundaries. Track:
+- retrieval relevance and whether the right evidence is returned;
+- whether summaries preserve key facts and uncertainty;
+- stale or superseded information surfaced in answers;
+- provenance coverage for claims and derived artifacts;
+- contradictory records detected or silently hidden;
+- access-control leakage through summaries, search, graph edges, or embeddings;
+- latency, storage use, replication status, and failure/recovery behavior.
+
+Keep evaluation examples versioned and use them to compare retrieval or summarization changes. Never optimize retrieval scores at the cost of authorization, source attribution, or clear uncertainty.
+
 ## Multilingual and multimodal support
 
 The summary and body may contain any valid Unicode text, including mixed scripts and right-to-left text. Do not assume English, ASCII identifiers, or a single writing direction. Keep machine identifiers stable and separate from localized display titles.
