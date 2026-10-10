@@ -105,3 +105,7 @@ AIDB is approaching the one-stop goal when:
 ## Scope statement
 
 Prefer describing AIDB as an **agent-oriented data, memory, and artifact substrate**. It can host or connect to many agent workflows, but it is not inherently a universal replacement for every operational database, search engine, vector database, filesystem, or specialized analytics system. Integration should be capability-driven and avoid duplicating data unnecessarily.
+
+## Structured agent memory
+
+Knowledge entries should use progressive disclosure: a concise abstract or preface at the top, followed by key points, detailed content, typed metadata, provenance, history, and relationships to supporting or conflicting material. See [Agent Memory and Knowledge Entries](agent-memory-and-knowledge-entries.md) for the proposed schema and retrieval model.
