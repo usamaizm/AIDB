@@ -7,7 +7,7 @@ Status: experimental, concept-first, standards-aware, and reviewable.
 
 ## For AI agents and fresh sessions
 
-Start with [the project context and agent handoff](docs/PROJECT_CONTEXT.md). It summarizes the current mission, architecture decisions, implementation boundaries, key documents, and open priorities so a new session does not need to reconstruct the project from chat history. Then read [`AGENTS.md`](AGENTS.md) for contributor rules and [the living repository audit](docs/repository-audit.md) for current risks and verification status. Always refresh the files from the current default branch and verify live CI/PR state; design proposals are not proof of implementation.
+Fast path for a fresh agent session: read the machine-readable [session context manifest](.aidb/session-context.yml), then [project handoff](docs/PROJECT_CONTEXT.md), [`AGENTS.md`](AGENTS.md), and the [repository audit](docs/repository-audit.md). These point to the right code, tests, architecture contracts, known limitations, and next priorities. Fetch current `main` and verify live CI/PR state before acting; do not rediscover the project from chat history or treat proposals as shipped features.
 
 AIDB is a local-first knowledge and memory substrate for AI systems. It gives agents a durable place to store operational memory, session state, shared knowledge, workflow events, and project context without depending on a central cloud service.
 
