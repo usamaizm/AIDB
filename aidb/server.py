@@ -3,12 +3,15 @@ from __future__ import annotations
 import json
 import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from .store import AIDB
 
 
-def create_handler(db: AIDB, auth_token: str | None = None):
+def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int = 1048576, max_page_size: int = 200):
+    if max_body_bytes < 1 or max_page_size < 1:
+        raise ValueError("limits must be positive")
+
     class Handler(BaseHTTPRequestHandler):
         def _send(self, status: int, payload) -> None:
             data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -19,8 +22,17 @@ def create_handler(db: AIDB, auth_token: str | None = None):
             self.wfile.write(data)
 
         def _json_body(self):
-            length = int(self.headers.get("Content-Length", "0"))
-            return json.loads(self.rfile.read(length) or b"{}")
+            raw_length = self.headers.get("Content-Length", "0")
+            try:
+                length = int(raw_length)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("invalid Content-Length") from exc
+            if length < 0:
+                raise ValueError("invalid Content-Length")
+            if length > max_body_bytes:
+                raise OverflowError("request body too large")
+            raw = self.rfile.read(length) if length else b"{}"
+            return json.loads(raw)
 
         def do_GET(self):
             # SQLite connections are shared by the threaded HTTP handler.
@@ -29,23 +41,32 @@ def create_handler(db: AIDB, auth_token: str | None = None):
                 self._handle_get()
 
         def _handle_get(self):
-            path = urlparse(self.path).path
+            parsed = urlparse(self.path)
+            path = parsed.path
+            query = parse_qs(parsed.query, strict_parsing=False)
             try:
+                limit = min(int(query.get("limit", [min(100, max_page_size)])[0]), max_page_size)
+                offset = int(query.get("offset", ["0"])[0])
+                if limit < 1 or offset < 0:
+                    raise ValueError("limit must be positive and offset non-negative")
                 if path == "/healthz":
                     return self._send(200, {"ok": True})
                 if path in {"/specification", "/.well-known/aidb.json"}:
                     return self._send(200, db.specification_dict())
                 if path == "/v1/notes":
                     return self._send(
-                        200, [note.__dict__ for note in db.list_notes(include_private=False)]
+                        200, [note.__dict__ for note in db.list_notes(include_private=False, limit=limit, offset=offset)]
                     )
                 if path == "/v1/resources":
                     return self._send(
                         200,
-                        [resource.__dict__ for resource in db.list_resources(include_private=False)],
+                        [resource.__dict__ for resource in db.list_resources(include_private=False, limit=limit, offset=offset)],
                     )
                 if path == "/v1/changes":
-                    return self._send(200, db.public_changes())
+                    after_id = int(query.get("after_id", ["0"])[0])
+                    if after_id < 0:
+                        raise ValueError("after_id must be non-negative")
+                    return self._send(200, db.public_changes(after_id=after_id, limit=limit))
                 return self._send(404, {"error": "not_found"})
             except (PermissionError, ValueError) as exc:
                 return self._send(400, {"error": str(exc)})
@@ -97,6 +118,8 @@ def create_handler(db: AIDB, auth_token: str | None = None):
                     )
                     return self._send(201, {"ok": True})
                 return self._send(404, {"error": "not_found"})
+            except OverflowError as exc:
+                return self._send(413, {"error": str(exc)})
             except (KeyError, ValueError, json.JSONDecodeError) as exc:
                 return self._send(400, {"error": str(exc)})
 
