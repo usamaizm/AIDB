@@ -80,7 +80,7 @@ def test_snapshot_is_content_addressed_and_restorable():
 
     restored = db.restore_snapshot(snap["snapshot_id"])
     assert restored.node_id == "node:one"
-    assert db.get_note(note.id).content == "state""
+    assert db.get_note(note.id).content == "state"
 
 def test_public_changes_hide_private_resources():
     db = AIDB(":memory:")
