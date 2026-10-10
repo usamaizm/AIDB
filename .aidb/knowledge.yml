@@ -69,3 +69,28 @@ knowledge_base:
       path: docs/standards.md
       category: architecture
       status: accepted
+    - id: project-context-handoff
+      title: Project context and fresh-session handoff
+      path: docs/PROJECT_CONTEXT.md
+      category: project
+      status: accepted
+    - id: repository-audit
+      title: Repository audit and launch readiness
+      path: docs/repository-audit.md
+      category: limitation
+      status: accepted
+    - id: self-evolving-architecture
+      title: Self-evolving architecture proposal
+      path: docs/self-evolving-architecture.md
+      category: architecture
+      status: proposed
+    - id: performance-context-scale
+      title: Performance, context efficiency, and scale proposal
+      path: docs/performance-context-and-scale.md
+      category: architecture
+      status: proposed
+    - id: storage-efficiency-numeric-data
+      title: Storage efficiency and numeric data proposal
+      path: docs/storage-efficiency-and-numeric-data.md
+      category: architecture
+      status: proposed
