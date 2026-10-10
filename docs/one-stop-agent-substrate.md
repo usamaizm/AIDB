@@ -114,3 +114,8 @@ Knowledge entries should use progressive disclosure: a concise abstract or prefa
 ## Continuous improvement and evolution
 
 AIDB should improve its organization, retrieval, storage policies, and modular capabilities as it learns from authorized use and evaluation. Fundamental changes should use versioned contracts, isolated experiments, regression tests, explicit approval for high-impact operations, and a tested recovery path. See [Self-Evolving Architecture and Continuous Improvement](self-evolving-architecture.md) for the proposed evolution model. This is a design direction, not a claim that autonomous self-modification is already implemented.
+
+
+## Performance, context efficiency, and scale
+
+AIDB should remain useful on constrained hardware and scale to large deployments through bounded queries, streaming, selective indexes, explicit resource budgets, progressive disclosure, and token-budgeted context assembly. It should return the smallest sufficient evidence-backed context by default, with details available on demand. See [Performance, Context Efficiency, and Scale](performance-context-and-scale.md). This is a target architecture; performance must be measured and verified on representative workloads rather than assumed.
