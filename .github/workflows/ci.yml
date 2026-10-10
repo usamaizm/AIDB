@@ -30,5 +30,8 @@ jobs:
       - name: Compile source and tests
         run: python -m compileall -q aidb tests
 
+      - name: Run Ruff static checks
+        run: python -m ruff check aidb tests
+
       - name: Run pytest
         run: python -m pytest -q
