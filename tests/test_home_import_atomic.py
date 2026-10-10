@@ -1,3 +1,5 @@
+import sqlite3
+
 import pytest
 
 from aidb import AIDB
@@ -47,7 +49,7 @@ def test_home_import_rolls_back_when_foreign_key_validation_fails():
         }
     )
 
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.IntegrityError):
         db.import_home(payload)
 
     with pytest.raises(ValueError, match="resource does not exist"):
