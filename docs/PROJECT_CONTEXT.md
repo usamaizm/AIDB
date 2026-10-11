@@ -23,6 +23,16 @@ AIDB is an experimental, local-first, model-agnostic knowledge, memory, artifact
 
 The long-term goal is a modular, interoperable substrate that can serve constrained devices and very large deployments, with stable contracts and replaceable implementations. This is a direction, not a claim of production readiness or extreme-scale performance.
 
+## AI-first development principle
+
+AIDB is intended to be built and maintained primarily through capable AI agents, with human collaboration welcome. Routine progress should not depend on a human manually performing work an agent can safely and reliably complete. This is a project requirement, not a claim that autonomous development is already fully implemented.
+
+Agents should be able to discover the current project state, understand contracts and constraints, plan bounded work, inspect and modify code, run checks, interpret actual tool output, repair failures, and leave a reviewable handoff. The repository is the durable source of truth; chat history and model-generated claims are not evidence.
+
+Autonomy must remain evidence-driven and bounded. Agents must not bypass access controls, tests, provenance, review requirements, or execution isolation. Changes to persistent data, public interfaces, security boundaries, release state, or untrusted-code execution require the safeguards defined by the relevant contracts. Human review remains available for collaboration and higher-risk decisions; it should not be a substitute for automating routine, verifiable work.
+
+Progress is measured by demonstrated workflows, not labels. A capability counts as implemented only when a repeatable test or recorded execution proves it. Track discovery, implementation, validation, failure recovery, and handoff separately; state what remains manual and why.
+
 ## Product and architecture requirements discussed so far
 
 ### 1. Language and API neutrality
