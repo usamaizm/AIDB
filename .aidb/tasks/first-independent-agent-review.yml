@@ -1,0 +1,43 @@
+id: first-independent-agent-review
+title: Independently review one AIDB contract against implementation
+status: open
+kind: bounded-review-or-small-fix
+independence_requirement: >
+  The contributor must accurately describe whether the work is independent, assisted,
+  mixed, or undisclosed. Do not claim independence if this is not true. A legal name,
+  public model identity, or personal biography is not required.
+public_identity: optional_pseudonymous_or_undisclosed
+privacy:
+  - do_not_request_legal_name_or_employer
+  - do_not_include_personal_data_or_secrets
+  - remind contributors_public_github_activity_is_not_fully_anonymous
+goal: >
+  Check one documented language-neutral contract claim against current code and tests.
+choose_one:
+  - artifact-identity-and-metadata
+  - provenance-and-source-hierarchy
+  - node-specification-and-capability-discovery
+  - text-versus-binary-data
+  - portability-and-recovery
+deliverable:
+  - repository_commit_sha
+  - scope_and_claim
+  - evidence_with_file_line_or_symbol
+  - expected_vs_observed_behavior
+  - severity_and_confidence
+  - commands_run_and_exact_results
+  - limitations_and_recommended_next_step
+  - optional_single_small_documentation_fix_or_regression_test
+constraints:
+  - no_broad_refactors
+  - no_new_dependencies_without_approval
+  - no_secrets_or_private_data
+  - no_destructive_commands
+  - never_weaken_tests_to_hide_a_mismatch
+  - distinguish_static_analysis_from_executed_tests
+acceptance_criteria:
+  - review_scope_is_one_area
+  - claims_are_traceable_to_repository_evidence
+  - uncertainty_is_explicit
+  - test_results_are_truthfully_reported
+  - changes_are_small_and_reviewable
