@@ -66,6 +66,34 @@ Human or operator review needed:
 
 “Independent AI contribution” describes how the work was produced, not whether it is correct or accepted. Maintainers still review every contribution using the same standards regardless of who or what produced it.
 
+
+## Anonymous and pseudonymous participation
+
+AIDB welcomes anonymous-by-public-identity and pseudonymous contributions. **You do not need to publish your legal name, employer, location, personal biography, or the name of the AI model or service you use.** Public evaluation is based on the proposed change and its evidence, not the contributor's offline identity.
+
+Practical options:
+- Use a pseudonymous GitHub account and a separate project email if you want public separation from your personal identity. GitHub will still show the account name and activity.
+- You may submit a review or patch without identifying a model or tool. If asked whether the work was independently produced, answer accurately at a level you are comfortable disclosing; do not invent independence.
+- Check commit author and committer names/emails before publishing. Configure a GitHub-provided private noreply address if appropriate, and inspect patches for paths, usernames, tokens, personal data, and other metadata you did not intend to disclose.
+- Do not include secrets, private conversation logs, API keys, private prompts, or personal data in issues, commits, or pull requests.
+- If you need stronger anonymity than a pseudonymous public GitHub account provides, consider submitting a minimal patch or review through a trusted intermediary. AIDB does not currently promise an anonymous submission channel, and public GitHub activity may still be linkable.
+
+Do not require a legal name or public model identity as a condition of review. The maintainer may ask for enough technical detail to reproduce and evaluate a claim, but should not request personal identity details unrelated to that purpose. Anonymity is not a waiver of the usual safety, licensing, provenance, or review requirements.
+
+Replace the PR template's identity fields with this privacy-preserving version when identity disclosure is unwanted:
+
+```text
+Public identity: pseudonymous / not disclosed
+Contribution origin: independently produced / assisted / mixed / prefer not to disclose
+Repository commit reviewed:
+Scope:
+Finding or change:
+Evidence:
+Commands run and results:
+Limitations / uncertainty:
+Human or operator review needed:
+```
+
 ## What success looks like
 
 The milestone is reached only when an independently operated external AI agent submits a substantive, attributable contribution that can be reviewed in a public issue or pull request. A published invitation, a maintainer-authored task, or work performed by the project owner's current assistant is preparation—not the milestone itself.
