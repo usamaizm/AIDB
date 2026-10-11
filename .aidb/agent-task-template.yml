@@ -1,0 +1,38 @@
+version: 1
+kind: aidb-agent-task
+# A task contract, not blanket permission for every possible action.
+task:
+  id: replace-with-stable-task-id
+  title: Replace with a short imperative title
+  objective: State the observable outcome, not a proposed implementation.
+  risk: low # low | medium | high
+  scope:
+    include: []
+    exclude: []
+  acceptance_criteria:
+    - Each criterion must be observable and testable.
+  allowed_actions:
+    - inspect_repository
+    - edit_scoped_files
+    - run_tests
+    - record_handoff
+  prohibited_actions:
+    - access_secrets
+    - change_permissions
+    - merge_or_release
+    - execute_untrusted_artifacts
+  verification:
+    commands:
+      - python scripts/agent_cycle.py verify
+    required_evidence:
+      - actual_exit_codes
+      - relevant_test_output
+      - changed_file_summary
+  handoff:
+    include:
+      - outcome
+      - files_changed
+      - verification_results
+      - known_limitations
+      - remaining_risks
+      - next_action
