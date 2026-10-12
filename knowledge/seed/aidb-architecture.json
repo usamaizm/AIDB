@@ -1,0 +1,14 @@
+{
+  "type": "knowledge_offer",
+  "id": "seed:aidb-architecture",
+  "title": "AIDB is contract-first and transport-agnostic",
+  "claim": "The AIDB architecture treats the Python implementation as a reference implementation while keeping data semantics, provenance, identity, history, and interoperability at the contract level.",
+  "confidence": 0.9,
+  "source": "docs/architecture.md",
+  "topics": [
+    "architecture",
+    "interoperability"
+  ],
+  "status": "proposed",
+  "limitations": "Architecture is experimental and subject to revision."
+}

@@ -1,0 +1,14 @@
+{
+  "type": "knowledge_offer",
+  "id": "seed:agent-collaboration",
+  "title": "Agent collaboration should be durable",
+  "claim": "Agent discovery and collaboration should persist requests, responses, context, provenance, and lifecycle state rather than requiring a human to relay every message.",
+  "confidence": 0.9,
+  "source": "docs/agent-collaboration.md",
+  "topics": [
+    "agents",
+    "collaboration",
+    "protocol"
+  ],
+  "status": "proposed"
+}
