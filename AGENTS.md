@@ -1,8 +1,8 @@
 # Agent Maintenance Notes
 
-**Fast bootstrap: read [.aidb/session-context.yml](.aidb/session-context.yml), then [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).** The YAML is the compact machine-readable map; the Markdown explains the reasoning and project state. Next follow this file and check live CI/PR state. Do not rely on chat history, old model memory, or design docs as proof that a feature is implemented.
+**New-session entry point: [docs/agent-onboarding.md](docs/agent-onboarding.md).** For each task, read [.aidb/session-context.yml](.aidb/session-context.yml) and this file, inspect the task issue/PR plus relevant source/tests, and load broader context only when the task needs it. Use the [task handoff template](.aidb/templates/agent-handoff.md) for substantive work. Do not rely on chat history, old model memory, stale status snapshots, or design docs as proof that a feature is implemented.
 
-This file is a durable handoff for human and AI contributors working on AIDB.
+This file contains mandatory contributor rules and durable engineering lessons; it is not a substitute for task-specific evidence.
 
 ## What currently works
 
@@ -35,9 +35,9 @@ This file is a durable handoff for human and AI contributors working on AIDB.
 5. Preserve provenance, privacy, portability, and compatibility invariants.
 6. Update this file when a bug, invariant, architectural decision, or contributor workflow lesson is important enough to help the next agent.
 
-## Known status
+## Status freshness
 
-As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the atomic, schema-safe home-import hardening pass. The repository remains experimental; treat architecture and protocol details as evolving unless explicitly frozen.
+Repository and PR status changes quickly. Treat dates and status notes in this file as historical unless they are backed by a current source, commit, or CI run. Before making status claims, inspect current `main`, live issue/PR state, and current CI. The repository remains experimental; treat architecture and protocol details as evolving unless explicitly frozen.
 ## Agent and file-format compatibility
 
 - Keep `AGENTS.md` as repository-level contributor instructions; keep `README.md` human-facing and `docs/` authoritative for architecture and contracts.

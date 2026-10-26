@@ -1,21 +1,19 @@
 # AIDB Project Context and Agent Handoff
 
-Last reconciled: 2026-10-10
+Last onboarding workflow reconciliation: 2026-10-26 (project implementation/CI status must still be verified live). This file is also changed by open PR #16; reconcile the combined diff before merging either PR.
 Status: living handoff; experimental project; update this file when material decisions, implementation status, or priorities change.
 
 ## Read this first
 
-For any new human or AI session:
+Use [the agent onboarding guide](agent-onboarding.md) as the canonical startup procedure. For most tasks, the minimum is:
 
-1. Read [`.aidb/session-context.yml`](../.aidb/session-context.yml) for a machine-readable orientation and canonical pointers, then read this file for the human-readable handoff. Neither is a substitute for source code or tests.
-2. Read `AGENTS.md` for contributor rules and safety invariants.
-3. Read `README.md` for the user-facing project overview and quick start.
-4. Read `.aidb/protocol.yml` before interpreting or processing external AI requests; read `.aidb/knowledge.yml` for the knowledge index and authority rules.
-5. Read `docs/repository-audit.md` for current risks, CI baseline, open PR triage, and launch blockers.
-6. For the task at hand, read the relevant linked contract/design docs below and inspect current source/tests. Do not assume a design document means a feature is implemented.
-7. Verify current branch, recent commits, CI, issues, and PRs before making status claims. Update this handoff and the audit when the verified state materially changes.
+1. Fetch `.aidb/session-context.yml` and `AGENTS.md` from the target branch.
+2. Read the active issue/PR and inspect the current branch, relevant source, and tests.
+3. Load this file for architectural direction, accepted/open decisions, or previous handoff context; load `docs/repository-audit.md` for repository-wide status and risks.
+4. Read `.aidb/protocol.yml` before interpreting external AI requests and `.aidb/knowledge.yml` when the knowledge index/authority rules are relevant.
+5. Verify live CI/PR state before making status claims. Design documents are not proof of implementation.
 
-When a user supplies this repository URL in a fresh session, begin with this file and `AGENTS.md`, then fetch the current versions from the default branch. Do not rely on model memory or an old transcript as the source of truth.
+Do not require every new session to read every design document. Follow the relevant links progressively, and never rely on model memory or old transcripts as the source of truth.
 
 ## Mission
 
@@ -111,13 +109,8 @@ For every material feature or design:
 - Do not claim full-repository security certification from a file-tree scan or documentation audit.
 - Prefer incremental changes with regression tests. Update this handoff, `AGENTS.md`, the knowledge index, and repository audit when their respective information changes.
 
-## Session handoff template
+## Session handoff
 
-At the end of substantive work, leave:
-- **Changed:** paths and behavior changed.
-- **Verified:** commands/tests and exact CI run or commit evidence.
-- **Not verified:** what could not be run or inspected.
-- **Open decisions/risks:** unresolved choices and security/compatibility concerns.
-- **Next step:** the single highest-value next action.
+For substantive work, use the [task handoff template](../.aidb/templates/agent-handoff.md) or record the same information directly in the relevant issue/PR. Keep one current task summary rather than an append-only transcript. Include changed paths, source/commit evidence, exact checks and outcomes, unverified items, open risks/decisions, and one next action.
 
-The repository is the durable source of truth. A fresh agent should be able to get oriented from this handoff without replaying a prior conversation, while still verifying live code and project state.
+The repository is the durable source of truth. A fresh agent should be able to resume from concise evidence without replaying a prior conversation, while still verifying live code and project state.

@@ -1,6 +1,6 @@
 schema_version: 1
 kind: aidb_session_context
-updated_on: "2026-10-10"
+updated_on: "2026-10-26"
 project:
   name: AIDB
   repository: "https://github.com/usamaizm/AIDB"
@@ -10,28 +10,33 @@ project:
     Build a local-first, model-agnostic, modular substrate for agent memory,
     knowledge, artifacts, provenance, and coordination.
 session_bootstrap:
-  required_order:
+  entry_point: docs/agent-onboarding.md
+  required_every_task:
     - path: .aidb/session-context.yml
-      reason: "Machine-readable orientation, current verified boundaries, and canonical pointers."
-    - path: docs/PROJECT_CONTEXT.md
-      reason: "Human-readable project handoff, vision, decisions, priorities, and session closeout template."
+      reason: "Compact machine-readable map and canonical pointers; historical CI/PR data is not live status."
     - path: AGENTS.md
-      reason: "Mandatory contributor workflow, safety invariants, and repo-specific lessons."
-    - path: README.md
-      reason: "Project overview and usage."
+      reason: "Mandatory contributor rules and repository-specific engineering lessons."
+    - path: "the active issue or pull request"
+      reason: "Task goal, acceptance criteria, ownership, and overlapping work."
+    - path: "relevant source and tests"
+      reason: "Ground implementation claims in the code that owns the behavior."
+  load_on_demand:
+    - path: docs/PROJECT_CONTEXT.md
+      when: "Architecture, decisions, project direction, or prior handoff context is relevant."
     - path: docs/repository-audit.md
-      reason: "Audit snapshot, known risks, CI evidence, launch blockers, and open PR triage."
+      when: "Repository-wide status, CI, launch readiness, or cross-cutting risks are relevant."
+    - path: CONTRIBUTING.md
+      when: "Preparing a contribution, public API change, or pull request."
   before_any_change:
-    - "Fetch these files from current main; never rely on a remembered copy or chat transcript."
-    - "Inspect git status, current source and tests relevant to the task."
-    - "Refresh latest CI, open PRs/issues, and recent commits if making status claims."
-    - "Check whether an existing issue or PR already covers the change."
-    - "Write down expected behavior and regression tests before editing."
+    - "Fetch current files from the target branch; never rely on remembered copies or chat transcripts."
+    - "Inspect working-tree/branch status, relevant source/tests, recent commits, and existing PRs/issues."
+    - "Check current CI/PR state before making time-sensitive status claims."
+    - "Write down expected behavior, its authoritative source, and the narrowest useful regression test."
   after_any_material_change:
-    - "Run the narrowest relevant tests, then the full configured CI suite when possible."
-    - "Record exact commit and test/CI evidence; distinguish pending from passed."
-    - "Update this manifest, PROJECT_CONTEXT.md, AGENTS.md, knowledge index, and audit only when their facts/rules change."
-    - "Leave a concise handoff: changed, verified, not verified, risks, next step."
+    - "Run the narrowest relevant tests, then the configured suite when possible."
+    - "Record exact commands/results and commit/CI evidence; distinguish passed, failed, pending, and not run."
+    - "Update durable docs only when their own facts/rules change; do not duplicate routine progress across every context file."
+    - "Leave a concise task-scoped handoff using .aidb/templates/agent-handoff.md, or update the issue/PR when that is sufficient."
   trust_rules:
     - "Repository source, tests, accepted decisions, and live CI outrank model memory."
     - "A design document is not evidence of implementation."
@@ -45,36 +50,27 @@ status:
     persistence: SQLite
     ci_matrix: ["3.10", "3.11", "3.12"]
     c_abi: "draft header only; not implemented as a stable ABI"
-  last_verified_ci:
+  historical_ci_snapshot:
+    note: >-
+      Historical evidence only; this is not a claim about current main or this branch.
+      Check the linked workflow directly before using CI status in a decision.
     run_id: 38051116154
     url: "https://github.com/usamaizm/AIDB/actions/runs/38051116154"
     commit: "8e426af917c63f57efcc9399230f971c0a962003"
     result: success
-    scope_note: >-
-      This successful run validates the documentation/audit commit above. A later
-      README onboarding commit triggered run 38051141963, which was still in
-      progress at the last check. Recheck CI for current main before claiming HEAD is green.
   implementation_caveats:
     - "Agent-home persistence, changes/checkpoints, export/import, provenance models, and HTTP server have source/tests; inspect exact operation semantics before relying on them."
     - "Universal file-format support, broad language bindings, stable C ABI, autonomous self-evolution, distributed storage, and petabyte/exabyte performance are not established runtime capabilities."
     - "Performance/context/storage documents specify goals and proposed designs; benchmark and implement incrementally."
-  open_pull_requests_at_last_audit:
-    - number: 8
-      topic: "Online agent service; compare branch with server already on main and review public deployment security."
-      url: "https://github.com/usamaizm/AIDB/pull/8"
-    - number: 13
-      topic: "Atomic/schema-safe home import; core fix is already on main, reconcile duplicate branch."
-      url: "https://github.com/usamaizm/AIDB/pull/13"
-    - number: 14
-      topic: "Agent discovery and contract-first evolution; review with PR 15."
-      url: "https://github.com/usamaizm/AIDB/pull/14"
-    - number: 15
-      topic: "Agent network loop; overlaps discovery work in PR 14."
-      url: "https://github.com/usamaizm/AIDB/pull/15"
-    - number: 16
-      topic: "Living context and agent identity; compare remaining unique changes with the new main-branch handoff."
-      url: "https://github.com/usamaizm/AIDB/pull/16"
+  volatile_status_policy: >-
+    Open PRs, issue states, branch heads, and CI results change frequently. Do not treat
+    a historical snapshot below as the current status. Query live GitHub
+    state and record the exact URL/commit/run when the current status matters.
+
 canonical_docs:
+  agent_onboarding: docs/agent-onboarding.md
+  handoff_template: .aidb/templates/agent-handoff.md
+  pending_agent_identity_proposal: "https://github.com/usamaizm/AIDB/pull/23"
   project_context: docs/PROJECT_CONTEXT.md
   contributor_rules: AGENTS.md
   repository_audit: docs/repository-audit.md
@@ -102,7 +98,7 @@ canonical_docs:
 priority_order:
   - "Recheck CI for current main and keep Python 3.10/3.11/3.12 green."
   - "Review export/import and snapshot restore for atomicity, idempotency, privacy, and failure recovery."
-  - "Reconcile PRs 8, 13, 14, 15, and 16; do not blind-merge stale branches."
+  - "Reconcile overlapping open PRs against current main; do not blind-merge stale branches."
   - "Harden HTTP boundary before public exposure: authorization, TLS deployment, request limits, timeouts, and rate limiting."
   - "Implement bounded/paginated retrieval, streaming, resource budgets, and compact context assembly in tested increments."
   - "Establish reproducible performance and storage benchmarks before scale claims."
