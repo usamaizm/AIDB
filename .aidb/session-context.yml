@@ -69,6 +69,8 @@ status:
     state and record the exact URL/commit/run when the current status matters.
 
 canonical_docs:
+  agent_onboarding: docs/agent-onboarding.md
+  handoff_template: .aidb/templates/agent-handoff.md
   project_context: docs/PROJECT_CONTEXT.md
   contributor_rules: AGENTS.md
   repository_audit: docs/repository-audit.md
