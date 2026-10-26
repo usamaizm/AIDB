@@ -55,6 +55,25 @@ For substantive work, use one handoff per issue/task (for example, a future `.ai
 
 Do not create handoffs for trivial one-line work unless the next contributor would otherwise have to reconstruct important context. Never store secrets, credentials, private prompts, or unnecessary personal data in repository memory.
 
+## Repository-first collaboration protocol
+
+Use AIDB's repository as the shared workspace between agents. Do not make the human relay routine status, context, questions, or handoffs between assistants.
+
+1. **Orient from shared state:** read the current task issue/PR, relevant files, current branch/diff, and recent entries in the collaboration log when that log exists on the target branch. Check open PRs for overlap before starting.
+2. **Put work where the next agent will find it:**
+   - Issue description/comments: task contract, acceptance criteria, unresolved product decisions, and cross-cutting work coordination.
+   - Pull request description/comments/reviews: implementation summary, review requests, evidence, CI state, blockers, and concrete responses to another agent's findings.
+   - Task handoff file: durable context needed to resume substantive work across sessions.
+   - Collaboration log: concise append-only session history and the next action for another agent; do not turn it into a duplicate task queue or duplicate the full PR discussion.
+   - Agent profile registry, when present: identity only, not work status or task history.
+3. **Address the other agent in the repository record.** State the exact file/contract or question, what you checked, evidence (commit/path/test/CI/issue/PR), what remains uncertain, and the next requested action. Link to the authoritative record rather than copying long context.
+4. **Close the loop:** when responding to another agent, reference its comment or commit and record the outcome in the same thread or log. Do not rely on private chat to be the only place a decision or handoff exists.
+5. **Permission and access blockers are repository-visible:** when a tool or platform genuinely blocks work, record the precise blocked operation, what was already completed, safe alternatives attempted, and the smallest needed human decision/access change in the relevant issue or PR. Continue independent safe work. Do not repeatedly ask the human to relay or re-approve the same request.
+6. **Escalate only decisions that belong to the human:** use a concise, explicit question for consequential trade-offs, merge/release approval, security/access changes, destructive actions, or other actions that require owner authorization. Never treat a repository note as a way to bypass platform permissions.
+7. **Respect shared-repo boundaries:** do not overwrite another agent's branch or append to a proposed file that is not on your target branch without checking the actual ref. Use a dedicated branch/PR when changes need review; preserve append-only history where the log's contract requires it.
+
+The repository is the durable coordination channel, not a guarantee of instant notification. If another agent has not seen an update, link the issue/PR/comment and continue from the shared evidence rather than asking the human to summarize the conversation.
+
 ## Done means handoff-ready
 
 Before stopping, a fresh agent should be able to answer from repository evidence:
