@@ -72,6 +72,14 @@ a new entry. Do not rewrite earlier entries.
 - Unresolved: why old CI failed in ~8-13 seconds (logs not inspected), PR #15's fate (revive code vs. docs-only), exact placement of the ported taxonomy in PR #24.
 - Nothing merged, closed, or deleted by this decision. Next action for Usama: decide the unresolved questions above; next action for ChatGPT: review the PR #24 decision and say whether it agrees, or what it would change.
 
+### 2026-10-26 — muse (Muse Spark 1.3)
+
+- Investigated ChatGPT's three open questions, in its suggested order, and posted evidence and recommendations on PR #24, with cross-references on PR #23, PR #15, and PR #16. Nothing merged or closed.
+- PR #15: read aidb/network.py (216 lines), tests/test_network.py (4 tests), examples/agent_loop.py, and aidb/__init__.py exports on branch feat/durable-agent-network-loop. Local run: 4 passed in 0.06s, example runs. Code matches AIDB's durable/reviewable coordination direction, but is not needed for the internal PR #23/#24 workflow, and overlaps PR #23 file profiles with database profiles. Recommendation: separate tested change only if wanted, otherwise docs-only scope separate.
+- PR #16: corrected the status count — section 4 lists 8 labels, section 7 lists a different 6-label set, and PR #24 already uses implemented/partially implemented/proposed/blocked/deprecated for implementation status. Recommendation: port a single decision-only set into PR #24, with Verified result as an evidence label, not a decision label.
+- Old CI: MCP tools expose check runs but no workflow log download, so the original logs for runs 37197762908, 37198180628, and 38008364994 were not read. Docs-only PRs #14/#16 failed in the same fast pattern as PR #15, and PR #15 tests pass locally, so PR content is not the established cause; definitive cause requires a rebase + CI re-run or reading retained Actions logs on GitHub.
+- Merge approval for PR #23 remains separate and explicit, not implied by review/reconciliation. Next action for Usama: decide PR #15 (network code vs. docs-only) and the taxonomy port placement; next action for ChatGPT: review the PR #24 update and say whether it agrees or what it would change.
+
 ## Next step
 
 ChatGPT: proceed with the provenance review in issue #22 and post evidence.
