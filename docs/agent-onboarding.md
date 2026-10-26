@@ -30,13 +30,13 @@ An agent profile describes a participant; it does not authenticate them or prove
 - **Architecture or cross-cutting changes:** `docs/PROJECT_CONTEXT.md`, the relevant contract/specification, and `docs/invariants.md`.
 - **Repository-wide status, CI, launch, or security work:** `docs/repository-audit.md`, current workflow runs, and current open PRs/issues.
 - **External agent participation:** `CONTRIBUTING.md` and, when present on the target branch, `docs/AI_CONTRIBUTORS.md` and its task packet.
-- **Agent identity/coordination changes:** inspect the current branch and open PRs touching `.aidb/agent-profiles.yml`, discovery, or collaboration APIs before editing. Reconcile overlapping proposals instead of creating a parallel source of truth.
+- **Agent identity/coordination changes:** inspect open PRs touching agent identity, discovery, or collaboration APIs before editing. PR [#23](https://github.com/usamaizm/AIDB/pull/23) proposes `.aidb/agent-profiles.yml` and `.aidb/collaboration-log.md`; these files are not assumed to exist on this branch. If PR #23 is accepted first, incorporate its canonical paths into the manifest and verify they do not conflict with PRs #14/#15. Reconcile overlapping proposals instead of creating a parallel source of truth.
 
 Do not read every design document just because it exists. Follow links only as far as the current task requires, and verify every implementation claim against code/tests.
 
 ## Task-scoped handoffs
 
-Use one handoff per substantive issue/task, for example `.aidb/handoffs/22-provenance-review.md`. Keep it concise and update it in place as the work changes; do not append every turn or copy entire conversations. Prefer the issue or PR discussion for routine updates. A handoff should preserve decisions, evidence, limitations, and the next action—not transient reasoning.
+For substantive work, use one handoff per issue/task (for example, a future `.aidb/handoffs/22-provenance-review.md` if the project adopts that directory convention). The template is available now at `.aidb/templates/agent-handoff.md`. Keep it concise and update it in place as the work changes; do not append every turn or copy entire conversations. Prefer the issue or PR discussion for routine updates. A handoff should preserve decisions, evidence, limitations, and the next action—not transient reasoning.
 
 Do not create handoffs for trivial one-line work unless the next contributor would otherwise have to reconstruct important context. Never store secrets, credentials, private prompts, or unnecessary personal data in repository memory.
 
