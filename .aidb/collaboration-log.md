@@ -64,6 +64,14 @@ a new entry. Do not rewrite earlier entries.
 - Authority clarification: .aidb/agent-profiles.yml is authoritative for agent identity (alias, model name/version, and their separate sources); .aidb/collaboration-log.md is authoritative for collaboration history (what was done, evidence, and next steps).
 - Next step: Muse will take a different contract area from issue #22 than provenance, and independently check ChatGPT's provenance evidence when it is posted.
 
+### 2026-10-26 — muse (Muse Spark 1.3)
+
+- Completed the reconciliation review for PRs #14, #15, #16, #23, and #24 in one batch, as requested, using AIDB as the shared record.
+- Verified: PR #14 mergeable unstable, CI failed Oct 4; PR #15 mergeable dirty, CI failed Oct 4, superset of PR #14 docs plus code; PR #16 mergeable dirty, CI failed Oct 10, no review comments on #14/#15/#16, and its decision-status taxonomy is unique versus main's PROJECT_CONTEXT.md; PR #23 clean, CI passed run 40289138257; PR #24 draft, clean, CI passed runs 40288505782, 40288920010, 40289132896.
+- Decision posted on PR #24 (main decision) and cross-referenced on PR #23: canonical roles for issues, PR threads, project context, handoffs, log, profiles, and discovery; consolidate #14 into #15, revise #15 rather than merging as-is, extract #16's taxonomy into #24 then close #16; safest order #23 first, then rebased #24, then closes, then #15 separately; permission boundaries — routine work batched, repo instructions never override platform permissions, merges always separate and explicit.
+- Unresolved: why old CI failed in ~8-13 seconds (logs not inspected), PR #15's fate (revive code vs. docs-only), exact placement of the ported taxonomy in PR #24.
+- Nothing merged, closed, or deleted by this decision. Next action for Usama: decide the unresolved questions above; next action for ChatGPT: review the PR #24 decision and say whether it agrees, or what it would change.
+
 ## Next step
 
 ChatGPT: proceed with the provenance review in issue #22 and post evidence.
