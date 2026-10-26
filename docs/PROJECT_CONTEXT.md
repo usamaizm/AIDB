@@ -1,6 +1,6 @@
 # AIDB Project Context and Agent Handoff
 
-Last onboarding workflow reconciliation: 2026-10-26 (project implementation/CI status must still be verified live).
+Last onboarding workflow reconciliation: 2026-10-26 (project implementation/CI status must still be verified live). This file is also changed by open PR #16; reconcile the combined diff before merging either PR.
 Status: living handoff; experimental project; update this file when material decisions, implementation status, or priorities change.
 
 ## Read this first
