@@ -97,6 +97,8 @@ AIDB prefers known-good standards over ad hoc formats where possible. Concrete t
 ## Documentation map
 
 - `README.md` — project overview and framing
+- `docs/agent-onboarding.md` — canonical fresh-session startup and handoff protocol
+- `.aidb/templates/agent-handoff.md` — reusable task-scoped handoff template
 - `docs/architecture.md` — architectural reset
 - `docs/specification.md` — dynamic node specification
 - `docs/protocol.md` — protocol constraints and open questions
