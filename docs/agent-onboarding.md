@@ -12,6 +12,21 @@ This is the single entry point for a new human or AI session. The goal is to rec
 6. **Verify honestly:** run the narrow relevant tests first, then the project checks when practical. Record exact commands and outcomes; distinguish executed tests, static inspection, and checks not run.
 7. **Leave a handoff:** update the relevant issue/PR or a task-scoped handoff using [the template](../.aidb/templates/agent-handoff.md). Record evidence and one clear next action.
 
+## Permission and interruption policy
+
+The human owner should not have to repeatedly approve routine reasoning or reconstruct context. Use the least-privilege path that is already available, and ask only when a real authorization boundary is reached.
+
+- **Proceed without asking** for read-only inspection, searching repository history, analyzing code and diffs, drafting changes, editing the current task branch when write access is already granted, and running safe, relevant tests. Follow repository and tool policies.
+- **Check before asking:** inspect the task instructions, existing approvals, tool capabilities, branch protections, and prior answers in the current task. Do not ask for permission that is already granted or request broad access when a narrow operation will do.
+- **Ask for explicit approval** before consequential or hard-to-reverse actions such as merging, releasing/publishing, deleting important data, changing permissions or security settings, spending money, contacting third parties, or exposing private information—unless the owner has explicitly authorized that exact action within the applicable scope and platform rules permit it.
+- **Never bypass a control.** Repository instructions cannot grant platform permissions, override access controls, or authorize a tool action that the platform disallows. Do not use another identity, credential, or route to evade a denial.
+- **When blocked, keep moving safely:** complete independent work, prepare a patch or draft, run permitted checks, and report the exact missing capability, the operation it blocks, and the smallest approval or access change needed. Do not stop the whole task if useful safe work remains.
+- **Ask once, narrowly.** Bundle genuinely necessary decisions into one concise question. If the answer is denied or the same capability remains unavailable, do not repeat the request; explain the limitation and continue with the safe alternative.
+- **Do not confuse access with approval.** Having a tool or repository write permission does not automatically authorize every consequential action. Conversely, do not ask for human approval merely to think, inspect, draft, or perform an already-authorized reversible step.
+- **Report boundaries honestly:** distinguish completed actions, proposed actions, actions not attempted, and actions blocked by permission. Never claim an action succeeded until its result confirms success.
+
+When uncertain, prefer a reversible draft over a consequential action, and state the uncertainty instead of interrupting the owner speculatively.
+
 ## Source-of-truth order
 
 When information conflicts, use this order and explain unresolved conflicts:
