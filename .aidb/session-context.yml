@@ -50,27 +50,27 @@ status:
     persistence: SQLite
     ci_matrix: ["3.10", "3.11", "3.12"]
     c_abi: "draft header only; not implemented as a stable ABI"
-  last_verified_ci:
+  historical_ci_snapshot:
+    note: >-
+      Historical evidence only; this is not a claim about current main or this branch.
+      Check the linked workflow directly before using CI status in a decision.
     run_id: 38051116154
     url: "https://github.com/usamaizm/AIDB/actions/runs/38051116154"
     commit: "8e426af917c63f57efcc9399230f971c0a962003"
     result: success
-    scope_note: >-
-      This successful run validates the documentation/audit commit above. A later
-      README onboarding commit triggered run 38051141963, which was still in
-      progress at the last check. Recheck CI for current main before claiming HEAD is green.
   implementation_caveats:
     - "Agent-home persistence, changes/checkpoints, export/import, provenance models, and HTTP server have source/tests; inspect exact operation semantics before relying on them."
     - "Universal file-format support, broad language bindings, stable C ABI, autonomous self-evolution, distributed storage, and petabyte/exabyte performance are not established runtime capabilities."
     - "Performance/context/storage documents specify goals and proposed designs; benchmark and implement incrementally."
   volatile_status_policy: >-
     Open PRs, issue states, branch heads, and CI results change frequently. Do not treat
-    a historical list or last_verified_ci below as the current status. Query live GitHub
+    a historical snapshot below as the current status. Query live GitHub
     state and record the exact URL/commit/run when the current status matters.
 
 canonical_docs:
   agent_onboarding: docs/agent-onboarding.md
   handoff_template: .aidb/templates/agent-handoff.md
+  pending_agent_identity_proposal: "https://github.com/usamaizm/AIDB/pull/23"
   project_context: docs/PROJECT_CONTEXT.md
   contributor_rules: AGENTS.md
   repository_audit: docs/repository-audit.md
