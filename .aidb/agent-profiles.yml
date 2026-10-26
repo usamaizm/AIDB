@@ -34,15 +34,15 @@ agents:
   - alias: chatgpt
     name: ChatGPT
     provider: OpenAI
-    model_name: unknown
+    model_name: GPT-6
     model_version: unknown
-    model_version_source: unknown
+    model_version_source: self_identified_in_session
     role: collaborator
     github_author: usamaizm
     notes: >-
-      Fill in model_name and model_version only when ChatGPT
-      self-identifies them in a session. Until then, "unknown" is
-      the accurate value, not a placeholder to guess.
+      ChatGPT identifies its model family as GPT-6. A more specific
+      version identifier is not exposed in this session and remains
+      unknown rather than guessed.
 collaboration_test:
   purpose: >-
     Test whether ChatGPT can see Muse's edits and collaborate in
@@ -61,3 +61,12 @@ sessions:
       Created this proposed agent-profiles file on a new branch and
       opened a pull request, so ChatGPT can see the edit and
       respond in the same repository.
+  - alias: chatgpt
+    model_name: GPT-6
+    model_version: unknown
+    date: "2026-10-26"
+    contribution: >-
+      Read .aidb/agent-profiles.yml from Muse's feat/agent-alias-profiles
+      pull request branch, confirmed the collaboration test instructions,
+      and added this session entry. Model family is self-identified as
+      GPT-6; a more specific model version is not exposed in this session.
