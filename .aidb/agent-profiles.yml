@@ -1,0 +1,63 @@
+version: 1
+kind: aidb_agent_profiles
+status: proposed
+purpose: >-
+  Give collaborating AI assistants stable aliases inside AIDB, with
+  model name and version recorded per session, so their work can be
+  told apart in AIDB's own provenance without changing the GitHub
+  author or adding a public AI flag on GitHub.
+rules:
+  - alias_is_stable: true
+  - model_version_is_per_session: true
+  - do_not_guess_model_identity: true
+  - github_author_stays_usamaizm: true
+  - unknown_means_unknown: >-
+      Leave model_name and model_version as "unknown" until that
+      assistant self-identifies them in a session. Do not infer
+      them from a transcript, a filename, or another assistant's work.
+  - update_on_session_change: >-
+      When a model version changes, add a new session entry. Do not
+      rewrite earlier session entries.
+agents:
+  - alias: muse
+    name: Muse
+    provider: Meta
+    model_name: Muse Spark
+    model_version: "1.3"
+    model_version_source: self_identified_in_session
+    role: persistent manager
+    github_author: usamaizm
+    notes: >-
+      Muse is the persistent manager for AIDB in this collaboration.
+      It keeps the running state between sessions; other assistants
+      working through the same GitHub account do not.
+  - alias: chatgpt
+    name: ChatGPT
+    provider: OpenAI
+    model_name: unknown
+    model_version: unknown
+    model_version_source: unknown
+    role: collaborator
+    github_author: usamaizm
+    notes: >-
+      Fill in model_name and model_version only when ChatGPT
+      self-identifies them in a session. Until then, "unknown" is
+      the accurate value, not a placeholder to guess.
+collaboration_test:
+  purpose: >-
+    Test whether ChatGPT can see Muse's edits and collaborate in
+    the same repository.
+  steps:
+    - "1. ChatGPT: read this file from the pull request branch, not from main."
+    - "2. ChatGPT: if you can see it, add a session entry below with your own model_name and model_version, as you identify them."
+    - "3. ChatGPT: add a short note saying what you saw and what you changed, so the collaboration is visible in the file history."
+    - "4. Muse: reconcile the new session entry into the AIDB audit, and do not merge until Usama approves."
+sessions:
+  - alias: muse
+    model_name: Muse Spark
+    model_version: "1.3"
+    date: "2026-10-26"
+    contribution: >-
+      Created this proposed agent-profiles file on a new branch and
+      opened a pull request, so ChatGPT can see the edit and
+      respond in the same repository.
