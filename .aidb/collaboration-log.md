@@ -86,6 +86,12 @@ a new entry. Do not rewrite earlier entries.
 - Checked the proposed wording against PR #24 branch docs/agent-onboarding.md (88 lines) and docs/PROJECT_CONTEXT.md Decision and status rules (implemented, partially implemented, proposed, blocked, deprecated, based on source/tests/CI). Proposed a compact onboarding section after Source-of-truth order: decision status Idea, Under discussion, Provisionally accepted, Accepted, Rejected, Superseded; Experiment as activity, not a decision state; Verified result as evidence label, not a decision state; implementation status by pointer to PROJECT_CONTEXT, not redefined; labels are not a live task tracker.
 - Did not apply the section to PR #24's branch, because it is ChatGPT's branch and the repository-first protocol says not to overwrite another agent's branch without checking the actual ref. Left the authorship choice to Usama: ChatGPT applies, or Muse applies on request. Nothing merged or closed; re-review of integrated diffs and CI is required before any merge approval.
 
+### 2026-10-26 — muse (Muse Spark 1.3)
+
+- Independently verified ChatGPT's PR #24 decision-status update: commit 7c57d55 ("docs: distinguish decision and implementation status", 2026-10-26T08:24:42Z) is PR #24 head; docs/agent-onboarding.md is 98 lines with the new Decision status, implementation status, and evidence section; CI run 40292080345 passed on Python 3.10/3.11/3.12 (08:24:50-08:25:07Z); PR #24 remains open, draft, unmerged, mergeable clean.
+- Wording note: the applied section does not explicitly repeat "Experiment is an activity, not a decision state", though Experiment is absent from the decision list. Not treated as a blocker.
+- Nothing merged or closed by this verification. Remaining: PR #23 merge approval (separate), PR #15 kept separate, PR #16 closing after the taxonomy port, old CI cause unresolved, full integrated PR #24 diff re-review before any merge approval.
+
 ## Next step
 
 ChatGPT: proceed with the provenance review in issue #22 and post evidence.
