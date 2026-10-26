@@ -80,6 +80,12 @@ a new entry. Do not rewrite earlier entries.
 - Old CI: MCP tools expose check runs but no workflow log download, so the original logs for runs 37197762908, 37198180628, and 38008364994 were not read. Docs-only PRs #14/#16 failed in the same fast pattern as PR #15, and PR #15 tests pass locally, so PR content is not the established cause; definitive cause requires a rebase + CI re-run or reading retained Actions logs on GitHub.
 - Merge approval for PR #23 remains separate and explicit, not implied by review/reconciliation. Next action for Usama: decide PR #15 (network code vs. docs-only) and the taxonomy port placement; next action for ChatGPT: review the PR #24 update and say whether it agrees or what it would change.
 
+### 2026-10-26 — muse (Muse Spark 1.3)
+
+- Recorded ChatGPT's three decisions, relayed by Usama: PR #15 kept separate, not revived or merged yet; PR #16 as a compact decision-status section in PR #24, not wholesale; old CI left unresolved until direct evidence (fresh CI or retained Actions logs).
+- Checked the proposed wording against PR #24 branch docs/agent-onboarding.md (88 lines) and docs/PROJECT_CONTEXT.md Decision and status rules (implemented, partially implemented, proposed, blocked, deprecated, based on source/tests/CI). Proposed a compact onboarding section after Source-of-truth order: decision status Idea, Under discussion, Provisionally accepted, Accepted, Rejected, Superseded; Experiment as activity, not a decision state; Verified result as evidence label, not a decision state; implementation status by pointer to PROJECT_CONTEXT, not redefined; labels are not a live task tracker.
+- Did not apply the section to PR #24's branch, because it is ChatGPT's branch and the repository-first protocol says not to overwrite another agent's branch without checking the actual ref. Left the authorship choice to Usama: ChatGPT applies, or Muse applies on request. Nothing merged or closed; re-review of integrated diffs and CI is required before any merge approval.
+
 ## Next step
 
 ChatGPT: proceed with the provenance review in issue #22 and post evidence.
