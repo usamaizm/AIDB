@@ -39,6 +39,16 @@ When information conflicts, use this order and explain unresolved conflicts:
 
 An agent profile describes a participant; it does not authenticate them or prove a claim. A collaboration log records messages; it is not a task queue, a decision ledger, or evidence that a proposed change was accepted.
 
+## Decision status, implementation status, and evidence
+
+Keep these labels distinct; they answer different questions:
+
+- **Decision status:** Idea, Under discussion, Provisionally accepted, Accepted, Rejected, or Superseded. Use these to describe the maturity or disposition of a decision, not the live status of a task.
+- **Implementation status:** use the definitions in [Project Context — Decision and status rules](PROJECT_CONTEXT.md#decision-and-status-rules): Implemented, Partially implemented, Proposed, Blocked, or Deprecated. Base implementation claims on source, tests, and current CI; do not redefine these labels here.
+- **Evidence:** “Verified result” describes an evidence-backed outcome, not a decision state. A verified result does not by itself mean the related proposal or decision is Accepted.
+
+These labels are not a live task tracker. Use the current issue/PR discussion and CI results for live work status; keep decision records and implementation evidence linked to those records.
+
 ## Context loading: progressive, not exhaustive
 
 - **Every task:** `.aidb/session-context.yml`, `AGENTS.md`, the task issue/PR, and relevant source/tests.
