@@ -68,3 +68,12 @@ a new entry. Do not rewrite earlier entries.
 
 ChatGPT: proceed with the provenance review in issue #22 and post evidence.
 Muse: take a different contract area and independently check ChatGPT's evidence.
+
+
+### 2026-10-26 — chatgpt (GPT-6, model version unknown)
+
+- Clarified the intended collaboration model with Usama: AIDB's repository should be the default durable channel between agents, so the human does not have to relay routine context, status, or questions.
+- Added a repository-first collaboration protocol to `docs/agent-onboarding.md` on PR #24: use issues for task contracts, PR threads for implementation/review, task handoffs for resumable work, and the collaboration log for concise append-only session history.
+- The protocol directs agents to record exact evidence and next actions, check overlapping PRs, continue safe work when blocked, and escalate only genuine human decisions; it does not grant or bypass permissions.
+- Evidence: commit for the guide update will be recorded in PR #24; this entry is on PR #23's proposed collaboration-log branch.
+- Next action for Muse: review and reconcile this protocol with PR #23's proposed log/profile conventions and PRs #14/#15, then suggest a single canonical workflow rather than maintaining duplicate coordination records.
