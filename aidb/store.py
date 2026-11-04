@@ -1009,12 +1009,6 @@ class AIDB:
             # Apply the visibility boundary to every exported table, not only
             # the primary resource rows. Relations, change payloads, and stored
             # snapshots can otherwise disclose private content or identifiers.
-            public_resources = {
-                row["id"]
-                for row in self.db.execute(
-                    "SELECT id FROM home_resources WHERE visibility='public'"
-                ).fetchall()
-            }
             payload["tables"]["node_identity"] = [
                 dict(row) for row in self.db.execute(
                     "SELECT * FROM node_identity WHERE visibility='public'"
