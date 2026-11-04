@@ -1044,7 +1044,8 @@ class AIDB:
             ]
             payload["tables"]["home_changes"] = [
                 dict(row) for row in self.db.execute(
-                    "SELECT * FROM home_changes WHERE resource_id IN "
+                    "SELECT * FROM home_changes WHERE operation IN ('create','update','publish') "
+                    "AND resource_id IN "
                     "(SELECT id FROM home_resources WHERE visibility='public')"
                 ).fetchall()
             ]
@@ -1052,7 +1053,24 @@ class AIDB:
             # private rows even when the current export is filtered. Omit it.
             payload["tables"]["home_snapshots"] = []
 
-        payload["verification"] = self.verify_home()
+        if include_private:
+            payload["verification"] = self.verify_home()
+        else:
+            # Verify only the rows present in this filtered export. Do not run
+            # whole-home verification here: its diagnostics can name private IDs.
+            revisions = {
+                row["id"]: row["revision"]
+                for row in payload["tables"]["home_resources"]
+            }
+            issues = []
+            for row in payload["tables"]["home_changes"]:
+                resource_id = row["resource_id"]
+                revision = revisions.get(resource_id)
+                if revision is None:
+                    issues.append("missing public resource:" + str(resource_id))
+                elif row["new_revision"] is not None and row["new_revision"] > revision:
+                    issues.append("future public revision:" + str(row["id"]))
+            payload["verification"] = {"ok": not issues, "issues": issues}
         return payload
 
     def import_home(self, payload):
