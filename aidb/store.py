@@ -1000,12 +1000,58 @@ class AIDB:
     def export_home(self, include_private=True):
         tables = ["node_identity", "node_specifications", "home_resources", "notes", "resource_relations", "home_changes", "home_snapshots"]
         payload = {"format": "aidb-home-v1", "tables": {}}
-        for table in tables:
-            if table in {"home_resources", "notes"} and not include_private:
-                rows = self.db.execute(f"SELECT * FROM {table} WHERE visibility='public'").fetchall()
-            else:
+
+        if include_private:
+            for table in tables:
                 rows = self.db.execute(f"SELECT * FROM {table}").fetchall()
-            payload["tables"][table] = [dict(row) for row in rows]
+                payload["tables"][table] = [dict(row) for row in rows]
+        else:
+            # Apply the visibility boundary to every exported table, not only
+            # the primary resource rows. Relations, change payloads, and stored
+            # snapshots can otherwise disclose private content or identifiers.
+            public_resources = {
+                row["id"]
+                for row in self.db.execute(
+                    "SELECT id FROM home_resources WHERE visibility='public'"
+                ).fetchall()
+            }
+            payload["tables"]["node_identity"] = [
+                dict(row) for row in self.db.execute(
+                    "SELECT * FROM node_identity WHERE visibility='public'"
+                ).fetchall()
+            ]
+            payload["tables"]["node_specifications"] = [
+                dict(row) for row in self.db.execute(
+                    "SELECT * FROM node_specifications WHERE visibility='public'"
+                ).fetchall()
+            ]
+            payload["tables"]["home_resources"] = [
+                dict(row) for row in self.db.execute(
+                    "SELECT * FROM home_resources WHERE visibility='public'"
+                ).fetchall()
+            ]
+            payload["tables"]["notes"] = [
+                dict(row) for row in self.db.execute(
+                    "SELECT * FROM notes WHERE visibility='public'"
+                ).fetchall()
+            ]
+            payload["tables"]["resource_relations"] = [
+                dict(row) for row in self.db.execute(
+                    "SELECT * FROM resource_relations "
+                    "WHERE source_resource_id IN (SELECT id FROM home_resources WHERE visibility='public') "
+                    "AND target_resource_id IN (SELECT id FROM home_resources WHERE visibility='public')"
+                ).fetchall()
+            ]
+            payload["tables"]["home_changes"] = [
+                dict(row) for row in self.db.execute(
+                    "SELECT * FROM home_changes WHERE resource_id IN "
+                    "(SELECT id FROM home_resources WHERE visibility='public')"
+                ).fetchall()
+            ]
+            # Snapshot content is an opaque serialized home and may contain
+            # private rows even when the current export is filtered. Omit it.
+            payload["tables"]["home_snapshots"] = []
+
         payload["verification"] = self.verify_home()
         return payload
 
