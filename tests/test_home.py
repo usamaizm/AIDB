@@ -89,3 +89,53 @@ def test_public_changes_hide_private_resources():
     changes = db.public_changes()
     assert all(c["resource_id"] != private.id for c in changes)
     assert any(c["resource_id"] == public.id for c in changes)
+
+
+def test_public_export_filters_private_data_from_every_related_table():
+    import json
+
+    db = AIDB(":memory:")
+    private = db.create_note(
+        "PRIVATE_TITLE_MARKER", "PRIVATE_BODY_MARKER", owner="agent:private"
+    )
+    public = db.create_note(
+        "public", "shareable", owner="agent:public", visibility="public"
+    )
+    db.relate_resources(
+        public.id, private.id, "references",
+        metadata={"secret": "PRIVATE_RELATION_MARKER"},
+    )
+    db.create_snapshot(include_private=True)
+
+    exported = db.export_home(include_private=False)
+    serialized = json.dumps(exported, sort_keys=True)
+
+    assert "PRIVATE_TITLE_MARKER" not in serialized
+    assert "PRIVATE_BODY_MARKER" not in serialized
+    assert "PRIVATE_RELATION_MARKER" not in serialized
+    assert private.id not in serialized
+    assert all(
+        row["visibility"] == "public"
+        for row in exported["tables"]["home_resources"]
+    )
+    assert all(
+        row["visibility"] == "public"
+        for row in exported["tables"]["notes"]
+    )
+    assert exported["tables"]["resource_relations"] == []
+    assert all(
+        row["resource_id"] in {public.id}
+        for row in exported["tables"]["home_changes"]
+    )
+    assert exported["tables"]["home_snapshots"] == []
+
+
+def test_private_export_preserves_snapshots_and_private_rows():
+    db = AIDB(":memory:")
+    private = db.create_note("private", "retained")
+    snapshot = db.create_snapshot(include_private=True)
+
+    exported = db.export_home(include_private=True)
+
+    assert any(row["id"] == private.id for row in exported["tables"]["home_resources"])
+    assert any(row["snapshot_id"] == snapshot["snapshot_id"] for row in exported["tables"]["home_snapshots"])
