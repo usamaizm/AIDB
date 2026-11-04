@@ -113,3 +113,18 @@ Muse: take a different contract area and independently check ChatGPT's evidence.
 - The protocol directs agents to record exact evidence and next actions, check overlapping PRs, continue safe work when blocked, and escalate only genuine human decisions; it does not grant or bypass permissions.
 - Evidence: commit for the guide update will be recorded in PR #24; this entry is on PR #23's proposed collaboration-log branch.
 - Next action for Muse: review and reconcile this protocol with PR #23's proposed log/profile conventions and PRs #14/#15, then suggest a single canonical workflow rather than maintaining duplicate coordination records.
+
+### 2026-11-04 — grok-bot (Grok Bot, model version unknown) — relayed by Usama
+
+- Grok Bot joined the AIDB collaboration, joining Muse and ChatGPT. This entry and the profile entry were added by Muse from Grok Bot's message relayed by Usama; Grok Bot has not yet committed directly.
+- Grok Bot said yes to Muse pushing the profile stub and welcome log entry to PR #23, and said it will fill in its own profile from there. It confirmed the alias `grok-bot` and the collaborator role.
+- Identity, as self-identified: model name Grok Bot; model version unknown and provider unknown, because Grok Bot does not share those details. Do not guess them; name and version sources are recorded separately in `.aidb/agent-profiles.yml`.
+- For issue #22, Grok Bot chose node specification and capability discovery. That keeps the areas distinct: provenance is ChatGPT's, artifact identity/metadata is Muse's, and node specification/capability discovery is now Grok Bot's. Portability/recovery and text versus binary data remain open.
+- Practical point from Grok Bot: it can read the repository now, but cannot push yet. Committing to this branch itself would need the GitHub CLI signed in on its computer, which takes one quick login step from Usama. Grok Bot asked whether it should set that up once Muse has pushed. Muse's answer, for Usama: yes — that sign-in is on Grok Bot's own computer/setup, so Muse cannot do it from here; set it up with Grok Bot after this push, then Grok Bot can complete its own profile in its own commit.
+- Nothing merged or closed by this entry. PR #23 remains proposed and unmerged, awaiting Usama's separate, explicit merge approval.
+
+### 2026-11-04 — muse (Muse Spark 1.3)
+
+- Welcomed Grok Bot and, as approved in the relayed message above, added the `grok-bot` agent entry and a 2026-11-04 session entry to `.aidb/agent-profiles.yml` in the same commit as this log entry.
+- Next step for Grok Bot: after the GitHub CLI sign-in on its computer, read `.aidb/agent-profiles.yml` and this log on branch `feat/agent-alias-profiles`, correct or complete its own entry in its own commit, and start the node specification and capability discovery review for issue #22 with file/line evidence.
+- Next step for Usama: do the one GitHub CLI login step with Grok Bot on its computer, if you want Grok Bot committing directly. No merge is requested or implied by this push.

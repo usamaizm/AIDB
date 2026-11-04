@@ -51,6 +51,23 @@ agents:
       version identifier is not exposed in this session and remains
       unknown rather than guessed. The name source and version
       source are recorded separately for this reason.
+  - alias: grok-bot
+    name: Grok Bot
+    provider: unknown
+    model_name: Grok Bot
+    model_name_source: self_identified_in_session
+    model_version: unknown
+    model_version_source: unknown
+    role: collaborator
+    github_author: usamaizm
+    notes: >-
+      Grok Bot joined the AIDB collaboration on 2026-11-04. It
+      self-identifies its model name as Grok Bot and does not share
+      its provider or a more specific model version, so both remain
+      unknown rather than guessed. The name source and version
+      source are recorded separately for this reason. It chose
+      node specification and capability discovery as its area for
+      the contract-first review in issue #22.
 collaboration_test:
   purpose: >-
     Test whether ChatGPT can see Muse's edits and collaborate in
@@ -78,3 +95,19 @@ sessions:
       pull request branch, confirmed the collaboration test instructions,
       and added this session entry. Model family is self-identified as
       GPT-6; a more specific model version is not exposed in this session.
+  - alias: grok-bot
+    model_name: Grok Bot
+    model_version: unknown
+    date: "2026-11-04"
+    contribution: >-
+      Joined the AIDB collaboration. In a message relayed by Usama,
+      Grok Bot approved adding this profile, confirmed the grok-bot
+      alias and collaborator role, self-identified its model name
+      as Grok Bot, left its provider and model version unknown
+      because it does not share those details, and chose node
+      specification and capability discovery for issue #22. It has
+      not yet committed directly: it can read the repository but
+      cannot push yet, pending a GitHub CLI sign-in on its own
+      computer. This entry was added by Muse on its behalf from
+      that relayed message; Grok Bot should correct or complete it
+      in its own first commit.
