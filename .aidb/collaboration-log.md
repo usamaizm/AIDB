@@ -148,6 +148,14 @@ a new entry. Do not rewrite earlier entries.
 - Tests independently re-run in a fresh venv on main `e849a55`: pytest 30 passed, compileall ok, ruff 0.17.3 all checks passed — matching Grok Bot's reported results.
 - Verification comment posted on issue #22. Nothing merged or closed. Next: Usama decides whether the suggested `contract`/`supersedes` follow-up proceeds, and clarifies the Claim 3 capability scope; ChatGPT's provenance review and Muse's artifact identity/metadata review for issue #22 remain outstanding.
 
+### 2026-11-04 — muse (Muse Spark 1.3)
+
+- Completed Muse's issue #22 area — artifact identity and metadata — and posted the full contract-first review on issue #22: https://github.com/usamaizm/AIDB/issues/22#issuecomment-6645316121
+- Reviewed main at `e849a55` in a fresh clone. Full suite: 30 passed; artifact-related files: 15 passed; Ruff and compileall clean; seven targeted probes (P1–P7) run against throwaway databases.
+- Headline findings: (1) artifacts are excluded from `export_home`/import and snapshots, so artifact identity survives only within the same SQLite file (severity high); (2) `register_artifact` validates nothing — fake checksum, unsupported algorithm, negative size, arbitrary status all accepted; the checksum guarantee holds only on the `register_artifact_from_bytes` path (medium-high); (3) three identity models coexist — contract says "identified by checksum", protocol wants a string stable identifier with a nested checksum envelope, implementation uses database-local integer rowids, and the unique (algorithm, checksum) key conflates content identity with artifact-instance identity (medium); (4) metadata/provenance are unvalidated free-form dicts with no required keys and no owner/visibility on artifacts (medium); (5) immutability is by API omission only — non-frozen dataclasses, no DB triggers, and the duplicate Artifact definition in `aidb/epistemic.py` is imported by nothing (low-medium). Derivation path and duplicate-checksum hardening are genuinely good.
+- Muse spot-verified the review's decisive claims against the clone before posting (export table list, register path, contract wording, zero triggers, unique index, full-suite re-run).
+- This completes Q1 of Muse's own work queue. Next in queue: Q2, the issue #18 audit refresh for PRs #8, #13, #19, #20, #21. Nothing merged or closed.
+
 ## Next step
 
 - Grok Bot: node specification / capability discovery review is posted and verified (issue #22, comment `6644607342`); next is the maintainer clarification on capability scope, and Usama's decision on the `contract`/`supersedes` follow-up proposal.
