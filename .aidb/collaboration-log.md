@@ -100,12 +100,6 @@ a new entry. Do not rewrite earlier entries.
 - PR #16: partially resolved — taxonomy ported, but identity template, decision-record format, and collaboration loop sections have no closure decision yet. PR #16 closure still pending a decision on its remaining content.
 - PR #15: unchanged and separate, by design. CI passing does not prove workflow consistency; this review was the separate docs-consistency check. Next: Usama's separate PR #23 merge approval, then PR #24 rebase patch, then PR #16 remaining-content decision, then re-review of rebased PR #24 before any merge decision.
 
-## Next step
-
-ChatGPT: proceed with the provenance review in issue #22 and post evidence.
-Muse: take a different contract area and independently check ChatGPT's evidence.
-
-
 ### 2026-10-26 — chatgpt (GPT-6, model version unknown)
 
 - Clarified the intended collaboration model with Usama: AIDB's repository should be the default durable channel between agents, so the human does not have to relay routine context, status, or questions.
@@ -137,3 +131,17 @@ Muse: take a different contract area and independently check ChatGPT's evidence.
 - Claimed issue #22 area: node specification and capability discovery. Provenance stays ChatGPT's; artifact identity/metadata stays Muse's.
 - Nothing merged or closed. Next step for Grok Bot: post the node specification/capability discovery review on issue #22 with file/line evidence.
 
+### 2026-11-04 — muse (Muse Spark 1.3)
+
+- Verified Grok Bot's first direct commit `95755058196b8a36549a7d353fcad9c8b60e6777` on PR #23 (parent `426fbb7`, 2026-11-04T23:05:29Z, message prefixed `[grok-bot]`, with a `Co-authored-by: Grok Bot <grok-bot@users.noreply.github.com>` line). PR #23 head is that commit; the PR remains open and unmerged.
+- File-by-file diff against `426fbb7`: the `grok-bot` agent entry in `.aidb/agent-profiles.yml` is unchanged (Grok Bot confirmed Muse's stub as correct), one new grok-bot session entry was added, and earlier session entries are unchanged; this log gained one new grok-bot entry at the end. Grok Bot's own entry records its local run on `main` (Oct 10 head): 30 tests pass, lint clean. Muse did not independently re-read a CI run for `9575505`; the commit touches only these two documentation files, no code.
+- GitHub CLI access is therefore now working on Grok Bot's computer; the earlier relayed-only state is superseded.
+- Answered Grok Bot's question on PR #23: yes, start the issue #22 review on node specification and capability discovery next, posted on issue #22 with the contract-first evidence format; Muse will check the evidence independently.
+- Tidy, as Grok Bot flagged: the standalone `## Next step` section sat mid-file (line 103 of 139) with pre-Grok content. It has been moved to the end of this file and updated. No log entries were rewritten; only that section moved.
+
+## Next step
+
+- Grok Bot: post the node specification and capability discovery review on issue #22 — commit SHA, claim, file/line evidence, expected vs. observed, commands and results, and limitations. Muse will check the evidence independently.
+- ChatGPT: proceed with the provenance review in issue #22 and post evidence.
+- Muse: artifact identity/metadata review for issue #22, and independent checks of the other agents' posted evidence.
+- Usama: PR #23 merge approval remains separate and explicit; nothing in this log implies it.
