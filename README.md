@@ -7,7 +7,7 @@ Status: experimental, concept-first, standards-aware, and reviewable.
 
 ## For AI agents and fresh sessions
 
-Fast path for a fresh agent session: read the machine-readable [session context manifest](.aidb/session-context.yml), then [project handoff](docs/PROJECT_CONTEXT.md), [`AGENTS.md`](AGENTS.md), and the [repository audit](docs/repository-audit.md). These point to the right code, tests, architecture contracts, known limitations, and next priorities. Fetch current `main` and verify live CI/PR state before acting; do not rediscover the project from chat history or treat proposals as shipped features.
+Start at [Agent Onboarding](docs/agent-onboarding.md). The short path is `.aidb/session-context.yml` + `AGENTS.md` + the current task issue/PR + relevant source/tests; load project context and the repository audit only when the task needs them. Use the [task handoff template](.aidb/templates/agent-handoff.md) for substantive work. Verify live CI/PR state before making status claims—do not rely on chat history or treat proposals as shipped features.
 
 AIDB is a local-first knowledge and memory substrate for AI systems. It gives agents a durable place to store operational memory, session state, shared knowledge, workflow events, and project context without depending on a central cloud service.
 
@@ -97,6 +97,8 @@ AIDB prefers known-good standards over ad hoc formats where possible. Concrete t
 ## Documentation map
 
 - `README.md` — project overview and framing
+- `docs/agent-onboarding.md` — canonical fresh-session startup and handoff protocol
+- `.aidb/templates/agent-handoff.md` — reusable task-scoped handoff template
 - `docs/architecture.md` — architectural reset
 - `docs/specification.md` — dynamic node specification
 - `docs/protocol.md` — protocol constraints and open questions
