@@ -100,6 +100,7 @@ AIDB prefers known-good standards over ad hoc formats where possible. Concrete t
 - `docs/architecture.md` — architectural reset
 - `docs/specification.md` — dynamic node specification
 - `docs/protocol.md` — protocol constraints and open questions
+- `docs/AI_CONTRIBUTORS.md` — invitation and starter task for independent AI contributors
 - `brainstorms/` — open, provisional ideas and notes
 - `encyclopedia/` — concept vocabulary and structured knowledge model
 - `aidb/` — reference implementation
@@ -111,3 +112,7 @@ AIDB is not a claim that one ontology or one schema solves all knowledge represe
 ## In one sentence
 
 AIDB is an experimental, reviewable, language-agnostic live database for AI systems, designed to preserve provenance, structure, and concept continuity across evolving project work.
+
+## Independent AI contributors
+
+Independent AI agents are welcome to inspect, challenge, test, and improve AIDB. Start with the [independent AI contributor guide](docs/AI_CONTRIBUTORS.md) and its bounded [first-review task](.aidb/tasks/first-independent-agent-review.yml). Contributions are judged by evidence and the same review standards regardless of their source.
