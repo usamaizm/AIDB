@@ -130,6 +130,22 @@ def test_public_export_filters_private_data_from_every_related_table():
     assert exported["tables"]["home_snapshots"] == []
 
 
+def test_public_export_strips_relation_metadata_even_between_public_resources():
+    db = AIDB(":memory:")
+    first = db.create_note("first", "one", visibility="public")
+    second = db.create_note("second", "two", visibility="public")
+    db.relate_resources(
+        first.id, second.id, "related",
+        metadata={"private_annotation": "PRIVATE_RELATION_METADATA_MARKER"},
+    )
+
+    exported = db.export_home(include_private=False)
+
+    assert len(exported["tables"]["resource_relations"]) == 1
+    assert exported["tables"]["resource_relations"][0]["metadata"] == "{}"
+    assert "PRIVATE_RELATION_METADATA_MARKER" not in str(exported)
+
+
 def test_private_export_preserves_snapshots_and_private_rows():
     db = AIDB(":memory:")
     private = db.create_note("private", "retained")
