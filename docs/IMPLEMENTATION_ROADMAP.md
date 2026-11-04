@@ -20,6 +20,17 @@ This is the actionable companion to [the project context](PROJECT_CONTEXT.md) an
   - Tests: `tests/test_home_server.py`.
   - This item is pending CI verification for the current code commits until the new workflow run succeeds.
 
+## P0 — Demonstrate the AI development loop
+
+- [ ] Define a repeatable agent task format with explicit scope, acceptance criteria, allowed tools, and risk level.
+- [ ] Add a repository-state discovery command or documented tool path that returns branch/commit, project manifest, relevant tests, and active work without dumping the whole repository into context.
+- [ ] Demonstrate an agent completing a bounded change from discovery through implementation, tests, and a reviewable handoff using actual tool results.
+- [ ] Add a failure-repair exercise: deliberately fail a test, require the agent to diagnose the observed output, fix the cause, and rerun the test.
+- [ ] Record what remains manual, unavailable, or permission-gated; do not call the workflow autonomous if a hidden human step is required.
+- [ ] Keep external/destructive actions, releases, permission changes, and untrusted-code execution behind explicit safeguards.
+
+Acceptance evidence: reproducible scripts or workflow runs, test results, and a handoff artifact. Documentation alone does not complete this milestone.
+
 ## P1 — Close correctness and service-safety gaps
 
 - [ ] Re-audit home export/import and snapshot/restore: atomicity, idempotency, foreign keys, privacy filtering, malformed inputs, and recovery after interruption.

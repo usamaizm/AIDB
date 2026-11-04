@@ -9,6 +9,21 @@ project:
   mission: >-
     Build a local-first, model-agnostic, modular substrate for agent memory,
     knowledge, artifacts, provenance, and coordination.
+development_model:
+  principle: "AI-first development; human collaboration welcome."
+  status: "requirement; autonomous end-to-end development is not yet fully demonstrated."
+  expected_agent_loop:
+    - discover_current_state
+    - define_acceptance_criteria
+    - inspect_existing_work
+    - implement_bounded_change
+    - run_checks_and_repair_from_observed_output
+    - leave_evidence_based_handoff
+  safeguards:
+    - "Do not bypass authorization, provenance, tests, review gates, or isolation."
+    - "Do not execute untrusted artifacts without a verified isolated runtime and explicit permission."
+    - "Do not describe plans or model predictions as execution evidence."
+
 session_bootstrap:
   required_order:
     - path: .aidb/session-context.yml

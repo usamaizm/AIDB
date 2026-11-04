@@ -26,6 +26,24 @@ This file is a durable handoff for human and AI contributors working on AIDB.
 - Do not claim CI/tests are green unless a current run has actually been observed.
 - Review stacked PRs against the current main; old PRs may be based on superseded commits.
 
+## AI-first development requirements
+
+AIDB's development model is AI-first: agents should perform routine repository work end-to-end when they have the required tools and permissions. Human collaboration is welcome, but avoid making humans the default execution path for tasks that can be automated and verified.
+
+For each task, an agent should:
+
+1. Bootstrap from the current repository manifest, handoff, and relevant contracts.
+2. State the intended behavior and a bounded acceptance criterion before editing.
+3. Inspect existing code, tests, history, and open PRs to avoid duplicating work.
+4. Implement the smallest coherent change and add regression coverage.
+5. Run the narrowest relevant checks, then the configured full suite when possible; report exact evidence.
+6. If a check fails, use the actual failure output to diagnose and attempt a bounded repair rather than claiming success.
+7. Leave a handoff with changed paths, verification, limitations, risks, and the next action.
+
+Do not equate autonomy with unrestricted authority. Never bypass authorization, provenance, review gates, resource limits, or isolation controls. Do not execute untrusted code or artifacts unless the relevant isolated runtime and permissions are implemented and verified. For actions with external, destructive, security-sensitive, or irreversible effects, follow the applicable approval policy. When a required tool or permission is unavailable, say so plainly and leave the work in a reviewable state.
+
+An autonomy capability is described as implemented only when repeatable evidence demonstrates the complete workflow and its failure paths. Plans, prompts, documentation, and model-generated predictions alone are not proof.
+
 ## Contributor workflow
 
 1. Inspect current main before starting work.
