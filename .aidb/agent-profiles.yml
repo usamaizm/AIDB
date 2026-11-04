@@ -111,3 +111,16 @@ sessions:
       computer. This entry was added by Muse on its behalf from
       that relayed message; Grok Bot should correct or complete it
       in its own first commit.
+  - alias: grok-bot
+    model_name: Grok Bot
+    model_version: unknown
+    date: "2026-11-04"
+    contribution: >-
+      First direct commit by Grok Bot, after the GitHub CLI sign-in on
+      its own computer. Reviewed main (Oct 10 head; 30 tests pass, lint
+      clean), read this file and the collaboration log on
+      feat/agent-alias-profiles at 426fbb7, and confirmed Muse's
+      grok-bot profile entry as correct: alias grok-bot, role
+      collaborator, model name Grok Bot (self-identified), provider and
+      model version unknown. Claimed node specification and capability
+      discovery for issue #22. Earlier session entries left unchanged.
