@@ -139,9 +139,18 @@ a new entry. Do not rewrite earlier entries.
 - Answered Grok Bot's question on PR #23: yes, start the issue #22 review on node specification and capability discovery next, posted on issue #22 with the contract-first evidence format; Muse will check the evidence independently.
 - Tidy, as Grok Bot flagged: the standalone `## Next step` section sat mid-file (line 103 of 139) with pre-Grok content. It has been moved to the end of this file and updated. No log entries were rewritten; only that section moved.
 
+### 2026-11-04 — muse (Muse Spark 1.3)
+
+- Verified Grok Bot's node specification and capability discovery review on issue #22, comment `6644607342` (2026-11-04T23:11:34Z), against main head `e849a551118d172a223b92914074df6d07c4cee2` (still main head; PR #23 head `38806b1` and PR #24 head `7c57d55` unchanged; no new PR #23 or PR #24 comments).
+- Claim 1 verified: spec doc requires a semantic `version` plus a `contract` identity; `aidb/store.py` L69 / L975-L989 and `aidb/core.py` L37-L50 carry a row-counter `version` and no `contract` field. Claim 2 verified: no `supersedes` column, and re-issue only on `capabilities`/`resource_types` change (`aidb/store.py` L979-L983).
+- Claim 3 verified in substance with a route correction: GET routes are `/healthz`, `/specification`, `/.well-known/aidb.json`, `/v1/notes`, `/v1/resources`, `/v1/changes`; `/v1/resources/{id}/relations` is POST, and the `/specification` route was omitted from Grok Bot's list. `transports` is always `[]` (`aidb/store.py` L982). The capability-scope question (Python API vs. wire interface) remains open for a maintainer clarification.
+- Claim 4 verified with a line refinement: `AIDB_UNSUPPORTED_VERSION` is `include/aidb/aidb.h` L29 and `AIDB_UNSUPPORTED_CAPABILITY` L30; no Python code produces those contract codes. Claim 5 verified: PR #14 head `1842d96` and PR #15 head `525cb39` carry the identical `.well-known/agent-card.json` (blob `db2189ab`, protocol `"1.x"`, capabilities including `durable_memory`, `agent_messages`, `portable_recovery`), a different vocabulary from the runtime spec, with no statement of which is authoritative.
+- Tests independently re-run in a fresh venv on main `e849a55`: pytest 30 passed, compileall ok, ruff 0.17.3 all checks passed — matching Grok Bot's reported results.
+- Verification comment posted on issue #22. Nothing merged or closed. Next: Usama decides whether the suggested `contract`/`supersedes` follow-up proceeds, and clarifies the Claim 3 capability scope; ChatGPT's provenance review and Muse's artifact identity/metadata review for issue #22 remain outstanding.
+
 ## Next step
 
-- Grok Bot: post the node specification and capability discovery review on issue #22 — commit SHA, claim, file/line evidence, expected vs. observed, commands and results, and limitations. Muse will check the evidence independently.
+- Grok Bot: node specification / capability discovery review is posted and verified (issue #22, comment `6644607342`); next is the maintainer clarification on capability scope, and Usama's decision on the `contract`/`supersedes` follow-up proposal.
 - ChatGPT: proceed with the provenance review in issue #22 and post evidence.
 - Muse: artifact identity/metadata review for issue #22, and independent checks of the other agents' posted evidence.
 - Usama: PR #23 merge approval remains separate and explicit; nothing in this log implies it.
