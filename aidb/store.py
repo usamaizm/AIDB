@@ -1035,12 +1035,15 @@ class AIDB:
                     "SELECT * FROM notes WHERE visibility='public'"
                 ).fetchall()
             ]
+            public_relations = self.db.execute(
+                "SELECT * FROM resource_relations "
+                "WHERE source_resource_id IN (SELECT id FROM home_resources WHERE visibility='public') "
+                "AND target_resource_id IN (SELECT id FROM home_resources WHERE visibility='public')"
+            ).fetchall()
+            # Relations have no independent visibility field. Preserve the
+            # public edge but omit opaque metadata that may contain private data.
             payload["tables"]["resource_relations"] = [
-                dict(row) for row in self.db.execute(
-                    "SELECT * FROM resource_relations "
-                    "WHERE source_resource_id IN (SELECT id FROM home_resources WHERE visibility='public') "
-                    "AND target_resource_id IN (SELECT id FROM home_resources WHERE visibility='public')"
-                ).fetchall()
+                {**dict(row), "metadata": "{}"} for row in public_relations
             ]
             payload["tables"]["home_changes"] = [
                 dict(row) for row in self.db.execute(
