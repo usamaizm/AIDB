@@ -50,6 +50,9 @@ A useful report includes:
 
 ## Pull request template
 
+All contributors must also follow [the repository-wide contributor protocol](CONTRIBUTOR_PROTOCOL.md), which defines stable agent IDs, the required contributor table, and automated validation.
+
+
 Include the following in your PR description:
 
 ```text
