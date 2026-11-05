@@ -1185,10 +1185,21 @@ class AIDB:
         if unknown_tables:
             raise ValueError("unknown home import table")
 
-        # Validate the entire payload before touching durable state.
+# Tables whose `id` is a TEXT primary key carry semantic, portable
+        # identifiers (resources, notes). SQLite TEXT affinity silently
+        # coerces an integer id to a string, and a TEXT primary key without
+        # an explicit NOT NULL silently stores a NULL id, so the id shape
+        # must be enforced here, before any insert (E1 cases N1a/N1b).
+        # Tables whose `id` is an INTEGER rowid surrogate (node_identity,
+        # resource_relations, home_changes, home_snapshots, artifacts) hold
+        # database-local ids with no portable meaning; their exports
+        # legitimately carry integer ids, so they are not checked here.
+        text_id_tables = {"home_resources", "notes"}
+                          
+                          # Validate the entire payload before touching durable state.
         validated_rows = {}
         for table, allowed_columns in columns_by_table.items():
-            rows = tables.get(table, [])
+            rows = tables.get(table, [])}
             if not isinstance(rows, list):
                 raise ValueError(f"invalid rows for table: {table}")
             validated_rows[table] = []
@@ -1203,7 +1214,14 @@ class AIDB:
                     for value in row.values()
                 ):
                     raise ValueError(f"invalid value in home import row for table: {table}")
-                validated_rows[table].append(row)
+                if table in text_id_tables:
+                        id_value = row.get("id")
+                    if not isinstance(id_value, str) or not id_value:
+                            raise ValueError(
+                                    f"invalid id in home import row for table: {table} "
+                                f"(id must be a non-empty string, got {type(id_value).__name__})"
+                            )
+                        validated_rows[table].append(row)
 
         # A savepoint makes restore atomic and also works when the caller already
         # has an outer transaction. Existing rows are preserved for idempotency.
