@@ -3,6 +3,7 @@
 import base64
 import aidb
 import pytest
+from threading import Barrier, Thread
 from aidb.core import Agent, Artifact, EpistemicChainBrokenError, KnowledgeRecord, Memory, Message, Session, Task, Tool, ToolCall, WorkflowEvent
 from aidb.store import AIDB
 from aidb.errors import (
@@ -498,4 +499,38 @@ def test_update_note_rolls_back_if_change_serialization_fails() -> None:
     assert db.get_note(note.resource_id).title == "original"
     assert db.get_note(note.resource_id).content == "body"
     assert db.get_resource(note.resource_id).revision == 1
+    db.close()
+
+
+
+def test_concurrent_updates_enforce_expected_revision() -> None:
+    db = AIDB(":memory:")
+    resource = db.create_resource("item", {"version": 1})
+    barrier = Barrier(3)
+    outcomes = []
+
+    def update(value: int) -> None:
+        barrier.wait()
+        try:
+            db.update_resource(
+                resource.id,
+                content={"version": value},
+                expected_revision=1,
+            )
+            outcomes.append("updated")
+        except RevisionConflictError:
+            outcomes.append("conflict")
+
+    first = Thread(target=update, args=(2,))
+    second = Thread(target=update, args=(3,))
+    first.start()
+    second.start()
+    barrier.wait()
+    first.join(timeout=5)
+    second.join(timeout=5)
+
+    assert not first.is_alive()
+    assert not second.is_alive()
+    assert sorted(outcomes) == ["conflict", "updated"]
+    assert db.get_resource(resource.id).revision == 2
     db.close()
