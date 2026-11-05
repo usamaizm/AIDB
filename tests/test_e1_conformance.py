@@ -360,16 +360,12 @@ def test_f4b_unknown_column_rejected_atomically(tmp_path):
     assert_nothing_imported(db)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 F4(c): an unknown top-level key is silently ignored on import "
-    f"and lost on re-export; strictness asymmetry vs F4(b)/(d) ({RESULTS_REF})"))
 def test_f4c_unknown_top_level_key_preserved_or_rejected(tmp_path):
+    # PR #42 closes this asymmetry by rejecting unknown top-level fields.
     db = make_db(tmp_path, "f4c")
-    try:
+    with pytest.raises(ValueError, match="unknown home import field"):
         db.import_home(wire(load_fixture("f4c.json")))
-    except ValueError:
-        return  # explicit rejection also closes the defect
-    assert "extensions" in db.export_home()
+    assert_nothing_imported(db)
 
 
 def test_f4d_unknown_table_rejected_atomically(tmp_path):
@@ -383,7 +379,7 @@ def test_f4_combined_rejected_at_validation(tmp_path):
     # Whole-payload validation runs before any insert, so the (b)
     # rejection masks (a) and (c) in a combined payload.
     db = make_db(tmp_path, "f4all")
-    with pytest.raises(ValueError, match="invalid column in home import row"):
+    with pytest.raises(ValueError, match="unknown home import field"):
         db.import_home(wire(load_fixture("f4_combined.json")))
     assert_nothing_imported(db)
 
@@ -659,16 +655,17 @@ def test_n4a_tampered_snapshot_rejected_at_import(tmp_path):
 
 
 def test_n4a_tampered_snapshot_detected_at_restore(tmp_path):
+    # Import now rejects tampered snapshot rows (PR #42). Independently
+    # pin restore-time verification by corrupting a locally-created row
+    # after its valid hash has been recorded.
     db = make_db(tmp_path, "n4a_res")
-    db.import_home(wire(load_fixture("n4a.json")))
-    # PR #37 exports no longer carry a home_snapshots table, so the
-    # row is addressed by the fixture's snapshot_id; the detection
-    # behaviour itself is unchanged from E1.
-    snapshot_id = load_fixture(
-        "n4a.json")["tables"]["home_snapshots"][0]["snapshot_id"]
-    stored = db.db.execute(
-        "SELECT content, content_hash FROM home_snapshots").fetchone()
-    assert hashlib.sha256(stored[0].encode("utf-8")).hexdigest() != stored[1]
+    snapshot = db.create_snapshot()
+    snapshot_id = snapshot["snapshot_id"]
+    db.db.execute(
+        "UPDATE home_snapshots SET content = content || 'tampered' "
+        "WHERE snapshot_id = ?",
+        (snapshot_id,),
+    )
     with pytest.raises(ValueError, match="snapshot integrity check failed"):
         db.restore_snapshot(snapshot_id)
 
