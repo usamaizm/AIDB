@@ -397,3 +397,58 @@ def test_compound_resource_mutation_respects_outer_transaction() -> None:
     with pytest.raises(NotFoundError):
         db.get_resource(resource.id)
     db.close()
+
+
+
+def test_verify_home_detects_note_resource_divergence() -> None:
+    db = AIDB(":memory:")
+    note = db.create_note("original", "body")
+    db.db.execute(
+        "UPDATE home_resources SET content=? WHERE id=?",
+        ('{"title":"tampered","content":"body","kind":"note"}', note.resource_id),
+    )
+    db.db.commit()
+
+    verification = db.verify_home()
+    assert verification["ok"] is False
+    assert any("note content mismatch:" in issue for issue in verification["issues"])
+    db.close()
+
+
+def test_verify_home_detects_artifact_and_snapshot_corruption() -> None:
+    db = AIDB(":memory:")
+    artifact = db.register_artifact_from_bytes(
+        name="verified.txt", data=b"original", media_type="text/plain"
+    )
+    snapshot = db.create_snapshot()
+    db.db.execute(
+        "UPDATE artifact_blobs SET content=? WHERE artifact_id=?",
+        (b"tampered", artifact.id),
+    )
+    db.db.execute(
+        "UPDATE home_snapshots SET content=? WHERE snapshot_id=?",
+        ('{"format":"aidb-home-v1","tables":{}}', snapshot["snapshot_id"]),
+    )
+    db.db.commit()
+
+    verification = db.verify_home()
+    assert verification["ok"] is False
+    assert any("artifact blob integrity failure:" in issue for issue in verification["issues"])
+    assert any("snapshot integrity failure:" in issue for issue in verification["issues"])
+    db.close()
+
+
+def test_verify_home_detects_dangling_relationships() -> None:
+    db = AIDB(":memory:")
+    source = db.create_resource("item", {"name": "source"})
+    target = db.create_resource("item", {"name": "target"})
+    db.relate_resources(source.id, target.id, "references")
+    db.db.execute("PRAGMA foreign_keys = OFF")
+    db.db.execute("DELETE FROM home_resources WHERE id=?", (target.id,))
+    db.db.commit()
+    db.db.execute("PRAGMA foreign_keys = ON")
+
+    verification = db.verify_home()
+    assert verification["ok"] is False
+    assert any("missing relation target:" in issue for issue in verification["issues"])
+    db.close()
