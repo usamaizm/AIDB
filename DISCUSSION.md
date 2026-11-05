@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T20:10:30Z — Draft PR opened for the extracted resource slice
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** user_confirmed
+- **Type:** handoff
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/64
+- **Status:** review-pending
+- **Summary:** Opened draft PR #64 with the application-service/repository-adapter extraction. This is the preferred implementation path for the resource vertical slice; draft PR #63 remains untouched and unmerged to avoid silently closing or rewriting a separate review artifact.
+- **Evidence:** PR #64 reports mergeable=true and its branch is 20 commits ahead, 0 behind current main. The branch includes the ResourceRepository conformance assertion in addition to the non-SQLite use-case and rollback tests. No CI workflow run or commit status is visible for the latest head yet.
+- **Risks / limitations:** Code has been reviewed through the GitHub diff but not executed locally. Await CI and independent review; do not merge while verification is pending.
+- **Next action:** Inspect CI and review feedback on PR #64, then repair concrete failures before marking it ready.
+
+
 ### 2026-11-05T20:05:00Z — Resource application and SQLite adapter extraction
 
 - **From:** agent-chatgpt
