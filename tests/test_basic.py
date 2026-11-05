@@ -452,3 +452,50 @@ def test_verify_home_detects_dangling_relationships() -> None:
     assert verification["ok"] is False
     assert any("missing relation target:" in issue for issue in verification["issues"])
     db.close()
+
+
+
+def test_create_note_rolls_back_if_event_creation_fails() -> None:
+    db = AIDB(":memory:")
+
+    def fail_event(*_args, **_kwargs):
+        raise RuntimeError("simulated note event failure")
+
+    db._append_workflow_event = fail_event
+    with pytest.raises(RuntimeError, match="simulated note event failure"):
+        db.create_note("title", "body")
+
+    assert db.db.execute("SELECT COUNT(*) FROM notes").fetchone()[0] == 0
+    assert db.db.execute(
+        "SELECT COUNT(*) FROM home_resources WHERE resource_type='note'"
+    ).fetchone()[0] == 0
+    assert db.db.execute(
+        "SELECT COUNT(*) FROM home_changes WHERE operation='create'"
+    ).fetchone()[0] == 0
+    db.close()
+
+
+def test_update_note_rolls_back_if_change_serialization_fails() -> None:
+    db = AIDB(":memory:")
+    note = db.create_note("original", "body")
+    original_json = db._json
+    calls = 0
+
+    def fail_third_json(value):
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            raise RuntimeError("simulated update serialization failure")
+        return original_json(value)
+
+    db._json = fail_third_json
+    with pytest.raises(RuntimeError, match="simulated update serialization failure"):
+        db.update_resource(
+            note.resource_id,
+            content={"title": "changed", "content": "new body", "kind": "note"},
+        )
+
+    assert db.get_note(note.resource_id).title == "original"
+    assert db.get_note(note.resource_id).content == "body"
+    assert db.get_resource(note.resource_id).revision == 1
+    db.close()
