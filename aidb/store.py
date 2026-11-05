@@ -1791,10 +1791,15 @@ class AIDB:
             raise InvalidArgumentError("relation metadata must be an object")
         if source_resource_id == target_resource_id:
             raise InvalidArgumentError("a resource cannot relate to itself")
-        for rid in (source_resource_id, target_resource_id):
-            if self.db.execute("SELECT 1 FROM home_resources WHERE id=?", (rid,)).fetchone() is None:
-                raise NotFoundError("resource does not exist: " + rid, details={"resource_id": rid})
         with self._atomic("relate_resources"):
+            for rid in (source_resource_id, target_resource_id):
+                if self.db.execute(
+                    "SELECT 1 FROM home_resources WHERE id=?", (rid,)
+                ).fetchone() is None:
+                    raise NotFoundError(
+                        "resource does not exist: " + rid,
+                        details={"resource_id": rid},
+                    )
             self.db.execute("INSERT OR IGNORE INTO resource_relations(source_resource_id,target_resource_id,relation,metadata) VALUES(?,?,?,?)", (source_resource_id,target_resource_id,relation,self._json(metadata or {})))
             self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,payload) VALUES(?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),source_resource_id,"relate",None,self._json({"target_resource_id":target_resource_id,"relation":relation})))
 
@@ -1838,12 +1843,17 @@ class AIDB:
             new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
             new_content = json.loads(row["content"]) if content is None else content
             content_json = self._json_value(new_content)
-            self.db.execute(
+            cursor = self.db.execute(
                 "UPDATE home_resources SET content=?, metadata=?, revision=revision+1, "
                 "updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') "
                 "WHERE id=? AND revision=?",
                 (content_json, self._json(new_metadata), resource_id, old_revision),
             )
+            if cursor.rowcount != 1:
+                raise RevisionConflictError(
+                    "resource changed while updating",
+                    details={"resource_id": resource_id, "expected_revision": old_revision},
+                )
             note = self.db.execute(
                 "SELECT * FROM notes WHERE resource_id=?", (resource_id,)
             ).fetchone()
