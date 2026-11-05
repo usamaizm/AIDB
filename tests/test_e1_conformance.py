@@ -277,10 +277,6 @@ def test_f2_pass_through_fidelity(tmp_path):
     assert ex["updated_at"] == fx["updated_at"]
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 F2: rows created through the API export SQLite-shaped "
-    "CURRENT_TIMESTAMP values ('2026-11-05 02:53:13'), not RFC 3339 "
-    f"({RESULTS_REF})"))
 def test_f2_native_timestamps_are_rfc3339(tmp_path):
     db = make_db(tmp_path, "f2_api")
     made = db.create_resource("document", {"title": "x"}, owner="agent-muse",
@@ -361,7 +357,11 @@ def test_f4b_unknown_column_rejected_atomically(tmp_path):
 
 
 def test_f4c_unknown_top_level_key_preserved_or_rejected(tmp_path):
-    # PR #42 closes this asymmetry by rejecting unknown top-level fields.
+    # E1 F4(c): an unknown top-level key was silently ignored on
+    # import and lost on re-export (strictness asymmetry vs
+    # F4(b)/(d)). PR #42 closes the defect by rejection: top-level
+    # keys outside {format, tables, verification, required_extensions}
+    # raise before any row validation, and nothing is imported.
     db = make_db(tmp_path, "f4c")
     with pytest.raises(ValueError, match="unknown home import field"):
         db.import_home(wire(load_fixture("f4c.json")))
@@ -376,8 +376,11 @@ def test_f4d_unknown_table_rejected_atomically(tmp_path):
 
 
 def test_f4_combined_rejected_at_validation(tmp_path):
-    # Whole-payload validation runs before any insert, so the (b)
-    # rejection masks (a) and (c) in a combined payload.
+    # Whole-payload validation runs before any insert. The combined
+    # fixture carries all three F4 faults; since PR #42 the
+    # top-level field check runs before per-row column validation,
+    # so the (c) rejection now masks (b) in a combined payload.
+    # The (b) column rejection itself remains pinned by test_f4b.
     db = make_db(tmp_path, "f4all")
     with pytest.raises(ValueError, match="unknown home import field"):
         db.import_home(wire(load_fixture("f4_combined.json")))
@@ -589,15 +592,24 @@ def test_f8_tier_ii_private_at_creation_history(tmp_path):
 
 # ---------------------------------------------------------- N1
 def test_n1a_integer_id_rejected(tmp_path):
+    # E1 N1a, closed by PR #42: per-table string/non-empty checks
+    # reject an integer resource ID instead of letting SQLite TEXT
+    # affinity silently coerce it to '123'.
     db = make_db(tmp_path, "n1a")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="invalid id in home import row"):
         db.import_home(wire(load_fixture("n1a.json")))
+    assert_nothing_imported(db)
 
 
 def test_n1b_null_id_rejected(tmp_path):
+    # E1 N1b, closed by PR #42: the non-empty check rejects a NULL
+    # resource ID at validation (None is not a string), instead of
+    # letting it persist and re-export as id: null -- SQLite permits
+    # NULLs in a TEXT PRIMARY KEY column without an explicit NOT NULL.
     db = make_db(tmp_path, "n1b")
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError, match="invalid id in home import row"):
         db.import_home(wire(load_fixture("n1b.json")))
+    assert_nothing_imported(db)
 
 
 def test_n1c_prefix_free_string_id_accepted_verbatim(tmp_path):
@@ -624,6 +636,24 @@ def test_n2b_change_for_nonexistent_resource_rejected(tmp_path):
     assert_nothing_imported(db)
 
 
+def test_n2b_observed_fallback_surfaces_in_verification(tmp_path):
+    # E1-era companion pin, restructured for PR #42: the dangling
+    # change used to import silently and surface only in the next
+    # export's verification block ("missing resource: ..."). The
+    # cross-validation above moved the failure surface from verify
+    # time to import time, so the dangling reference now never
+    # reaches verification at all.
+    db = make_db(tmp_path, "n2b_obs")
+    with pytest.raises(
+            ValueError, match="home change references a missing resource"):
+        db.import_home(wire(load_fixture("n2b.json")))
+    assert_nothing_imported(db)
+    verification = db.export_home()["verification"]
+    assert verification["ok"] is True
+    assert not any(i.startswith("missing resource:")
+                   for i in verification["issues"])
+
+
 # ---------------------------------------------------------- N3
 def test_n3a_unknown_format_version_rejected(tmp_path):
     db = make_db(tmp_path, "n3a")
@@ -633,14 +663,13 @@ def test_n3a_unknown_format_version_rejected(tmp_path):
 
 
 def test_n3b_required_extensions_honored_or_rejected(tmp_path):
-    # PR #42 closes this by explicitly rejecting unsupported required
-    # extensions rather than silently accepting them.
+    # PR #42 closes E1 N3b by explicitly rejecting unsupported
+    # required extensions rather than silently accepting and
+    # ignoring them; no required-extension mechanism exists yet.
     db = make_db(tmp_path, "n3b")
-    try:
+    with pytest.raises(ValueError, match="unsupported required home extension"):
         db.import_home(wire(load_fixture("n3b.json")))
-    except ValueError:
-        return  # explicit rejection also closes the defect
-    assert "required_extensions" in db.export_home()
+    assert_nothing_imported(db)
 
 
 # N3c (unknown table) is covered by test_f4d_unknown_table_rejected_atomically.
@@ -648,24 +677,37 @@ def test_n3b_required_extensions_honored_or_rejected(tmp_path):
 
 # ---------------------------------------------------------- N4
 def test_n4a_tampered_snapshot_rejected_at_import(tmp_path):
-    # PR #42 validates snapshot format, content hash, and content-addressed ID.
+    # PR #42 validates snapshot format, content hash, and
+    # content-addressed ID during import validation, so a tampered
+    # snapshot row is rejected before any insert (E1 N4a import
+    # path: import_home previously never recomputed the hash).
     db = make_db(tmp_path, "n4a_imp")
-    with pytest.raises(ValueError):
+    with pytest.raises(
+            ValueError, match="snapshot integrity check failed during import"):
         db.import_home(wire(load_fixture("n4a.json")))
+    assert_nothing_imported(db)
 
 
 def test_n4a_tampered_snapshot_detected_at_restore(tmp_path):
-    # Import now rejects tampered snapshot rows (PR #42). Independently
-    # pin restore-time verification by corrupting a locally-created row
-    # after its valid hash has been recorded.
     db = make_db(tmp_path, "n4a_res")
-    snapshot = db.create_snapshot()
-    snapshot_id = snapshot["snapshot_id"]
+    # PR #42 rejects the tampered fixture at import (pinned above),
+    # so the row can no longer reach the database through
+    # import_home. Insert it directly, modelling a snapshot row
+    # tampered with at rest. Detection now happens at the restore
+    # entry point: restore_snapshot recomputes the content digest
+    # itself and raises before the content is handed to
+    # import_home_json, which is the only path restore uses.
+    row = load_fixture("n4a.json")["tables"]["home_snapshots"][0]
     db.db.execute(
-        "UPDATE home_snapshots SET content = content || 'tampered' "
-        "WHERE snapshot_id = ?",
-        (snapshot_id,),
-    )
+        "INSERT INTO home_snapshots"
+        "(snapshot_id, home_format, content, content_hash) VALUES(?,?,?,?)",
+        (row["snapshot_id"], row["home_format"],
+         row["content"], row["content_hash"]))
+    db.db.commit()
+    snapshot_id = row["snapshot_id"]
+    stored = db.db.execute(
+        "SELECT content, content_hash FROM home_snapshots").fetchone()
+    assert hashlib.sha256(stored[0].encode("utf-8")).hexdigest() != stored[1]
     with pytest.raises(ValueError, match="snapshot integrity check failed"):
         db.restore_snapshot(snapshot_id)
 
@@ -717,10 +759,13 @@ def test_n5a_duplicate_keys_v2_then_v1_rejected(tmp_path):
 
 
 def test_n5b_nan_value_rejected(tmp_path):
-    # PR #42 rejects non-finite numeric values even after parsing.
+    # PR #42 rejects non-finite numeric values even after parsing:
+    # the non-finite guard fires during row validation (E1 N5b: the
+    # NaN previously passed the value-type check and was silently
+    # laundered to NULL by the sqlite3 binding).
     parsed = json.loads(load_fixture_text("n5b_nan.txt"))
     db = make_db(tmp_path, "n5b")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="non-finite number in home import row"):
         db.import_home(parsed)
 
 
