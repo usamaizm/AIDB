@@ -974,8 +974,8 @@ class AIDB:
 
     def current_specification(self):
         identity=self.initialize_home()
-        caps=["resources","notes","artifacts","knowledge","messages","changes","export","restore","public_private","ownership"]
-        types=["resource","note","artifact","knowledge","memory","message","task"]
+        caps=["resources","notes","artifacts","knowledge","changes","export","restore","public_private","ownership"]
+        types=["resource","note","artifact","knowledge","memory"]
         latest=self.db.execute("SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1").fetchone()
         desired=(caps,types)
         if latest is None or (json.loads(latest["capabilities"]), json.loads(latest["resource_types"])) != desired:
