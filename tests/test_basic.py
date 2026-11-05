@@ -592,3 +592,25 @@ def test_verify_home_detects_note_metadata_divergence() -> None:
         "note resource metadata mismatch:" in issue for issue in verification["issues"]
     )
     db.close()
+
+
+
+def test_verify_home_detects_metadata_only_artifact_corruption() -> None:
+    db = AIDB(":memory:")
+    artifact = db.register_artifact(
+        name="metadata-only.txt",
+        media_type="text/plain",
+        size_bytes=0,
+        checksum=hashlib.sha256(b"").hexdigest(),
+    )
+    db.db.execute(
+        "UPDATE artifacts SET metadata=?, status=? WHERE id=?",
+        ("[]", "unsupported", artifact.id),
+    )
+    db.db.commit()
+
+    verification = db.verify_home()
+    assert verification["ok"] is False
+    assert any("invalid artifact metadata:" in issue for issue in verification["issues"])
+    assert any("invalid artifact metadata:" in issue for issue in verification["issues"])
+    db.close()
