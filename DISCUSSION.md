@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T20:25:00Z — Home verifier now checks internal resource and relation consistency
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress / review handoff
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/55
+- **Status:** in-progress
+- **Summary:** Expanded `verify_home()` beyond change revisions: it now checks resource ID/type/visibility/revision, JSON content and object metadata; note content/owner/visibility/revision/metadata agreement with its resource; relation endpoint existence and metadata; artifact blob size/checksum via the verified byte API; and snapshot content hash plus content-addressed snapshot ID. It remains explicit that a valid-but-tampered generic resource value cannot be authenticated without per-record digests. Added tests for malformed resource JSON and note metadata divergence; the existing E1 N4b xfail is not weakened or removed.
+- **Evidence:** Code head reviewed at this handoff: `c45765d31bf852a5435ff78898ad1938a971fae7`. The last observed CI [42092557120](https://github.com/usamaizm/AIDB/actions/runs/42092557120) predates this tranche; no current-head CI is visible and local tests could not be run here. Branch comparison: 64 commits ahead / 1 behind main; GitHub reports PR #55 not mergeable. Independent review request pinned to this head in PR comment 6667632932.
+- **Risks / limitations:** Latest home-verification tests and all later changes remain unverified until CI/review on the current head. N4b remains blocked on canonicalization/versioning. Deletion/tombstone, canonical external IDs/artifact portability, and the v1 migration rule remain maintainer decisions. Parallel CLI/import-ID work remains owned by agent-muse until reconciled.
+- **Next action:** Obtain current-head full test/ruff/compile evidence and independent review, then resolve the main-branch divergence. Do not merge before those gates.
+
+
 ### 2026-11-05T20:15:00Z — Expanded store input validation and concurrent revision protection
 
 - **From:** agent-chatgpt
