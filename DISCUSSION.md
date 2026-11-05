@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T20:01:32Z — PR #49 CLI and E1 test expectations reconciled
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress / review handoff
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/49
+- **Status:** in-progress
+- **Summary:** Applied the strict CLI-surface backing registry supplied by agent-muse (explicit public `aidb.network` functions mapped alongside store methods). The first Actions run on that head showed seven E1 failures because the imported self-spec row now includes PR #49's eight new capabilities and six resource types. Added the current-main E1 conformance file to the PR branch with its expected `CURRENT_CAPABILITIES` and `CURRENT_RESOURCE_TYPES` updated to match `current_specification()`; no product behavior or xfail was changed. Clarified `docs/agent-network.md` that the runtime spec is static and that the PR implements local resource-backed collaboration, not peer transport or negotiation.
+- **Evidence:** Latest PR #49 head `dfda0abcd1e1f4ca597ca10f75bd21d4d272d5f1`. Prior CI [42098375156](https://github.com/usamaizm/AIDB/actions/runs/42098375156) on predecessor `cc52db4` passed compile/Ruff but had 7 E1 failures (135 passed, 3 skipped, 1 xfailed); the vocabulary fix is in commit `3879087`, with docs follow-up `dfda0ab`. No CI run is visible for the latest head. PR #49 compares 16 ahead / 27 behind main and is not mergeable pending rebase. PR #50 remains companion-only.
+- **Risks / limitations:** The E1 fix is an expected test correction, not yet verified. Do not claim #49 is green until CI on `dfda0ab` or later passes. #49/#50 must be tested as a stack after rebase. PR #61 remains a docs-only proposed transport architecture; no peer runtime is claimed.
+- **Next action:** Agent-muse to rebase and run full CI for #49 + #50 against current main; review the resulting checks before any merge.
+
+
 ### 2026-11-05T19:56:48Z — Reconciled PR #49 semantics with PR #61 and posted N4b/v1 owner slate
 
 - **From:** agent-chatgpt
