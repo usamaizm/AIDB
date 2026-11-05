@@ -1172,9 +1172,53 @@ class AIDB:
             }
         return payload
 
+    @staticmethod
+    def _unique_json_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate JSON object key: " + str(key))
+            result[key] = value
+        return result
+
+    @staticmethod
+    def _reject_json_constant(value):
+        raise ValueError("non-standard JSON numeric constant: " + value)
+
+    def import_home_json(self, content: str | bytes):
+        """Import a JSON wire payload while rejecting duplicate keys and NaN/Infinity."""
+        if not isinstance(content, (str, bytes)):
+            raise ValueError("home JSON content must be text or bytes")
+        try:
+            payload = json.loads(
+                content,
+                object_pairs_hook=self._unique_json_object,
+                parse_constant=self._reject_json_constant,
+            )
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise ValueError("invalid home JSON") from exc
+        return self.import_home(payload)
+
     def import_home(self, payload):
         if not isinstance(payload, dict) or payload.get("format") != "aidb-home-v1":
             raise ValueError("unsupported home format")
+
+        allowed_top_level = {"format", "tables", "verification", "required_extensions"}
+        if set(payload) - allowed_top_level:
+            raise ValueError("unknown home import field")
+        required_extensions = payload.get("required_extensions", [])
+        if (
+            not isinstance(required_extensions, list)
+            or any(not isinstance(item, str) for item in required_extensions)
+        ):
+            raise ValueError("invalid required_extensions")
+        if required_extensions:
+            raise ValueError(
+                "unsupported required home extension: " + ", ".join(required_extensions)
+            )
+        verification = payload.get("verification")
+        if verification is not None and not isinstance(verification, dict):
+            raise ValueError("invalid home verification metadata")
 
         tables = payload.get("tables", {})
         if not isinstance(tables, dict):
@@ -1238,9 +1282,63 @@ class AIDB:
                     for value in row.values()
                 ):
                     raise ValueError(f"invalid value in home import row for table: {table}")
+                if any(
+                    isinstance(value, float) and not math.isfinite(value)
+                    for value in row.values()
+                ):
+                    raise ValueError(f"non-finite number in home import row for table: {table}")
+
+                required_strings = {
+                    "node_identity": ("node_id",),
+                    "node_specifications": ("specification_id", "node_id"),
+                    "home_resources": ("id", "resource_type"),
+                    "notes": ("id", "resource_id", "title", "content", "kind"),
+                    "resource_relations": ("source_resource_id", "target_resource_id", "relation"),
+                    "home_changes": ("change_id", "operation"),
+                    "artifacts": ("name", "media_type", "checksum"),
+                    "home_snapshots": ("snapshot_id", "home_format", "content", "content_hash"),
+                }.get(table, ())
+                for field in required_strings:
+                    if field in row and (
+                        not isinstance(row[field], str) or not row[field].strip()
+                    ):
+                        raise ValueError(f"invalid {field} in home import row for table: {table}")
+                if table == "home_resources" and "id" in row and not isinstance(row["id"], str):
+                    raise ValueError("resource IDs must be non-empty strings")
+                if table == "notes" and "id" in row and not isinstance(row["id"], str):
+                    raise ValueError("note IDs must be non-empty strings")
+                if table == "home_changes" and row.get("resource_id") is not None and not isinstance(row["resource_id"], str):
+                    raise ValueError("change resource_id must be a string or null")
+                if table == "home_snapshots":
+                    content = row.get("content")
+                    digest = row.get("content_hash")
+                    if (
+                        row.get("home_format") != "aidb-home-v1"
+                        or not isinstance(content, str)
+                        or not isinstance(digest, str)
+                        or not re.fullmatch(r"[0-9a-f]{64}", digest)
+                        or hashlib.sha256(content.encode("utf-8")).hexdigest() != digest
+                        or row.get("snapshot_id") != "snap:" + digest
+                    ):
+                        raise ValueError("snapshot integrity check failed during import")
                 if table == "artifact_blobs":
                     row = self._decode_artifact_blob_row(row)
                 validated_rows[table].append(row)
+
+        # Change rows have no schema-level FK, so validate their targets
+        # against both incoming resources and resources already in this home.
+        imported_resource_ids = {
+            row["id"] for row in validated_rows["home_resources"]
+            if isinstance(row.get("id"), str)
+        }
+        existing_resource_ids = {
+            row["id"] for row in self.db.execute("SELECT id FROM home_resources").fetchall()
+        }
+        valid_resource_ids = imported_resource_ids | existing_resource_ids
+        for row in validated_rows["home_changes"]:
+            resource_id = row.get("resource_id")
+            if resource_id is not None and resource_id not in valid_resource_ids:
+                raise ValueError("home change references a missing resource")
 
         # A savepoint makes restore atomic and also works when the caller already
         # has an outer transaction. Existing rows are preserved for idempotency.
@@ -1439,7 +1537,7 @@ class AIDB:
         digest=hashlib.sha256(row["content"].encode("utf-8")).hexdigest()
         if digest != row["content_hash"]:
             raise ValueError("snapshot integrity check failed")
-        return self.import_home(json.loads(row["content"]))
+        return self.import_home_json(row["content"])
 
     def list_changes(self, after_id=0, limit=100, resource_id=None):
         if limit < 1:
