@@ -573,3 +573,21 @@ def test_verify_home_detects_invalid_resource_json() -> None:
     assert verification["ok"] is False
     assert any("invalid resource content:" in issue for issue in verification["issues"])
     db.close()
+
+
+
+def test_verify_home_detects_note_metadata_divergence() -> None:
+    db = AIDB(":memory:")
+    note = db.create_note("title", "body", metadata={"source": "user"})
+    db.db.execute(
+        "UPDATE notes SET metadata=? WHERE id=?",
+        ('{"source":"imported"}', note.id),
+    )
+    db.db.commit()
+
+    verification = db.verify_home()
+    assert verification["ok"] is False
+    assert any(
+        "note resource metadata mismatch:" in issue for issue in verification["issues"]
+    )
+    db.close()
