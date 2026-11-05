@@ -1,5 +1,7 @@
 import base64
 import json
+import hashlib
+import json
 import sqlite3
 
 import pytest
@@ -158,3 +160,131 @@ def test_public_export_still_excludes_artifact_blobs(tmp_path):
     assert exported["tables"]["artifacts"] == []
     assert exported["tables"]["artifact_blobs"] == []
     json.dumps(exported)
+
+
+def test_import_rejects_unknown_top_level_fields():
+    db = AIDB(":memory:")
+    payload = {"format": "aidb-home-v1", "tables": {}, "extensions": []}
+    with pytest.raises(ValueError, match="unknown home import field"):
+        db.import_home(payload)
+    assert db.list_resources() == []
+
+
+def test_import_rejects_unsupported_required_extensions():
+    db = AIDB(":memory:")
+    payload = {
+        "format": "aidb-home-v1",
+        "tables": {},
+        "required_extensions": ["aidb/ext-x"],
+    }
+    with pytest.raises(ValueError, match="unsupported required home extension"):
+        db.import_home(payload)
+    assert db.list_resources() == []
+
+
+@pytest.mark.parametrize("resource_id", [123, None, ""])
+def test_import_rejects_invalid_resource_ids(resource_id):
+    db = AIDB(":memory:")
+    payload = {
+        "format": "aidb-home-v1",
+        "tables": {
+            "home_resources": [{
+                "id": resource_id,
+                "resource_type": "document",
+                "content": "{}",
+                "owner": None,
+                "visibility": "private",
+                "metadata": "{}",
+                "revision": 1,
+            }]
+        },
+    }
+    with pytest.raises(ValueError, match="invalid id"):
+        db.import_home(payload)
+    assert db.list_resources() == []
+
+
+def test_import_rejects_dangling_home_change_reference_atomically():
+    db = AIDB(":memory:")
+    payload = {
+        "format": "aidb-home-v1",
+        "tables": {
+            "home_resources": [{
+                "id": "incoming-resource",
+                "resource_type": "document",
+                "content": "{}",
+                "owner": None,
+                "visibility": "public",
+                "metadata": "{}",
+                "revision": 1,
+            }],
+            "home_changes": [{
+                "change_id": "change:missing-target",
+                "resource_id": "not-in-payload",
+                "operation": "update",
+                "actor": None,
+                "previous_revision": 1,
+                "new_revision": 2,
+                "payload": "{}",
+            }],
+        },
+    }
+    with pytest.raises(ValueError, match="home change references a missing resource"):
+        db.import_home(payload)
+    assert db.list_resources() == []
+
+
+def test_import_rejects_tampered_snapshot_before_writing():
+    db = AIDB(":memory:")
+    content = json.dumps({"format": "aidb-home-v1", "tables": {}})
+    digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    payload = {
+        "format": "aidb-home-v1",
+        "tables": {
+            "home_snapshots": [{
+                "snapshot_id": "snap:" + digest,
+                "home_format": "aidb-home-v1",
+                "content": content + "tampered",
+                "content_hash": digest,
+            }]
+        },
+    }
+    with pytest.raises(ValueError, match="snapshot integrity check failed"):
+        db.import_home(payload)
+    assert db.db.execute("SELECT COUNT(*) FROM home_snapshots").fetchone()[0] == 0
+
+
+def test_import_rejects_programmatic_non_finite_numbers():
+    db = AIDB(":memory:")
+    payload = {
+        "format": "aidb-home-v1",
+        "tables": {
+            "home_changes": [{
+                "change_id": "change:nan",
+                "resource_id": None,
+                "operation": "system",
+                "previous_revision": float("nan"),
+                "new_revision": 1,
+                "payload": "{}",
+            }]
+        },
+    }
+    with pytest.raises(ValueError, match="non-finite number"):
+        db.import_home(payload)
+    assert db.db.execute("SELECT COUNT(*) FROM home_changes").fetchone()[0] == 0
+
+
+def test_import_home_json_rejects_duplicate_object_keys():
+    db = AIDB(":memory:")
+    raw = '{"format":"aidb-home-v1","format":"aidb-home-v2","tables":{}}'
+    with pytest.raises(ValueError, match="duplicate JSON object key"):
+        db.import_home_json(raw)
+    assert db.list_resources() == []
+
+
+def test_import_home_json_rejects_non_standard_numeric_constants():
+    db = AIDB(":memory:")
+    raw = '{"format":"aidb-home-v1","tables":{},"value":NaN}'
+    with pytest.raises(ValueError, match="non-standard JSON numeric constant"):
+        db.import_home_json(raw)
+    assert db.list_resources() == []
