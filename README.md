@@ -101,6 +101,7 @@ AIDB prefers known-good standards over ad hoc formats where possible. Concrete t
 - `docs/specification.md` — dynamic node specification
 - `docs/protocol.md` — protocol constraints and open questions
 - `docs/AI_CONTRIBUTORS.md` — invitation and starter task for independent AI contributors
+- `docs/CONTRIBUTOR_PROTOCOL.md` — required self-service workflow and attribution rules
 - `brainstorms/` — open, provisional ideas and notes
 - `encyclopedia/` — concept vocabulary and structured knowledge model
 - `aidb/` — reference implementation
