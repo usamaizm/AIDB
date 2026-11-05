@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import sqlite3
@@ -127,6 +128,13 @@ class AIDB:
                 metadata TEXT NOT NULL DEFAULT '{}',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(parent_artifact_id) REFERENCES artifacts(id) ON DELETE SET NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS artifact_blobs (
+                artifact_id INTEGER PRIMARY KEY,
+                content BLOB NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(artifact_id) REFERENCES artifacts(id) ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS extractions (
@@ -333,6 +341,29 @@ class AIDB:
         return dot / (mag_a * mag_b)
 
     @staticmethod
+    def _decode_artifact_blob_row(row):
+        """Normalize an imported artifact_blobs row to raw bytes.
+
+        Serialized exports carry blob content as base64 text marked with
+        content_encoding="base64"; in-process dict payloads may still
+        carry raw bytes with no marker. Anything else is rejected.
+        """
+        row = dict(row)
+        encoding = row.pop("content_encoding", None)
+        content = row.get("content")
+        if encoding is None:
+            if not isinstance(content, bytes):
+                raise ValueError("artifact blob content must be bytes or base64 text")
+            return row
+        if encoding != "base64" or not isinstance(content, str):
+            raise ValueError("unsupported artifact blob content encoding: " + str(encoding))
+        try:
+            row["content"] = base64.b64decode(content, validate=True)
+        except (ValueError, base64.binascii.Error) as exc:
+            raise ValueError("invalid base64 artifact blob content") from exc
+        return row
+
+    @staticmethod
     def _checksum_bytes(data: bytes, algorithm: str = "sha-256") -> str:
         normalized = (algorithm or "sha-256").lower()
         if normalized not in {"sha-256", "sha1", "md5"}:
@@ -474,6 +505,20 @@ class AIDB:
         output_artifact_id: int,
         sequence: int | None = None,
     ) -> ExtractionOutput:
+        extraction = self.db.execute(
+            "SELECT input_artifact_id FROM extractions WHERE id = ?", (extraction_id,)
+        ).fetchone()
+        output = self.db.execute(
+            "SELECT parent_artifact_id FROM artifacts WHERE id = ?", (output_artifact_id,)
+        ).fetchone()
+        if extraction is None:
+            raise ValueError(f"extraction {extraction_id} does not exist")
+        if output is None:
+            raise ValueError(f"output artifact {output_artifact_id} does not exist")
+        if output["parent_artifact_id"] != extraction["input_artifact_id"]:
+            raise ValueError(
+                "output artifact parent must match the extraction input artifact"
+            )
         if sequence is None:
             rows = self.db.execute("SELECT COUNT(*) AS n FROM extraction_outputs WHERE extraction_id = ?", (extraction_id,)).fetchone()
             sequence = int(rows["n"]) if rows is not None else 0
@@ -680,6 +725,10 @@ class AIDB:
             )
 
         extraction = self._extraction_from_row(extraction_row)
+        if output_artifact.parent_artifact_id != extraction.input_artifact_id:
+            raise EpistemicChainBrokenError(
+                "extraction input artifact does not match output artifact parent"
+            )
         source_row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (extraction.input_artifact_id,)).fetchone()
         if source_row is None:
             raise EpistemicChainBrokenError(
@@ -708,6 +757,7 @@ class AIDB:
         transformation_history: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
         checksum_algorithm: str = "sha-256",
+        content: bytes | None = None,
     ) -> Artifact:
         self._assert_no_duplicate_checksum(checksum_algorithm, checksum)
         try:
@@ -731,6 +781,11 @@ class AIDB:
             )
             row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (cur.lastrowid,)).fetchone()
             artifact = self._artifact_from_row(row)
+            if content is not None:
+                self.db.execute(
+                    "INSERT INTO artifact_blobs(artifact_id, content) VALUES (?, ?)",
+                    (artifact.id, sqlite3.Binary(content)),
+                )
             self._append_workflow_event(
                 "artifact_created",
                 f"artifact {artifact.id} created",
@@ -773,7 +828,29 @@ class AIDB:
             transformation_history=transformation_history,
             metadata=metadata,
             checksum_algorithm=checksum_algorithm,
+            content=data,
         )
+
+    def get_artifact_bytes(self, artifact_id: int) -> bytes | None:
+        """Return a verified payload, or None for metadata-only/unknown artifacts."""
+        row = self.db.execute(
+            """
+            SELECT b.content, a.size_bytes, a.checksum, a.checksum_algorithm
+            FROM artifact_blobs b
+            JOIN artifacts a ON a.id = b.artifact_id
+            WHERE b.artifact_id = ?
+            """,
+            (artifact_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        content = bytes(row["content"])
+        if len(content) != row["size_bytes"]:
+            raise ValueError(f"artifact {artifact_id} payload size does not match metadata")
+        actual_checksum = self._checksum_bytes(content, row["checksum_algorithm"])
+        if actual_checksum != row["checksum"]:
+            raise ValueError(f"artifact {artifact_id} payload checksum verification failed")
+        return content
 
     def derive_artifact(
         self,
@@ -932,10 +1009,34 @@ class AIDB:
         return [self.get_resource(r["id"]) for r in rows]
 
     def create_note(self, title, content, owner=None, visibility="private", kind="note", metadata=None):
-        resource=self.create_resource("note", {"title":title,"content":content,"kind":kind}, owner, visibility, metadata)
-        self.db.execute("INSERT INTO notes(id,resource_id,title,content,owner,visibility,kind,metadata) VALUES(?,?,?,?,?,?,?,?)", (resource.id,resource.id,title,content,owner,visibility,kind,self._json(metadata or {})))
-        self.db.commit()
-        return self.get_note(resource.id)
+        if visibility not in {"public", "private"}:
+            raise ValueError("visibility must be public or private")
+        resource_id = "res:" + str(uuid.uuid4())
+        resource_content = {"title": title, "content": content, "kind": kind}
+        try:
+            self.db.execute("BEGIN")
+            self.db.execute(
+                "INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)",
+                (resource_id, "note", json.dumps(resource_content), owner, visibility, self._json(metadata or {})),
+            )
+            self.db.execute(
+                "INSERT INTO notes(id,resource_id,title,content,owner,visibility,kind,metadata) VALUES(?,?,?,?,?,?,?,?)",
+                (resource_id, resource_id, title, content, owner, visibility, kind, self._json(metadata or {})),
+            )
+            self._append_workflow_event(
+                "resource_created", "note created",
+                metadata={"resource_id": resource_id, "resource_type": "note", "owner": owner, "visibility": visibility},
+            )
+            self.db.execute(
+                "INSERT INTO home_changes(change_id,resource_id,operation,actor,new_revision,payload) VALUES(?,?,?,?,?,?)",
+                ("chg:" + str(uuid.uuid4()), resource_id, "create", owner, 1,
+                 self._json({"resource_type": "note", "visibility": visibility})),
+            )
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        return self.get_note(resource_id)
 
     def get_note(self, note_id, include_private=True):
         row=self.db.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
@@ -998,15 +1099,74 @@ class AIDB:
         return {"ok": not issues, "issues": issues}
 
     def export_home(self, include_private=True):
-        tables = ["node_identity", "node_specifications", "home_resources", "notes", "resource_relations", "home_changes", "home_snapshots"]
+        # Snapshot archives are deliberately excluded: embedding snapshots in
+        # snapshots causes recursive growth and can re-export private history.
+        tables = [
+            "node_identity", "node_specifications", "home_resources", "notes",
+            "resource_relations", "home_changes", "artifacts", "artifact_blobs",
+        ]
         payload = {"format": "aidb-home-v1", "tables": {}}
-        for table in tables:
-            if table in {"home_resources", "notes"} and not include_private:
-                rows = self.db.execute(f"SELECT * FROM {table} WHERE visibility='public'").fetchall()
-            else:
+        if include_private:
+            for table in tables:
                 rows = self.db.execute(f"SELECT * FROM {table}").fetchall()
-            payload["tables"][table] = [dict(row) for row in rows]
-        payload["verification"] = self.verify_home()
+                payload["tables"][table] = [dict(row) for row in rows]
+            payload["tables"]["artifact_blobs"] = [
+                {
+                    **row,
+                    "content": base64.b64encode(row["content"]).decode("ascii"),
+                    "content_encoding": "base64",
+                }
+                for row in payload["tables"]["artifact_blobs"]
+            ]
+        else:
+            payload["tables"]["node_identity"] = [
+                dict(row) for row in self.db.execute(
+                    "SELECT * FROM node_identity WHERE visibility='public'"
+                ).fetchall()
+            ]
+            payload["tables"]["node_specifications"] = [
+                dict(row) for row in self.db.execute(
+                    "SELECT * FROM node_specifications WHERE visibility='public'"
+                ).fetchall()
+            ]
+            payload["tables"]["home_resources"] = [
+                dict(row) for row in self.db.execute(
+                    "SELECT * FROM home_resources WHERE visibility='public'"
+                ).fetchall()
+            ]
+            payload["tables"]["notes"] = [
+                dict(row) for row in self.db.execute(
+                    "SELECT * FROM notes WHERE visibility='public'"
+                ).fetchall()
+            ]
+            payload["tables"]["resource_relations"] = [
+                dict(row) for row in self.db.execute(
+                    """
+                    SELECT rel.* FROM resource_relations rel
+                    JOIN home_resources src ON src.id=rel.source_resource_id
+                    JOIN home_resources dst ON dst.id=rel.target_resource_id
+                    WHERE src.visibility='public' AND dst.visibility='public'
+                    """
+                ).fetchall()
+            ]
+            payload["tables"]["home_changes"] = [
+                dict(row) for row in self.db.execute(
+                    """
+                    SELECT c.* FROM home_changes c
+                    JOIN home_resources src ON src.id=c.resource_id
+                    WHERE src.visibility='public'
+                      AND c.operation != 'relate'
+                    """
+                ).fetchall()
+            ]
+            # Artifacts currently have no independent visibility/ownership
+            # contract. Exclude them from public-only exports until one exists.
+            payload["tables"]["artifacts"] = []
+            payload["tables"]["artifact_blobs"] = []
+        verification = self.verify_home()
+        payload["verification"] = (
+            verification if include_private else {"ok": verification["ok"], "issues": []}
+        )
         return payload
 
     def import_home(self, payload):
@@ -1046,6 +1206,12 @@ class AIDB:
                 "id", "snapshot_id", "home_format", "content", "content_hash",
                 "created_at",
             },
+            "artifacts": {
+                "id", "name", "media_type", "filename", "size_bytes", "checksum",
+                "checksum_algorithm", "provenance", "status", "encoding",
+                "parent_artifact_id", "transformation_history", "metadata", "created_at",
+            },
+            "artifact_blobs": {"artifact_id", "content", "created_at", "content_encoding"},
         }
         unknown_tables = set(tables) - set(columns_by_table)
         if unknown_tables:
@@ -1069,6 +1235,8 @@ class AIDB:
                     for value in row.values()
                 ):
                     raise ValueError(f"invalid value in home import row for table: {table}")
+                if table == "artifact_blobs":
+                    row = self._decode_artifact_blob_row(row)
                 validated_rows[table].append(row)
 
         # A savepoint makes restore atomic and also works when the caller already
@@ -1079,10 +1247,33 @@ class AIDB:
                 for row in rows:
                     columns = list(row)
                     placeholders = ",".join("?" for _ in columns)
-                    self.db.execute(
+                    cursor = self.db.execute(
                         "INSERT OR IGNORE INTO " + table + " ("
                         + ",".join(columns) + ") VALUES (" + placeholders + ")",
                         [row[column] for column in columns],
+                    )
+                    if cursor.rowcount == 0:
+                        primary_keys = [
+                            info["name"] for info in self.db.execute(
+                                "PRAGMA table_info(" + table + ")"
+                            ).fetchall() if info["pk"]
+                        ]
+                        existing = None
+                        if primary_keys and all(key in row for key in primary_keys):
+                            where = " AND ".join(key + " = ?" for key in primary_keys)
+                            existing = self.db.execute(
+                                "SELECT * FROM " + table + " WHERE " + where,
+                                [row[key] for key in primary_keys],
+                            ).fetchone()
+                        if existing is None or any(existing[key] != value for key, value in row.items()):
+                            raise ValueError(
+                                "conflicting existing row while importing table: " + table
+                            )
+            for row in validated_rows["artifact_blobs"]:
+                if self.get_artifact_bytes(row["artifact_id"]) is None:
+                    raise ValueError(
+                        "imported artifact blob has no matching artifact: "
+                        + str(row["artifact_id"])
                     )
             self.db.execute("RELEASE SAVEPOINT aidb_import_home")
         except Exception:
@@ -1107,26 +1298,85 @@ class AIDB:
         return [dict(r) for r in rows]
 
     def update_resource(self, resource_id, content=None, metadata=None, owner=None, expected_revision=None):
-        row=self.db.execute("SELECT * FROM home_resources WHERE id=?", (resource_id,)).fetchone()
+        row = self.db.execute(
+            "SELECT * FROM home_resources WHERE id=?", (resource_id,)
+        ).fetchone()
         if row is None:
             raise ValueError("resource does not exist")
         if owner is not None and row["owner"] != owner:
             raise PermissionError("owner mismatch")
         if expected_revision is not None and row["revision"] != expected_revision:
             raise ValueError("revision conflict")
-        old_revision=row["revision"]
-        new_metadata=json.loads(row["metadata"]) if metadata is None else metadata
-        new_content=json.loads(row["content"]) if content is None else content
-        self.db.execute("UPDATE home_resources SET content=?, metadata=?, revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE id=?", (json.dumps(new_content),self._json(new_metadata),resource_id))
-        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),resource_id,"update",owner or row["owner"],old_revision,old_revision+1,self._json({"content_changed":content is not None,"metadata_changed":metadata is not None})))
-        self.db.commit()
+
+        old_revision = row["revision"]
+        new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
+        new_content = json.loads(row["content"]) if content is None else content
+        try:
+            self.db.execute("BEGIN")
+            self.db.execute(
+                "UPDATE home_resources SET content=?, metadata=?, revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (json.dumps(new_content), self._json(new_metadata), resource_id),
+            )
+            note = self.db.execute(
+                "SELECT * FROM notes WHERE resource_id=?", (resource_id,)
+            ).fetchone()
+            if note is not None:
+                if isinstance(new_content, dict):
+                    if not {"title", "content"}.issubset(new_content):
+                        raise ValueError("note resource content must include title and content")
+                    note_title = new_content["title"]
+                    note_content = new_content["content"]
+                    note_kind = new_content.get("kind", note["kind"])
+                else:
+                    # Preserve the legacy shorthand: a scalar update replaces
+                    # the note body while retaining its title and kind.
+                    note_title = note["title"]
+                    note_content = new_content
+                    note_kind = note["kind"]
+                    new_content = {
+                        "title": note_title, "content": note_content, "kind": note_kind
+                    }
+                    self.db.execute(
+                        "UPDATE home_resources SET content=? WHERE id=?",
+                        (json.dumps(new_content), resource_id),
+                    )
+                self.db.execute(
+                    "UPDATE notes SET title=?, content=?, kind=?, metadata=?, revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE resource_id=?",
+                    (note_title, note_content, note_kind, self._json(new_metadata), resource_id),
+                )
+            self.db.execute(
+                "INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)",
+                ("chg:" + str(uuid.uuid4()), resource_id, "update", owner or row["owner"],
+                 old_revision, old_revision + 1,
+                 self._json({"content_changed": content is not None, "metadata_changed": metadata is not None})),
+            )
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
         return self.get_resource(resource_id)
 
     def public_changes(self, after_id=0, limit=100):
         if limit < 1:
             raise ValueError("limit must be positive")
-        rows=self.db.execute("SELECT c.* FROM home_changes c LEFT JOIN home_resources r ON r.id=c.resource_id WHERE c.id>? AND (c.resource_id IS NULL OR r.visibility='public') ORDER BY c.id ASC LIMIT ?", (after_id,limit)).fetchall()
-        return [dict(r) for r in rows]
+        rows = self.db.execute(
+            """
+            SELECT c.*
+            FROM home_changes c
+            JOIN home_resources source ON source.id = c.resource_id
+            WHERE c.id > ?
+              AND source.visibility = 'public'
+              -- Relation changes are omitted from the public feed. Public
+              -- relationships are available through the separately filtered
+              -- resource_relations export; omitting events avoids leaking a
+              -- private target through arbitrary or malformed event payloads.
+              AND c.operation != 'relate'
+            ORDER BY c.id ASC
+            LIMIT ?
+            """,
+            (after_id, limit),
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     def create_snapshot(self, include_private=True):
         payload=self.export_home(include_private=include_private)
