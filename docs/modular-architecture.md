@@ -8,6 +8,12 @@ AIDB should be modular from the inside out: a small stable core defines data sem
 
 ## Architectural rules
 
+11. **Evolve contracts independently.** Version logical semantics, portable interchange, persisted storage, wire protocols, module interfaces, and optional extensions separately where their lifecycles differ. Do not let a current file envelope or backend schema dictate unrelated future formats.
+12. **Manage compatibility explicitly.** Prefer additive evolution when sound; otherwise use adapters, migrations, parallel implementations, or a new contract version. Never silently reinterpret bytes, silently discard unknown content, or claim legacy data has guarantees it has not earned.
+13. **Prove replaceability.** An adapter boundary is real only when independent implementations pass the same language-neutral conformance suite, including failure and recovery cases.
+
+See [Evolution and Compatibility Architecture](evolution-and-compatibility.md) for migration requirements, negotiation, format separation, decision records, and acceptance criteria.
+
 1. **Contract before implementation.** Define observable behavior in the language-neutral specification. Every implementation and adapter follows that contract.
 2. **Small core, optional capabilities.** Core identity, resource semantics, revisions, relationships, provenance, authorization decisions, and errors must not depend on a specific database, programming language, model, file format, or transport.
 3. **Ports and adapters.** The core calls interfaces; adapters implement those interfaces. Core modules must not import concrete optional adapters.
