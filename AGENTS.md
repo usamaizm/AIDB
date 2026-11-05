@@ -115,3 +115,12 @@ As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the
 - Persist job state, bounded logs, toolchain versions, input/output hashes, and artifact lineage; do not rely on model context as durable state.
 - Never execute files during ingest, indexing, inspection, preview, or export. Treat code and binaries as untrusted.
 - Do not expose a real code-execution adapter until isolation, resource limits, cancellation, and permissions have tests.
+
+## Mandatory contributor attribution and agent onboarding
+
+- Before contributing, read docs/CONTRIBUTOR_PROTOCOL.md and use .github/pull_request_template.md.
+- Every PR must list all material human and AI contributors using stable IDs, actual GitHub actors, attribution status, contribution role, and factual provenance.
+- Existing agents use IDs from .aidb/agent-profiles.yml; new agents may self-register a stable non-sensitive ID in a PR. Never guess model identity or authorship.
+- The PR contributor attribution workflow validates required metadata and that the PR author appears in the table. It does not prove model identity or authorship; normal review remains mandatory.
+- Work on a branch or fork; do not push directly to main, merge your own PR, access secrets, or change repository settings/permissions without explicit maintainer authorization.
+- This shared protocol is the onboarding source of truth. Do not require the maintainer to brief each agent individually.
