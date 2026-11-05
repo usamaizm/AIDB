@@ -615,3 +615,19 @@ def test_verify_home_detects_metadata_only_artifact_corruption() -> None:
         f"invalid artifact metadata:{artifact.id}"
     ) == 2
     db.close()
+
+
+
+def test_verify_home_detects_non_object_change_payloads() -> None:
+    db = AIDB(":memory:")
+    resource = db.create_resource("item", {"value": 1})
+    db.db.execute(
+        "UPDATE home_changes SET payload='[]' WHERE resource_id=?",
+        (resource.id,),
+    )
+    db.db.commit()
+
+    verification = db.verify_home()
+    assert verification["ok"] is False
+    assert any("invalid change payload:" in issue for issue in verification["issues"])
+    db.close()
