@@ -5,7 +5,7 @@ from urllib.request import Request, urlopen
 from http.server import ThreadingHTTPServer
 from threading import Thread
 
-from aidb.server import create_handler, create_server
+from aidb.server import _http_status_for_error, create_handler, create_server
 from aidb import AIDB
 
 
@@ -204,3 +204,16 @@ def test_production_http_server_sets_a_socket_read_timeout():
         client.close()
         server.server_close()
         db.close()
+
+
+
+def test_http_status_mapping_covers_error_contract():
+    assert _http_status_for_error("invalid_argument") == 400
+    assert _http_status_for_error("not_found") == 404
+    assert _http_status_for_error("unauthenticated") == 401
+    assert _http_status_for_error("permission_denied") == 403
+    assert _http_status_for_error("revision_conflict") == 409
+    assert _http_status_for_error("integrity_failure") == 409
+    assert _http_status_for_error("temporarily_unavailable") == 503
+    assert _http_status_for_error("internal_error") == 500
+    assert _http_status_for_error("unknown_future_code") == 500
