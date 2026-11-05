@@ -81,3 +81,16 @@ def test_import_rejects_conflicting_existing_rows():
         db.import_home(payload)
     assert db.get_note(note.id).title == "original"
     assert db.get_note(note.id).content == "content"
+
+def test_artifact_payload_reads_verify_checksum(tmp_path):
+    db = AIDB(tmp_path / "artifact-integrity.sqlite3")
+    artifact = db.register_artifact_from_bytes(
+        name="verified.bin", data=b"trusted", media_type="application/octet-stream"
+    )
+    db.db.execute(
+        "UPDATE artifact_blobs SET content=? WHERE artifact_id=?",
+        (b"tampered", artifact.id),
+    )
+    db.db.commit()
+    with pytest.raises(ValueError, match="checksum verification failed"):
+        db.get_artifact_bytes(artifact.id)
