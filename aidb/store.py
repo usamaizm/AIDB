@@ -1334,7 +1334,7 @@ class AIDB:
             try:
                 if self.get_artifact_bytes(blob["artifact_id"]) is None:
                     issues.append("orphan artifact blob:" + str(blob["artifact_id"]))
-            except IntegrityFailureError:
+            except AIDBError:
                 issues.append("artifact blob integrity failure:" + str(blob["artifact_id"]))
 
         for snapshot in self.db.execute(
