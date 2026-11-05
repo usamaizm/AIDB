@@ -155,3 +155,25 @@ def test_private_export_preserves_snapshots_and_private_rows():
 
     assert any(row["id"] == private.id for row in exported["tables"]["home_resources"])
     assert any(row["snapshot_id"] == snapshot["snapshot_id"] for row in exported["tables"]["home_snapshots"])
+
+
+def test_public_export_omits_history_for_resources_published_after_private_creation():
+    import json
+
+    db = AIDB(":memory:")
+    private = db.create_note(
+        "HISTORIC_PRIVATE_TITLE",
+        "HISTORIC_PRIVATE_BODY",
+        owner="HISTORIC_PRIVATE_OWNER",
+    )
+    db.publish_resource(private.id)
+
+    exported = db.export_home(include_private=False)
+    serialized = json.dumps(exported, sort_keys=True)
+
+    # Current visibility cannot establish that historical event payloads are safe:
+    # the create event predates publication and may retain private metadata.
+    assert exported["tables"]["home_changes"] == []
+    assert "HISTORIC_PRIVATE_TITLE" not in serialized
+    assert "HISTORIC_PRIVATE_BODY" not in serialized
+    assert "HISTORIC_PRIVATE_OWNER" not in serialized
