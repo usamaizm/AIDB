@@ -1,37 +1,25 @@
 # AIDB Project Context and Agent Handoff
 
-Last reconciled: 2026-10-10
+Last onboarding workflow reconciliation: 2026-11-05. Project implementation and CI status must still be verified live.
 Status: living handoff; experimental project; update this file when material decisions, implementation status, or priorities change.
 
 ## Read this first
 
-For any new human or AI session:
+Use [the agent onboarding guide](agent-onboarding.md) as the canonical startup procedure. For most tasks, the minimum is:
 
-1. Read [`.aidb/session-context.yml`](../.aidb/session-context.yml) for a machine-readable orientation and canonical pointers, then read this file for the human-readable handoff. Neither is a substitute for source code or tests.
-2. Read `AGENTS.md` for contributor rules and safety invariants.
-3. Read `README.md` for the user-facing project overview and quick start.
-4. Read `.aidb/protocol.yml` before interpreting or processing external AI requests; read `.aidb/knowledge.yml` for the knowledge index and authority rules.
-5. Read `docs/repository-audit.md` for current risks, CI baseline, open PR triage, and launch blockers.
-6. For the task at hand, read the relevant linked contract/design docs below and inspect current source/tests. Do not assume a design document means a feature is implemented.
-7. Verify current branch, recent commits, CI, issues, and PRs before making status claims. Update this handoff and the audit when the verified state materially changes.
+1. Fetch `.aidb/session-context.yml` and `AGENTS.md` from the target branch.
+2. Read the active issue/PR and inspect the current branch, relevant source, and tests.
+3. Load this file for architectural direction, accepted/open decisions, or previous handoff context; load `docs/repository-audit.md` for repository-wide status and risks.
+4. Read `.aidb/protocol.yml` before interpreting external AI requests and `.aidb/knowledge.yml` when the knowledge index/authority rules are relevant.
+5. Verify live CI/PR state before making status claims. Design documents are not proof of implementation.
 
-When a user supplies this repository URL in a fresh session, begin with this file and `AGENTS.md`, then fetch the current versions from the default branch. Do not rely on model memory or an old transcript as the source of truth.
+Do not require every new session to read every design document. Follow the relevant links progressively, and never rely on model memory or old transcripts as the source of truth.
 
 ## Mission
 
 AIDB is an experimental, local-first, model-agnostic knowledge, memory, artifact, and coordination substrate for AI systems. It aims to let agents preserve durable information, provenance, project context, workflow state, and artifacts instead of starting from scratch in every session. It is not itself a model and does not automatically call external AI services.
 
 The long-term goal is a modular, interoperable substrate that can serve constrained devices and very large deployments, with stable contracts and replaceable implementations. This is a direction, not a claim of production readiness or extreme-scale performance.
-
-## AI-first development principle
-
-AIDB is intended to be built and maintained primarily through capable AI agents, with human collaboration welcome. Routine progress should not depend on a human manually performing work an agent can safely and reliably complete. This is a project requirement, not a claim that autonomous development is already fully implemented.
-
-Agents should be able to discover the current project state, understand contracts and constraints, plan bounded work, inspect and modify code, run checks, interpret actual tool output, repair failures, and leave a reviewable handoff. The repository is the durable source of truth; chat history and model-generated claims are not evidence.
-
-Autonomy must remain evidence-driven and bounded. Agents must not bypass access controls, tests, provenance, review requirements, or execution isolation. Changes to persistent data, public interfaces, security boundaries, release state, or untrusted-code execution require the safeguards defined by the relevant contracts. Human review remains available for collaboration and higher-risk decisions; it should not be a substitute for automating routine, verifiable work.
-
-Progress is measured by demonstrated workflows, not labels. A capability counts as implemented only when a repeatable test or recorded execution proves it. Track discovery, implementation, validation, failure recovery, and handoff separately; state what remains manual and why.
 
 ## Product and architecture requirements discussed so far
 
@@ -99,12 +87,7 @@ Known limitations:
 
 ## Current work queue
 
-Use the live GitHub issue/PR state and `docs/repository-audit.md` to refresh this list before acting. As last checked on 2026-10-10, PRs #8, #13, #14, #15, and #16 remained open and require reconciliation, not blind merging:
-- #8: compare online-service changes against the server/CLI already on main; review public deployment security before exposure.
-- #13: compare against the atomic/schema-safe import fix already on main; close or reconcile only after checking the actual diff.
-- #14 and #15: review together because agent discovery and network-loop work overlaps.
-- #16: living context and agent identity proposal; this handoff now provides a versioned-in-repository starting point, but compare its remaining unique changes before deciding.
-- Keep CI green; refresh the audit from current run results.
+Use the live GitHub issue/PR state and `docs/repository-audit.md` to refresh this list before acting. Use the live GitHub issue/PR state and `ISSUES.md` to determine active work. Do not keep a dated list of open PRs here: branches and CI move faster than this context document. Current architecture and security gaps should be represented by canonical issues and their evidence.
 - Follow [the implementation roadmap](IMPLEMENTATION_ROADMAP.md) as the canonical actionable backlog; mark work complete only with source, tests, and CI evidence.
 - Add benchmark baselines before making performance claims.
 - Implement context-budgeted retrieval, bounded/paginated APIs, streaming, resource controls, and storage improvements in small tested increments.
@@ -121,13 +104,8 @@ For every material feature or design:
 - Do not claim full-repository security certification from a file-tree scan or documentation audit.
 - Prefer incremental changes with regression tests. Update this handoff, `AGENTS.md`, the knowledge index, and repository audit when their respective information changes.
 
-## Session handoff template
+## Session handoff
 
-At the end of substantive work, leave:
-- **Changed:** paths and behavior changed.
-- **Verified:** commands/tests and exact CI run or commit evidence.
-- **Not verified:** what could not be run or inspected.
-- **Open decisions/risks:** unresolved choices and security/compatibility concerns.
-- **Next step:** the single highest-value next action.
+For substantive work, use the [task handoff template](../.aidb/templates/agent-handoff.md) or record the same information directly in the relevant issue/PR. Keep one current task summary rather than an append-only transcript. Include changed paths, source/commit evidence, exact checks and outcomes, unverified items, open risks/decisions, and one next action.
 
-The repository is the durable source of truth. A fresh agent should be able to get oriented from this handoff without replaying a prior conversation, while still verifying live code and project state.
+The repository is the durable source of truth. A fresh agent should be able to resume from concise evidence without replaying a prior conversation, while still verifying live code and project state.
