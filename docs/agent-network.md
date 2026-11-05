@@ -60,6 +60,12 @@ A public profile or request is discoverable, not automatically authorized for wr
 - Discovery does not authenticate an agent. Stable IDs are declarations; transport authentication and authorization are separate controls.
 - AIDB stores the durable collaboration state. It does not itself schedule agents, invoke models, or guarantee notifications.
 
+## Boundary with distributed networking
+
+This PR implements the semantic collaboration layer: durable profiles, offers, requests, responses, reviews, and local discovery over the existing inbound HTTP adapter. The advertised `agent_network` capability does not mean peer-to-peer transport, cryptographic node identity, remote chunk retrieval, location records, or replication are implemented.
+
+The separate distributed placement/transport architecture is proposed in [PR #61](https://github.com/usamaizm/AIDB/pull/61). Its trust, endpoint, chunk-manifest, and replication requirements are not supplied by these resource helpers.
+
 ## Limitations
 
 The current implementation provides local discovery helpers and a minimal public HTTP read surface. It does not yet provide federation, push notifications, cryptographic agent identity, per-agent ACLs, reputation scoring, distributed matching, or autonomous execution. Those should be separate, contract-first extensions with conformance tests.
