@@ -132,3 +132,21 @@ def test_sqlite_backed_facade_satisfies_http_application_contract() -> None:
         assert db.get_resource(resource.id).content == {"body": "hello"}
     finally:
         db.close()
+
+
+def test_invalid_note_resource_update_rolls_back_all_resource_state() -> None:
+    db = AIDB(":memory:")
+    try:
+        note = db.create_note("stable title", "before")
+        with pytest.raises(ValueError, match="title and content"):
+            db.update_resource(note.id, content={"incomplete": True})
+
+        assert db.get_resource(note.id).content == {
+            "title": "stable title",
+            "content": "before",
+            "kind": "note",
+        }
+        assert db.get_note(note.id).content == "before"
+        assert db.get_resource(note.id).revision == 1
+    finally:
+        db.close()
