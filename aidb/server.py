@@ -7,10 +7,11 @@ import ssl
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from .ports import HomeApplication
 from .store import AIDB
 
 
-def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int = 1048576, max_page_size: int = 200):
+def create_handler(db: HomeApplication, auth_token: str | None = None, max_body_bytes: int = 1048576, max_page_size: int = 200):
     if max_body_bytes < 1 or max_page_size < 1:
         raise ValueError("limits must be positive")
 
@@ -44,7 +45,7 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
         def do_GET(self):
             # SQLite connections are shared by the threaded HTTP handler.
             # Serialize requests so multi-step reads cannot interleave with writes.
-            with db._connection_lock:
+            with db.operation_lock:
                 self._handle_get()
 
         def _handle_get(self):
@@ -79,7 +80,7 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
                 return self._send(400, {"error": str(exc)})
 
         def do_POST(self):
-            with db._connection_lock:
+            with db.operation_lock:
                 self._handle_post()
 
         def _handle_post(self):
@@ -164,7 +165,7 @@ def validate_bind_security(
 
 
 def create_server(
-    db: AIDB,
+    db: HomeApplication,
     host: str = "127.0.0.1",
     port: int = 8765,
     auth_token: str | None = None,
