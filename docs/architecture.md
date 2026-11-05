@@ -35,7 +35,11 @@ The canonical contract is defined by:
 
 Python, Rust, Go, TypeScript, or another language may implement the contract. No language-specific object model is normative.
 
-## 3. The primary primitive: state plus change
+## 3. Evolution and compatibility
+
+AIDB must be able to evolve internal implementations, persisted representations, transports, and optional capabilities without forcing every consumer to change in lockstep. Compatibility is managed through independently versioned contracts, adapters, capability negotiation, explicit migrations, conformance tests, and recovery—not by freezing replaceable implementation choices. Stable invariants such as identity, authorization, integrity, provenance, and recoverability must survive those changes. Storage, interchange, and wire formats are distinct boundaries unless a contract deliberately makes them the same. See [Evolution and Compatibility Architecture](evolution-and-compatibility.md) for the rules and acceptance criteria.
+
+## 4. The primary primitive: state plus change
 
 AIDB must preserve both current state and its evolution.
 
@@ -57,7 +61,7 @@ This makes questions such as these first-class:
 - What else changed because of it?
 - What is changing now?
 
-## 4. Node model
+## 5. Node model
 
 An AIDB node is the smallest independently usable deployment unit.
 
@@ -73,7 +77,7 @@ A node can run locally, inside a container, or on a network.
 
 The container is disposable; the state is not.
 
-## 5. Access model
+## 6. Access model
 
 AIDB should have one conceptual database interface with multiple transports.
 
@@ -88,7 +92,7 @@ Access must support:
 
 HTTP, MCP, A2A, CLI, and language SDKs are adapters to the same semantics. They must not create independent data models.
 
-## 6. Data model
+## 7. Data model
 
 The current Artifact -> Extraction -> Interpretation -> Knowledge -> Memory chain is retained as a candidate epistemic model, not declared the universal ontology.
 
@@ -104,7 +108,7 @@ Before implementation expands, the project must determine:
 
 The architecture must permit additional structures without forcing every use case into one ontology.
 
-## 7. Portability
+## 8. Portability
 
 AIDB state must be movable between compatible implementations.
 
@@ -119,7 +123,7 @@ A portable state package should be able to preserve:
 
 Portability is a compatibility contract, not a promise that an internal SQLite file is itself the universal interchange format.
 
-## 8. Survivability
+## 9. Survivability
 
 The system should remain useful through:
 
@@ -134,7 +138,7 @@ The system should remain useful through:
 
 Recovery must be testable and verifiable.
 
-## 9. Simplicity
+## 10. Simplicity
 
 The minimum useful node should be small.
 
@@ -142,7 +146,7 @@ No model runtime, GPU stack, vector database, cloud account, or agent framework 
 
 Optional capabilities can be added without making the base node dependent on them.
 
-## 10. Vibrancy
+## 11. Vibrancy
 
 Vibrancy means the database is understandable as a living system.
 
@@ -158,23 +162,24 @@ Humans and agents should be able to see:
 
 The interface should make change visible without requiring users to reconstruct it from opaque logs.
 
-## 11. Internet cohesion
+## 12. Distributed network
 
-Internet connectivity is an access property, not the identity of the product.
+AIDB is intended to support a distributed knowledge network: independently operated nodes may store, discover, verify, retrieve, and replicate selected portions of a shared knowledge space. A node is not required to hold the entire corpus, and no single topology or central service is mandatory.
 
-A node may be:
+Logical resource identity and knowledge semantics must remain independent of physical placement. Content chunks, manifests, and location records belong to a distributed placement layer; they must not silently redefine the logical data model.
 
-- completely local
-- privately networked
-- publicly reachable
+When communication crosses a machine or trust boundary, authenticated encryption is required. HTTPS is the initial interoperable request/response transport, but transport is an adapter rather than the architecture. Node identity, agent identity, authorization, provenance, content integrity, and trust are separate concepts. See [Distributed Networking Architecture](distributed-networking.md) for the proposed design and implementation sequence.
 
-When networked, discovery, authentication, authorization, protocol negotiation, and interoperability must be explicit.
+A node may be completely local, privately networked, or publicly reachable. Discovery, peer authentication, authorization, protocol negotiation, partial replication, and partition behavior must be explicit.
 
-## 12. Architecture questions still open
+## 13. Architecture questions still open
 
 This document intentionally leaves major questions unresolved until they are researched and tested:
 
 - What exactly constitutes a canonical AIDB resource?
+- What is the stable cryptographic identity and key-rotation model for a node?
+- What canonical chunk/manifest format and content-addressing rules are required?
+- What replication policies, location semantics, and partial-replication guarantees are required?
 - Is the change log append-only, mutable, or hybrid?
 - Are state and history physically separate or one storage model?
 - What temporal query semantics are required?
@@ -186,7 +191,7 @@ This document intentionally leaves major questions unresolved until they are res
 - Which parts belong in the core versus adapters?
 - What is the smallest viable portable interchange package?
 
-## 13. Architectural rule
+## 14. Architectural rule
 
 Do not add a feature merely because a protocol, framework, or trend makes it possible.
 

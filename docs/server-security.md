@@ -32,3 +32,10 @@ The certificate must be valid for the hostname clients use. Protect the private 
 ## Limitations
 
 The adapter is intentionally minimal. It does not currently implement user-level authorization scopes, rate limiting, audit-grade identity, or multi-tenant isolation. A bearer token grants write access to the exposed write endpoints; it is not a substitute for per-agent authorization. Do not treat the service as production-ready for untrusted multi-tenant workloads.
+
+
+## Distributed networking boundary
+
+The TLS configuration above protects inbound connections to this HTTP server when it is bound beyond loopback. It does **not** implement outbound peer connections, mutual peer authentication, stable cryptographic AIDB node identities, discovery, content-addressed chunk transfer, or replication. The current bearer token is a coarse write gate, not an agent identity or distributed authorization system.
+
+The intended distributed design requires authenticated encryption across every machine/trust boundary, verified peer identity, operation-level authorization, content-integrity verification, and explicit replication policy. See [Distributed Networking Architecture](distributed-networking.md). Do not advertise the current server as a distributed node transport until those capabilities exist and are tested.

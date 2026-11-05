@@ -53,6 +53,8 @@ Progress is measured by demonstrated workflows, not labels. A capability counts 
 - Knowledge organization, indexes, ranking, caches, adapters, schemas, and even core architecture may evolve through reviewed, tested, versioned migrations.
 - Stable invariants include data integrity, identity, authorization, provenance, version/revision semantics, auditability, and recoverability. No unreviewed self-modification should bypass these invariants.
 - Agents may submit competing proposals and evidence; preserve attribution and disagreement. Unreviewed content is not automatically accepted knowledge.
+- Treat compatibility as an explicit architecture capability: independently version contracts, use adapters or migrations, negotiate capabilities, and require conformance and recovery evidence. Keep storage, interchange, and wire formats distinct unless a contract explicitly unifies them.
+- See [Evolution and Compatibility Architecture](evolution-and-compatibility.md) for the proposed rules; do not claim implementation until verified.
 
 ### 4. Speed, storage, and context efficiency
 - Design for constrained and high-end environments using configurable resource budgets, not assumptions that all available resources should be consumed.
