@@ -53,23 +53,23 @@ class AIDB:
             """
             PRAGMA foreign_keys = ON;
 
-            CREATE TABLE IF NOT EXISTS home_resources (id TEXT PRIMARY KEY, resource_type TEXT NOT NULL, content TEXT NOT NULL DEFAULT 'null', owner TEXT, visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('public','private')), metadata TEXT NOT NULL DEFAULT '{}', revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+            CREATE TABLE IF NOT EXISTS home_resources (id TEXT PRIMARY KEY, resource_type TEXT NOT NULL, content TEXT NOT NULL DEFAULT 'null', owner TEXT, visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('public','private')), metadata TEXT NOT NULL DEFAULT '{}', revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));
 
-            CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, resource_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, content TEXT NOT NULL, owner TEXT, visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('public','private')), kind TEXT NOT NULL DEFAULT 'note', metadata TEXT NOT NULL DEFAULT '{}', revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(resource_id) REFERENCES home_resources(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, resource_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, content TEXT NOT NULL, owner TEXT, visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('public','private')), kind TEXT NOT NULL DEFAULT 'note', metadata TEXT NOT NULL DEFAULT '{}', revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), FOREIGN KEY(resource_id) REFERENCES home_resources(id) ON DELETE CASCADE);
 
             CREATE TABLE IF NOT EXISTS node_identity (id INTEGER PRIMARY KEY CHECK(id=1), node_id TEXT NOT NULL UNIQUE, owner TEXT, visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('public','private')), metadata TEXT NOT NULL DEFAULT '{}');
 
-            CREATE TABLE IF NOT EXISTS resource_relations (id INTEGER PRIMARY KEY AUTOINCREMENT, source_resource_id TEXT NOT NULL, target_resource_id TEXT NOT NULL, relation TEXT NOT NULL, metadata TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(source_resource_id,target_resource_id,relation), FOREIGN KEY(source_resource_id) REFERENCES home_resources(id) ON DELETE CASCADE, FOREIGN KEY(target_resource_id) REFERENCES home_resources(id) ON DELETE CASCADE);
+            CREATE TABLE IF NOT EXISTS resource_relations (id INTEGER PRIMARY KEY AUTOINCREMENT, source_resource_id TEXT NOT NULL, target_resource_id TEXT NOT NULL, relation TEXT NOT NULL, metadata TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), UNIQUE(source_resource_id,target_resource_id,relation), FOREIGN KEY(source_resource_id) REFERENCES home_resources(id) ON DELETE CASCADE, FOREIGN KEY(target_resource_id) REFERENCES home_resources(id) ON DELETE CASCADE);
             CREATE INDEX IF NOT EXISTS idx_resource_relations_source ON resource_relations(source_resource_id);
             CREATE INDEX IF NOT EXISTS idx_resource_relations_target ON resource_relations(target_resource_id);
 
-            CREATE TABLE IF NOT EXISTS home_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, change_id TEXT NOT NULL UNIQUE, resource_id TEXT, operation TEXT NOT NULL, actor TEXT, previous_revision INTEGER, new_revision INTEGER, payload TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+            CREATE TABLE IF NOT EXISTS home_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, change_id TEXT NOT NULL UNIQUE, resource_id TEXT, operation TEXT NOT NULL, actor TEXT, previous_revision INTEGER, new_revision INTEGER, payload TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));
             CREATE INDEX IF NOT EXISTS idx_home_changes_resource ON home_changes(resource_id, id);
             CREATE INDEX IF NOT EXISTS idx_home_changes_actor ON home_changes(actor, id);
 
-            CREATE TABLE IF NOT EXISTS home_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, snapshot_id TEXT NOT NULL UNIQUE, home_format TEXT NOT NULL, content TEXT NOT NULL, content_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+            CREATE TABLE IF NOT EXISTS home_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, snapshot_id TEXT NOT NULL UNIQUE, home_format TEXT NOT NULL, content TEXT NOT NULL, content_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));
 
-            CREATE TABLE IF NOT EXISTS node_specifications (version INTEGER PRIMARY KEY AUTOINCREMENT, specification_id TEXT NOT NULL UNIQUE, node_id TEXT NOT NULL, visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public','private')), capabilities TEXT NOT NULL DEFAULT '[]', resource_types TEXT NOT NULL DEFAULT '[]', transports TEXT NOT NULL DEFAULT '[]', extensions TEXT NOT NULL DEFAULT '[]', constraints TEXT NOT NULL DEFAULT '{}', issued_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+            CREATE TABLE IF NOT EXISTS node_specifications (version INTEGER PRIMARY KEY AUTOINCREMENT, specification_id TEXT NOT NULL UNIQUE, node_id TEXT NOT NULL, visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public','private')), capabilities TEXT NOT NULL DEFAULT '[]', resource_types TEXT NOT NULL DEFAULT '[]', transports TEXT NOT NULL DEFAULT '[]', extensions TEXT NOT NULL DEFAULT '[]', constraints TEXT NOT NULL DEFAULT '{}', issued_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));
 
             CREATE TABLE IF NOT EXISTS agents (
                 id INTEGER PRIMARY KEY,
@@ -88,7 +88,7 @@ class AIDB:
                 description TEXT NOT NULL DEFAULT '',
                 metadata TEXT NOT NULL DEFAULT '{}',
                 created_by INTEGER,
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 status TEXT NOT NULL DEFAULT 'active',
                 FOREIGN KEY(created_by) REFERENCES agents(id) ON DELETE SET NULL
             );
@@ -97,7 +97,7 @@ class AIDB:
                 id INTEGER PRIMARY KEY,
                 session_id TEXT NOT NULL,
                 agent_id INTEGER NOT NULL,
-                joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                joined_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 UNIQUE(session_id, agent_id),
                 FOREIGN KEY(session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
                 FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE CASCADE
@@ -110,7 +110,7 @@ class AIDB:
                 content TEXT NOT NULL,
                 tags TEXT NOT NULL DEFAULT '[]',
                 metadata TEXT NOT NULL DEFAULT '{}',
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE SET NULL
             );
 
@@ -128,14 +128,14 @@ class AIDB:
                 parent_artifact_id INTEGER,
                 transformation_history TEXT NOT NULL DEFAULT '[]',
                 metadata TEXT NOT NULL DEFAULT '{}',
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 FOREIGN KEY(parent_artifact_id) REFERENCES artifacts(id) ON DELETE SET NULL
             );
 
             CREATE TABLE IF NOT EXISTS artifact_blobs (
                 artifact_id INTEGER PRIMARY KEY,
                 content BLOB NOT NULL,
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 FOREIGN KEY(artifact_id) REFERENCES artifacts(id) ON DELETE CASCADE
             );
 
@@ -145,7 +145,7 @@ class AIDB:
                 method TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'pending',
                 confidence REAL NOT NULL DEFAULT 0.5 CHECK(confidence >= 0.0 AND confidence <= 1.0),
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 metadata TEXT NOT NULL DEFAULT '{}',
                 FOREIGN KEY(input_artifact_id) REFERENCES artifacts(id) ON DELETE CASCADE
             );
@@ -167,7 +167,7 @@ class AIDB:
                 claim TEXT NOT NULL,
                 interpreter TEXT NOT NULL,
                 confidence REAL NOT NULL DEFAULT 0.5 CHECK(confidence >= 0.0 AND confidence <= 1.0),
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 metadata TEXT NOT NULL DEFAULT '{}',
                 FOREIGN KEY(output_artifact_id) REFERENCES artifacts(id) ON DELETE CASCADE
             );
@@ -177,7 +177,7 @@ class AIDB:
                 interpretation_id INTEGER NOT NULL,
                 status TEXT NOT NULL DEFAULT 'proposed',
                 confidence REAL NOT NULL DEFAULT 0.5 CHECK(confidence >= 0.0 AND confidence <= 1.0),
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 metadata TEXT NOT NULL DEFAULT '{}',
                 FOREIGN KEY(interpretation_id) REFERENCES interpretations(id) ON DELETE CASCADE
             );
@@ -190,7 +190,7 @@ class AIDB:
                 confidence REAL NOT NULL DEFAULT 0.5 CHECK(confidence >= 0.0 AND confidence <= 1.0),
                 evidence_artifact_id INTEGER,
                 created_by TEXT,
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 metadata TEXT NOT NULL DEFAULT '{}',
                 UNIQUE(source_knowledge_id, target_knowledge_id, relation),
                 FOREIGN KEY(source_knowledge_id) REFERENCES epistemic_knowledge(id) ON DELETE CASCADE,
@@ -206,7 +206,7 @@ class AIDB:
                 confidence REAL NOT NULL DEFAULT 0.5 CHECK(confidence >= 0.0 AND confidence <= 1.0),
                 status TEXT NOT NULL DEFAULT 'active',
                 context TEXT NOT NULL DEFAULT '{}',
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 metadata TEXT NOT NULL DEFAULT '{}',
                 FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE CASCADE,
                 FOREIGN KEY(knowledge_id) REFERENCES epistemic_knowledge(id) ON DELETE CASCADE
@@ -219,7 +219,7 @@ class AIDB:
                 kind TEXT NOT NULL DEFAULT 'fact',
                 importance REAL NOT NULL DEFAULT 0.5,
                 metadata TEXT NOT NULL DEFAULT '{}',
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE CASCADE
             );
 
@@ -239,7 +239,7 @@ class AIDB:
                 result TEXT NOT NULL DEFAULT '{}',
                 status TEXT NOT NULL DEFAULT 'success',
                 session_id TEXT,
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE SET NULL
             );
 
@@ -250,8 +250,8 @@ class AIDB:
                 assigned_to INTEGER,
                 status TEXT NOT NULL DEFAULT 'queued',
                 metadata TEXT NOT NULL DEFAULT '{}',
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 depends_on INTEGER,
                 priority INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY(assigned_to) REFERENCES agents(id) ON DELETE SET NULL,
@@ -266,7 +266,7 @@ class AIDB:
                 task_id INTEGER,
                 session_id TEXT,
                 metadata TEXT NOT NULL DEFAULT '{}',
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE SET NULL,
                 FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE SET NULL,
                 FOREIGN KEY(session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
@@ -279,7 +279,7 @@ class AIDB:
                 content TEXT NOT NULL,
                 session_id TEXT NOT NULL,
                 metadata TEXT NOT NULL DEFAULT '{}',
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE SET NULL,
                 FOREIGN KEY(session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
             );
@@ -288,7 +288,7 @@ class AIDB:
                 id INTEGER PRIMARY KEY,
                 message_id INTEGER NOT NULL,
                 agent_id INTEGER NOT NULL,
-                read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                read_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 UNIQUE(message_id, agent_id),
                 FOREIGN KEY(message_id) REFERENCES messages(id) ON DELETE CASCADE,
                 FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE CASCADE
@@ -1068,8 +1068,8 @@ class AIDB:
         if row["visibility"] == "public":
             return self.get_resource(resource_id)
         old_revision=row["revision"]
-        self.db.execute("UPDATE home_resources SET visibility='public', revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE id=?", (resource_id,))
-        self.db.execute("UPDATE notes SET visibility='public', revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE resource_id=?", (resource_id,))
+        self.db.execute("UPDATE home_resources SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=?", (resource_id,))
+        self.db.execute("UPDATE notes SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE resource_id=?", (resource_id,))
         self._append_workflow_event("resource_published", "resource published", metadata={"resource_id":resource_id})
         self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), resource_id, "publish", row["owner"], old_revision, old_revision+1, self._json({})))
         self.db.commit()
@@ -1452,7 +1452,7 @@ class AIDB:
         try:
             self.db.execute("BEGIN")
             self.db.execute(
-                "UPDATE home_resources SET content=?, metadata=?, revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                "UPDATE home_resources SET content=?, metadata=?, revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=?",
                 (json.dumps(new_content), self._json(new_metadata), resource_id),
             )
             note = self.db.execute(
@@ -1479,7 +1479,7 @@ class AIDB:
                         (json.dumps(new_content), resource_id),
                     )
                 self.db.execute(
-                    "UPDATE notes SET title=?, content=?, kind=?, metadata=?, revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE resource_id=?",
+                    "UPDATE notes SET title=?, content=?, kind=?, metadata=?, revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE resource_id=?",
                     (note_title, note_content, note_kind, self._json(new_metadata), resource_id),
                 )
             self.db.execute(
