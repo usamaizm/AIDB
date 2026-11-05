@@ -1,3 +1,5 @@
+import pytest
+
 from aidb import AIDB, HomeStore, ResourceStore
 
 
@@ -10,6 +12,7 @@ def exercise_resource_store(store: ResourceStore) -> None:
         metadata={"origin": "contract-test"},
     )
     second = store.create_resource("reference", {"body": "related"})
+    assert store.list_resources(include_private=False) == [first]
 
     assert store.get_resource(first.id).content == {"body": "initial"}
     assert [item.id for item in store.list_resources(resource_type="document")] == [
@@ -23,6 +26,10 @@ def exercise_resource_store(store: ResourceStore) -> None:
     )
     assert updated.revision == 2
     assert updated.content == {"body": "revised"}
+    with pytest.raises(ValueError, match="revision conflict"):
+        store.update_resource(first.id, content={"body": "stale"}, expected_revision=1)
+    with pytest.raises(PermissionError, match="private resource"):
+        store.get_resource(second.id, include_private=False)
 
     store.relate_resources(first.id, second.id, "references")
     relations = store.resource_relations(first.id)
