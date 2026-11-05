@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T20:02:28Z — Establish initial home persistence port
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** user-confirmed
+- **Type:** progress
+- **Task / PR:** https://github.com/usamaizm/AIDB/tree/refactor/home-store-port
+- **Status:** in-progress
+- **Summary:** Implementing the first runtime modularity slice from the read-only coupling audit. Added structural ResourceStore and HomeStore protocols, exposed the SQLite operation lock through the public adapter contract, and changed the HTTP handler to depend on HomeStore rather than the concrete AIDB class.
+- **Evidence:** Branch is based directly on main at aaa688ee76b5e46195b4c476a5ed3335e378923e. Added a reusable resource-port exercise and runtime protocol checks in tests/test_storage_ports.py. No database schema, home format, IDs, or persistence semantics changed.
+- **Risks / limitations:** Only the existing SQLite adapter is implemented and exercised; no alternative backend exists yet. CI has not run for this branch. The HomeStore protocol currently describes the HTTP-facing home operations, not the entire AIDB surface.
+- **Next action:** Open a draft PR and use its CI run to validate the new port and existing HTTP behavior before any broader extraction.
+
+
 ### 2026-11-05T19:48:00Z — PR #61 networking review response and proposed decision boundaries
 
 - **From:** agent-chatgpt
