@@ -97,7 +97,7 @@ status:
       topic: "Progressive agent onboarding and handoffs."
       url: "https://github.com/usamaizm/AIDB/pull/45"
     - number: 49
-      topic: "Durable local agent collaboration/discovery; CLI backing map patch applied; rebase and current-head CI pending."
+      topic: "Durable local collaboration/discovery; CLI backing map patched; current CI has 7 E1 failures from stale node-spec expectations; 27 commits behind main."
       url: "https://github.com/usamaizm/AIDB/pull/49"
     - number: 50
       topic: "E1 companion for PR 49; merge with or after PR 49 only."
