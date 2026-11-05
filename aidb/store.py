@@ -1386,12 +1386,41 @@ class AIDB:
                     public_from[row["resource_id"]] = row["id"]
             elif row["operation"] == "publish":
                 public_from.setdefault(row["resource_id"], row["id"])
-        visible = [
-            dict(row) for row in rows
-            if row["id"] > after_id
-            and row["resource_id"] in public_from
-            and row["id"] >= public_from[row["resource_id"]]
-        ]
+        visible = []
+        for row in rows:
+            if (
+                row["id"] <= after_id
+                or row["resource_id"] not in public_from
+                or row["id"] < public_from[row["resource_id"]]
+                or row["operation"] not in {"create", "publish", "update"}
+            ):
+                continue
+            # The actor can be a private owner, including on the publication
+            # event itself. Return only the event's safe structural fields;
+            # never forward opaque historical payloads or actor identifiers.
+            safe_payload = {}
+            if row["operation"] == "create":
+                try:
+                    original = json.loads(row["payload"] or "{}")
+                except (TypeError, json.JSONDecodeError):
+                    original = {}
+                safe_payload = {
+                    "resource_type": original.get("resource_type"),
+                    "visibility": "public",
+                }
+            elif row["operation"] == "update":
+                try:
+                    original = json.loads(row["payload"] or "{}")
+                except (TypeError, json.JSONDecodeError):
+                    original = {}
+                safe_payload = {
+                    "content_changed": bool(original.get("content_changed")),
+                    "metadata_changed": bool(original.get("metadata_changed")),
+                }
+            event = dict(row)
+            event["actor"] = None
+            event["payload"] = self._json(safe_payload)
+            visible.append(event)
         return visible[:limit]
 
     def create_snapshot(self, include_private=True):
