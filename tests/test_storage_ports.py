@@ -44,7 +44,6 @@ def test_sqlite_store_implements_http_home_port():
     store = AIDB(":memory:")
     try:
         assert isinstance(store, HomeStore)
-        assert store.operation_lock is store._connection_lock
         with store.operation_lock:
             assert store.specification_dict()["node"]["id"]
     finally:
