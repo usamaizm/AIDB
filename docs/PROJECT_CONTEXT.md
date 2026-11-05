@@ -77,6 +77,8 @@ Known limitations:
 - The project is experimental, not production-ready.
 - The C header is a draft ABI; no implemented stable C ABI should be claimed.
 - Proposed format adapters, universal agent compatibility, broad language bindings, autonomous self-evolution, adaptive resource profiles, distributed storage, and extreme-scale performance are not established runtime capabilities merely because design documents exist.
+- The intended distributed-network direction is documented as a proposal in [PR #61](https://github.com/usamaizm/AIDB/pull/61): independently operated nodes, stable transport-independent identity, authenticated endpoints, content-addressed chunks/manifests, partial replication, and explicit authorization. It is not implemented runtime behavior.
+- [PR #49](https://github.com/usamaizm/AIDB/pull/49) is the semantic collaboration layer (profiles/offers/requests/responses/reviews as home resources and local discovery), not peer transport or distributed storage. Its current runtime specification does not yet implement PR #61's endpoint identity, cryptographic trust, or negotiation requirements.
 - The design documents below are proposals unless source code, tests, capability discovery, and CI prove implementation.
 - The latest CI must be rechecked at task time; do not treat an old green run as proof the current HEAD passes.
 
