@@ -1380,11 +1380,11 @@ class AIDB:
                 issues.append("invalid resource revision:" + str(resource_id))
             try:
                 json.loads(resource["content"])
-            except (TypeError, json.JSONDecodeError):
+            except (TypeError, ValueError):
                 issues.append("invalid resource content:" + str(resource_id))
             try:
                 metadata = json.loads(resource["metadata"] or "{}")
-            except (TypeError, json.JSONDecodeError):
+            except (TypeError, ValueError):
                 metadata = None
             if not isinstance(metadata, dict):
                 issues.append("invalid resource metadata:" + str(resource_id))
@@ -1396,7 +1396,7 @@ class AIDB:
             resource_id = row["resource_id"]
             try:
                 change_payload = json.loads(row["payload"] or "{}")
-            except (TypeError, json.JSONDecodeError):
+            except (TypeError, ValueError):
                 change_payload = None
             if not isinstance(change_payload, dict):
                 issues.append("invalid change payload:" + str(row["id"]))
@@ -1428,7 +1428,7 @@ class AIDB:
                 issues.append("note resource type mismatch:" + str(note["id"]))
             try:
                 content = json.loads(resource["content"])
-            except (TypeError, json.JSONDecodeError):
+            except (TypeError, ValueError):
                 issues.append("invalid note resource content:" + str(note["id"]))
                 continue
             if not isinstance(content, dict) or any(
@@ -1437,11 +1437,11 @@ class AIDB:
                 issues.append("note content mismatch:" + str(note["id"]))
             try:
                 note_metadata = json.loads(note["metadata"] or "{}")
-            except (TypeError, json.JSONDecodeError):
+            except (TypeError, ValueError):
                 note_metadata = None
             try:
                 resource_metadata = json.loads(resource["metadata"] or "{}")
-            except (TypeError, json.JSONDecodeError):
+            except (TypeError, ValueError):
                 resource_metadata = None
             if (
                 resource["visibility"] != note["visibility"]
@@ -1461,7 +1461,7 @@ class AIDB:
                 issues.append("missing relation target:" + str(relation["id"]))
             try:
                 relation_metadata = json.loads(relation["metadata"] or "{}")
-            except (TypeError, json.JSONDecodeError):
+            except (TypeError, ValueError):
                 relation_metadata = None
             if not isinstance(relation_metadata, dict):
                 issues.append("invalid relation metadata:" + str(relation["id"]))
@@ -1488,13 +1488,13 @@ class AIDB:
             for field in ("provenance", "metadata"):
                 try:
                     parsed = json.loads(artifact[field] or "{}")
-                except (TypeError, json.JSONDecodeError):
+                except (TypeError, ValueError):
                     parsed = None
                 if not isinstance(parsed, dict):
                     issues.append("invalid artifact " + field + ":" + str(artifact["id"]))
             try:
                 history = json.loads(artifact["transformation_history"] or "[]")
-            except (TypeError, json.JSONDecodeError):
+            except (TypeError, ValueError):
                 history = None
             if not isinstance(history, list) or any(
                 not isinstance(step, str) for step in history
@@ -1788,14 +1788,14 @@ class AIDB:
                         raw_value = row.get(field, "{}")
                         try:
                             parsed_value = json.loads(raw_value) if isinstance(raw_value, str) else None
-                        except (TypeError, json.JSONDecodeError) as exc:
+                        except (TypeError, ValueError) as exc:
                             raise InvalidArgumentError(f"invalid artifact {field} JSON") from exc
                         if not isinstance(parsed_value, dict):
                             raise InvalidArgumentError(f"artifact {field} must encode a JSON object")
                     history = row.get("transformation_history", "[]")
                     try:
                         parsed_history = json.loads(history) if isinstance(history, str) else None
-                    except (TypeError, json.JSONDecodeError) as exc:
+                    except (TypeError, ValueError) as exc:
                         raise InvalidArgumentError("invalid artifact transformation_history JSON") from exc
                     if not isinstance(parsed_history, list) or any(
                         not isinstance(step, str) for step in parsed_history
@@ -2075,7 +2075,7 @@ class AIDB:
             if row["operation"] == "create":
                 try:
                     event_payload = json.loads(row["payload"] or "{}")
-                except (TypeError, json.JSONDecodeError):
+                except (TypeError, ValueError):
                     continue
                 if event_payload.get("visibility") == "public":
                     public_from[row["resource_id"]] = row["id"]
@@ -2097,7 +2097,7 @@ class AIDB:
             if row["operation"] == "create":
                 try:
                     original = json.loads(row["payload"] or "{}")
-                except (TypeError, json.JSONDecodeError):
+                except (TypeError, ValueError):
                     original = {}
                 safe_payload = {
                     "resource_type": original.get("resource_type"),
@@ -2106,7 +2106,7 @@ class AIDB:
             elif row["operation"] == "update":
                 try:
                     original = json.loads(row["payload"] or "{}")
-                except (TypeError, json.JSONDecodeError):
+                except (TypeError, ValueError):
                     original = {}
                 safe_payload = {
                     "content_changed": bool(original.get("content_changed")),
