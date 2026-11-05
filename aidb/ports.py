@@ -15,15 +15,44 @@ from .core import Note, Resource
 class ResourceStore(Protocol):
     """Persistence contract for the resource/relationship vertical slice."""
 
-    def create_resource(self, resource_type: str, content: Any = None, owner: str | None = None, visibility: str = "private", metadata: dict[str, Any] | None = None) -> Resource: ...
+    def create_resource(
+        self,
+        resource_type: str,
+        content: Any = None,
+        owner: str | None = None,
+        visibility: str = "private",
+        metadata: dict[str, Any] | None = None,
+    ) -> Resource: ...
 
-    def get_resource(self, resource_id: str, include_private: bool = True) -> Resource: ...
+    def get_resource(
+        self, resource_id: str, include_private: bool = True
+    ) -> Resource: ...
 
-    def list_resources(self, resource_type: str | None = None, visibility: str | None = None, include_private: bool = True, limit: int | None = None, offset: int = 0) -> list[Resource]: ...
+    def list_resources(
+        self,
+        resource_type: str | None = None,
+        visibility: str | None = None,
+        include_private: bool = True,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Resource]: ...
 
-    def update_resource(self, resource_id: str, content: Any = None, metadata: dict[str, Any] | None = None, owner: str | None = None, expected_revision: int | None = None) -> Resource: ...
+    def update_resource(
+        self,
+        resource_id: str,
+        content: Any = None,
+        metadata: dict[str, Any] | None = None,
+        owner: str | None = None,
+        expected_revision: int | None = None,
+    ) -> Resource: ...
 
-    def relate_resources(self, source_resource_id: str, target_resource_id: str, relation: str, metadata: dict[str, Any] | None = None) -> None: ...
+    def relate_resources(
+        self,
+        source_resource_id: str,
+        target_resource_id: str,
+        relation: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None: ...
 
     def resource_relations(self, resource_id: str) -> list[dict[str, Any]]: ...
 
@@ -42,8 +71,25 @@ class HomeStore(ResourceStore, Protocol):
 
     def specification_dict(self) -> dict[str, Any]: ...
 
-    def list_notes(self, owner: str | None = None, visibility: str | None = None, include_private: bool = True, limit: int | None = None, offset: int = 0) -> list[Note]: ...
+    def list_notes(
+        self,
+        owner: str | None = None,
+        visibility: str | None = None,
+        include_private: bool = True,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Note]: ...
 
-    def create_note(self, title: str, content: str, owner: str | None = None, visibility: str = "private", kind: str = "note", metadata: dict[str, Any] | None = None) -> Note: ...
+    def create_note(
+        self,
+        title: str,
+        content: str,
+        owner: str | None = None,
+        visibility: str = "private",
+        kind: str = "note",
+        metadata: dict[str, Any] | None = None,
+    ) -> Note: ...
 
-    def public_changes(self, after_id: int = 0, limit: int = 100) -> list[dict[str, Any]]: ...
+    def public_changes(
+        self, after_id: int = 0, limit: int = 100
+    ) -> list[dict[str, Any]]: ...
