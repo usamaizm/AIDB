@@ -37,6 +37,62 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T19:19:05Z — Second audit-remediation tranche verified green
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/55
+- **Status:** in-progress
+- **Summary:** Extended draft PR #55 with stable error classes/codes for common resource, artifact, import, and snapshot operations; HTTP error envelopes now carry stable codes. Refactored the HTTP handler so request bodies are read before taking the SQLite lock and response bodies are written after releasing it; production server sockets have a 10-second read timeout. Import now rejects non-primary-key SQLite constraint failures rather than silently ignoring rows, while preserving identical-primary-key idempotency and SQLite IntegrityError compatibility. Import validation now checks artifact metadata JSON, checksum algorithm/digest, size/status, and artifact-blob size/hash agreement.
+- **Evidence:** Current PR head `ccef9fc0d21f29288580b00887565e5761bf9cc3`. CI run [42092557120](https://github.com/usamaizm/AIDB/actions/runs/42092557120) passed Python 3.10/3.11/3.12; each job passed compile and Ruff, with pytest **138 passed, 3 skipped, 1 xfailed**. The one xfail remains E1 N4b.
+- **Risks / limitations:** PR #55 remains draft and unmerged. The N4b per-record tamper-detection fix needs a versioned integrity/canonicalization decision. Resource deletion/tombstones need a retention policy. Portable external IDs, artifact inclusion/profile, and aidb-home-v1 migration semantics remain owner decisions. Agent Muse has a separate claimed lane for CLI phantom-surface disposition and import-ID validation; this branch deliberately avoids those overlapping edits.
+- **Next action:** Continue only on non-overlapping, decision-independent work; request owner rulings on the blocked contract items before implementing them. Independent review remains required before marking the PR ready.
+
+
+### 2026-11-05T19:05:08Z — Latest PR #55 documentation refresh verified green
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/55
+- **Status:** in-progress
+- **Summary:** The documentation refresh and coordination handoff are now on the branch. This updates the earlier entry that recorded CI as pending.
+- **Evidence:** Current head `9688ba22bfff1fd38c199308d744d17352333dac`; CI run [42090323095](https://github.com/usamaizm/AIDB/actions/runs/42090323095) completed successfully across Python 3.10/3.11/3.12. Each job passed compile, Ruff, and pytest with 129 passed, 3 skipped, 1 xfailed.
+- **Risks / limitations:** PR #55 remains draft and unmerged. Stable error codes, delete/tombstone policy, portable per-record integrity and legacy format semantics, HTTP lock/error-envelope boundaries, and broader contract/benchmark work remain open.
+- **Next action:** Continue remediation in small tested commits; obtain independent review before marking the PR ready.
+
+
+### 2026-11-05T19:03:55Z — Remediation handoff expanded with current orientation refresh
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/55
+- **Status:** in-progress
+- **Summary:** Follow-up commits on PR #55 refresh `docs/PROJECT_CONTEXT.md`, `.aidb/session-context.yml`, `docs/repository-audit.md`, and the README bootstrap path. The handoff now points to DISCUSSION.md, records the verified main CI baseline, and lists the live open PRs rather than the superseded October queue.
+- **Evidence:** Current branch head before this journal entry: `647bcec3e92fe1050d48da416ddb0c15461a8994`. The prior code head `0b1b5aa4c4f838996bfa5a707c435274c2dba115` passed run [42089972938](https://github.com/usamaizm/AIDB/actions/runs/42089972938) on Python 3.10/3.11/3.12 (129 passed, 3 skipped, 1 xfailed; Ruff and compile clean). CI for the documentation refresh head has not yet been observed.
+- **Risks / limitations:** The code-level audit still has unresolved items listed in PR #55 and issue #18; docs refresh does not make them complete. The direct `aidb.engine` module remains present but is no longer package-exported.
+- **Next action:** Verify CI on the latest PR head, then continue with stable error semantics and HTTP boundary improvements while preserving the owner-gated deletion and snapshot-format decisions.
+
+
+### 2026-11-05T19:02:49Z — First audit-remediation tranche opened as draft PR #55
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/55
+- **Status:** in-progress
+- **Summary:** Opened draft PR #55 from `fix/comprehensive-audit-remediation`. Removed the broken `WorkflowEngine` package export; hardened `register_artifact()` for non-negative size, supported checksum algorithm and digest shape, allowed status values, and content size/hash agreement; consolidated `aidb.epistemic` as compatibility re-exports of canonical `aidb.core` models; corrected README capability claims and the machine-readable source-of-truth ordering.
+- **Evidence:** PR head `0b1b5aa4c4f838996bfa5a707c435274c2dba115`; CI run [42089972938](https://github.com/usamaizm/AIDB/actions/runs/42089972938) passed Python 3.10, 3.11, and 3.12; each matrix job passed compile, Ruff, and pytest with 129 passed, 3 skipped, 1 xfailed. Main baseline [41974601882](https://github.com/usamaizm/AIDB/actions/runs/41974601882) was also verified green at 128 passed, 3 skipped, 1 xfailed.
+- **Risks / limitations:** This is a first tranche, not completion of the full evaluation. Stable error codes, delete/tombstone semantics, portable per-record integrity and legacy-format policy, HTTP lock/error-envelope boundaries, spec vocabulary, stale handoff docs, and owner decisions remain open. The direct `aidb.engine` module remains in the repository but is no longer package-exported. No local test execution was available; CI is the observed verification.
+- **Next action:** Continue the remaining implementation work in bounded, test-backed commits on this branch; do not merge until independent review and all required decisions are complete.
+
+
 ### 2026-11-05T05:20:00Z — Full-repo evaluation posted on issue #18: headline judgments and questions
 
 - **From:** agent-muse
