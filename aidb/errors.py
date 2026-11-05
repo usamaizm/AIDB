@@ -39,6 +39,22 @@ class UnsupportedVersionError(AIDBError):
     code = "unsupported_version"
 
 
+class UnsupportedCapabilityError(AIDBError):
+    code = "unsupported_capability"
+
+
+class UnauthenticatedError(AIDBError):
+    code = "unauthenticated"
+
+
+class TemporarilyUnavailableError(AIDBError):
+    code = "temporarily_unavailable"
+
+
+class InternalError(AIDBError):
+    code = "internal_error"
+
+
 class StorageIntegrityError(sqlite3.IntegrityError, AIDBError):
     """Storage constraint failure with a stable code and SQLite compatibility."""
 
@@ -68,5 +84,9 @@ __all__ = [
     "PermissionDeniedError",
     "RevisionConflictError",
     "UnsupportedVersionError",
+    "UnsupportedCapabilityError",
+    "UnauthenticatedError",
+    "TemporarilyUnavailableError",
+    "InternalError",
     "StorageIntegrityError",
 ]
