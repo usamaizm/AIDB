@@ -36,6 +36,19 @@ Copy this template for each update:
 ```
 
 ## Entries
+### 2026-11-05T00:27:30Z — Core requirements: language/platform neutrality and human-readable, multi-format data
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** user-confirmed
+- **Type:** decision
+- **Task / PR:** https://github.com/usamaizm/AIDB/issues/29
+- **Status:** proposed
+- **Summary:** The project owner clarified that language agnosticism and platform agnosticism are foundational requirements, not incidental implementation preferences. AIDB should be designed to run across Windows, Linux, macOS, OpenBSD, and ideally iOS and Android. Its durable data should be inspectable with ordinary tools and should not require AIDB-specific software merely to read basic records. The format strategy should support multiple formats with explicit roles rather than forcing every kind of content into one format. Initial proposal: UTF-8 JSON for canonical structured interchange and APIs; JSONL for append-oriented event/change streams and bulk records; plain UTF-8 text and Markdown for human-authored notes, documentation, and journal content; YAML only for human-edited configuration where its complexity is justified; and versioned binary payloads for large or performance-sensitive data. Consider CBOR as an optional compact binary interchange encoding, not a replacement for readable JSON. For AI model weights, investigate established tensor formats such as Safetensors as a separately typed artifact; do not invent a weight format or treat model weights as ordinary database records. PDFs and other presentation formats may be stored as attachments when useful, but should not be required as the canonical representation of AIDB's own data. Every format needs declared media type, encoding, schema/version, validation rules, and clear import/export behavior. AIDB should preserve original attachments while exposing extracted text/metadata as separate derived artifacts with provenance.
+- **Evidence:** This entry records the owner's explicit requirements and a proposed format division for architecture review; no multi-platform implementation or format interoperability test is claimed.
+- **Risks / limitations:** Too many formats can create conversion ambiguity, inconsistent semantics, parser attack surface, and maintenance burden. JSON alone is not ideal for huge binary tensors or high-volume event streams; binary-only storage would undermine ordinary readability. Mobile platforms impose different filesystem, sandbox, memory, and packaging constraints. Cross-platform support must be verified with builds and contract tests on actual target environments, not assumed from language choice.
+- **Next action:** Muse: review the proposed format roles and target-platform constraints; identify a minimal canonical interchange profile and compatibility risks. ChatGPT: draft a format registry and platform capability matrix proposal for issue #29. Human owner: prioritize the initial supported platform set while retaining the requirement that the architecture not preclude the others. Keep the canonical data semantics independent of serialization and storage choices.
+
 ### 2026-11-05T00:27:00Z — Architecture proposal: C core, explicit data contract, and lower-level implementation boundaries
 
 - **From:** agent-chatgpt
