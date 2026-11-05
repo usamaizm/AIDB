@@ -1039,13 +1039,11 @@ class AIDB:
             payload["tables"]["resource_relations"] = [
                 {**dict(row), "metadata": "{}"} for row in public_relations
             ]
-            payload["tables"]["home_changes"] = [
-                dict(row) for row in self.db.execute(
-                    "SELECT * FROM home_changes WHERE operation IN ('create','update','publish') "
-                    "AND resource_id IN "
-                    "(SELECT id FROM home_resources WHERE visibility='public')"
-                ).fetchall()
-            ]
+            # Change payloads preserve historical state. A resource that is public
+            # now may have been private when it was created or updated, so filtering
+            # by current visibility is insufficient. Omit the history until events
+            # have their own safe, visibility-aware export representation.
+            payload["tables"]["home_changes"] = []
             # Snapshot content is an opaque serialized home and may contain
             # private rows even when the current export is filtered. Omit it.
             payload["tables"]["home_snapshots"] = []
