@@ -3,7 +3,7 @@
 import base64
 import aidb
 import pytest
-from aidb.core import Agent, Artifact, KnowledgeRecord, Memory, Message, Session, Task, Tool, ToolCall, WorkflowEvent
+from aidb.core import Agent, Artifact, EpistemicChainBrokenError, KnowledgeRecord, Memory, Message, Session, Task, Tool, ToolCall, WorkflowEvent
 from aidb.store import AIDB
 from aidb.errors import (
     AlreadyExistsError,
@@ -255,4 +255,46 @@ def test_epistemic_operations_report_missing_references_as_not_found() -> None:
         with pytest.raises(NotFoundError) as missing:
             operation()
         assert missing.value.code == "not_found"
+    db.close()
+
+
+
+def test_broken_epistemic_chain_exposes_integrity_error_code() -> None:
+    db = AIDB(":memory:")
+    agent = db.register_agent("broken-chain-agent")
+    db.db.execute("PRAGMA foreign_keys = OFF")
+    db.db.execute(
+        "INSERT INTO epistemic_memory(agent_id, knowledge_id, kind) VALUES (?, ?, ?)",
+        (agent.id, 999, "fact"),
+    )
+    db.db.execute("PRAGMA foreign_keys = ON")
+    memory_id = db.db.execute(
+        "SELECT id FROM epistemic_memory ORDER BY id DESC LIMIT 1"
+    ).fetchone()[0]
+
+    with pytest.raises(EpistemicChainBrokenError) as broken:
+        db.trace_memory_to_source(memory_id)
+    assert broken.value.code == "integrity_failure"
+    assert broken.value.details == {}
+    db.close()
+
+
+
+def test_event_and_legacy_memory_missing_references_use_not_found() -> None:
+    db = AIDB(":memory:")
+    with pytest.raises(NotFoundError) as missing_agent:
+        db.remember(999, "legacy memory")
+    assert missing_agent.value.code == "not_found"
+
+    with pytest.raises(NotFoundError) as missing_event_agent:
+        db.add_event("test", agent_id=999)
+    assert missing_event_agent.value.code == "not_found"
+
+    with pytest.raises(NotFoundError) as missing_event_task:
+        db.add_event("test", task_id=999)
+    assert missing_event_task.value.code == "not_found"
+
+    with pytest.raises(NotFoundError) as missing_event_session:
+        db.add_event("test", session_id="session:missing")
+    assert missing_event_session.value.code == "not_found"
     db.close()
