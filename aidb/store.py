@@ -12,6 +12,9 @@ from threading import RLock
 from pathlib import Path
 from typing import Any
 
+from .application.resources import ResourceService
+from .adapters.sqlite.resources import SQLiteResourceRepository
+
 from .core import (
     Agent,
     Artifact,
@@ -46,6 +49,15 @@ class AIDB:
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys = ON")
         self._create_schema()
+        self._resource_repository = SQLiteResourceRepository(
+            self.db, self._connection_lock, self._append_workflow_event
+        )
+        self._resource_service = ResourceService(self._resource_repository)
+
+    @property
+    def operation_lock(self):
+        """Synchronization boundary for adapters sharing this store instance."""
+        return self._connection_lock
 
     def _create_schema(self) -> None:
         self.db.executescript(
@@ -955,36 +967,19 @@ class AIDB:
         return dict(self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone())
 
     def create_resource(self, resource_type, content=None, owner=None, visibility="private", metadata=None):
-        if visibility not in {"public", "private"}: raise ValueError("visibility must be public or private")
-        rid = "res:" + str(uuid.uuid4())
-        self.db.execute("INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)", (rid, resource_type, json.dumps(content), owner, visibility, self._json(metadata or {})))
-        self._append_workflow_event("resource_created", "resource created", metadata={"resource_id": rid, "resource_type": resource_type, "owner": owner, "visibility": visibility})
-        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,new_revision,payload) VALUES(?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), rid, "create", owner, 1, self._json({"resource_type":resource_type,"visibility":visibility})))
-        self.db.commit()
-        return self.get_resource(rid)
+        return self._resource_service.create(
+            resource_type, content, owner, visibility, metadata
+        )
 
     def get_resource(self, resource_id, include_private=True):
-        row = self.db.execute("SELECT * FROM home_resources WHERE id=?", (resource_id,)).fetchone()
-        if row is None: raise ValueError("resource does not exist")
-        if row["visibility"] == "private" and not include_private: raise PermissionError("private resource")
-        return Resource(row["resource_type"], json.loads(row["content"]), row["owner"], row["visibility"], json.loads(row["metadata"]), row["id"], row["revision"], row["created_at"], row["updated_at"])
+        return self._resource_service.get(resource_id, include_private)
 
-    def list_resources(self, resource_type=None, visibility=None, include_private=True, limit=None, offset=0):
-        clauses=[]; params=[]
-        if resource_type: clauses.append("resource_type=?"); params.append(resource_type)
-        if visibility: clauses.append("visibility=?"); params.append(visibility)
-        elif not include_private: clauses.append("visibility='public'")
-        where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
-        sql="SELECT id FROM home_resources"+where+" ORDER BY updated_at DESC, id ASC"
-        if limit is not None:
-            if not isinstance(limit, int) or limit < 1: raise ValueError("limit must be a positive integer")
-            sql += " LIMIT ?"; params.append(limit)
-        if not isinstance(offset, int) or offset < 0: raise ValueError("offset must be a non-negative integer")
-        if offset:
-            if limit is None: sql += " LIMIT -1"
-            sql += " OFFSET ?"; params.append(offset)
-        rows=self.db.execute(sql,params).fetchall()
-        return [self.get_resource(r["id"]) for r in rows]
+    def list_resources(
+        self, resource_type=None, visibility=None, include_private=True, limit=None, offset=0
+    ):
+        return self._resource_service.list(
+            resource_type, visibility, include_private, limit, offset
+        )
 
     def create_note(self, title, content, owner=None, visibility="private", kind="note", metadata=None):
         if visibility not in {"public", "private"}:
@@ -1398,77 +1393,19 @@ class AIDB:
         return self.current_specification()
 
     def relate_resources(self, source_resource_id, target_resource_id, relation, metadata=None):
-        if source_resource_id == target_resource_id:
-            raise ValueError("a resource cannot relate to itself")
-        for rid in (source_resource_id, target_resource_id):
-            if self.db.execute("SELECT 1 FROM home_resources WHERE id=?", (rid,)).fetchone() is None:
-                raise ValueError("resource does not exist: " + rid)
-        self.db.execute("INSERT OR IGNORE INTO resource_relations(source_resource_id,target_resource_id,relation,metadata) VALUES(?,?,?,?)", (source_resource_id,target_resource_id,relation,self._json(metadata or {})))
-        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,payload) VALUES(?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),source_resource_id,"relate",None,self._json({"target_resource_id":target_resource_id,"relation":relation})))
-        self.db.commit()
+        return self._resource_service.relate(
+            source_resource_id, target_resource_id, relation, metadata
+        )
 
     def resource_relations(self, resource_id):
-        rows=self.db.execute("SELECT * FROM resource_relations WHERE source_resource_id=? OR target_resource_id=? ORDER BY id ASC", (resource_id,resource_id)).fetchall()
-        return [dict(r) for r in rows]
+        return self._resource_service.relations(resource_id)
 
-    def update_resource(self, resource_id, content=None, metadata=None, owner=None, expected_revision=None):
-        row = self.db.execute(
-            "SELECT * FROM home_resources WHERE id=?", (resource_id,)
-        ).fetchone()
-        if row is None:
-            raise ValueError("resource does not exist")
-        if owner is not None and row["owner"] != owner:
-            raise PermissionError("owner mismatch")
-        if expected_revision is not None and row["revision"] != expected_revision:
-            raise ValueError("revision conflict")
-
-        old_revision = row["revision"]
-        new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
-        new_content = json.loads(row["content"]) if content is None else content
-        try:
-            self.db.execute("BEGIN")
-            self.db.execute(
-                "UPDATE home_resources SET content=?, metadata=?, revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=?",
-                (json.dumps(new_content), self._json(new_metadata), resource_id),
-            )
-            note = self.db.execute(
-                "SELECT * FROM notes WHERE resource_id=?", (resource_id,)
-            ).fetchone()
-            if note is not None:
-                if isinstance(new_content, dict):
-                    if not {"title", "content"}.issubset(new_content):
-                        raise ValueError("note resource content must include title and content")
-                    note_title = new_content["title"]
-                    note_content = new_content["content"]
-                    note_kind = new_content.get("kind", note["kind"])
-                else:
-                    # Preserve the legacy shorthand: a scalar update replaces
-                    # the note body while retaining its title and kind.
-                    note_title = note["title"]
-                    note_content = new_content
-                    note_kind = note["kind"]
-                    new_content = {
-                        "title": note_title, "content": note_content, "kind": note_kind
-                    }
-                    self.db.execute(
-                        "UPDATE home_resources SET content=? WHERE id=?",
-                        (json.dumps(new_content), resource_id),
-                    )
-                self.db.execute(
-                    "UPDATE notes SET title=?, content=?, kind=?, metadata=?, revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE resource_id=?",
-                    (note_title, note_content, note_kind, self._json(new_metadata), resource_id),
-                )
-            self.db.execute(
-                "INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)",
-                ("chg:" + str(uuid.uuid4()), resource_id, "update", owner or row["owner"],
-                 old_revision, old_revision + 1,
-                 self._json({"content_changed": content is not None, "metadata_changed": metadata is not None})),
-            )
-            self.db.commit()
-        except Exception:
-            self.db.rollback()
-            raise
-        return self.get_resource(resource_id)
+    def update_resource(
+        self, resource_id, content=None, metadata=None, owner=None, expected_revision=None
+    ):
+        return self._resource_service.update(
+            resource_id, content, metadata, owner, expected_revision
+        )
 
     def public_changes(self, after_id=0, limit=100):
         if limit < 1:
