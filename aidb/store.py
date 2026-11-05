@@ -808,11 +808,25 @@ class AIDB:
         )
 
     def get_artifact_bytes(self, artifact_id: int) -> bytes | None:
-        """Return the stored artifact payload, or None for metadata-only artifacts."""
+        """Return a verified payload, or None for metadata-only/unknown artifacts."""
         row = self.db.execute(
-            "SELECT content FROM artifact_blobs WHERE artifact_id = ?", (artifact_id,)
+            """
+            SELECT b.content, a.size_bytes, a.checksum, a.checksum_algorithm
+            FROM artifact_blobs b
+            JOIN artifacts a ON a.id = b.artifact_id
+            WHERE b.artifact_id = ?
+            """,
+            (artifact_id,),
         ).fetchone()
-        return bytes(row["content"]) if row is not None else None
+        if row is None:
+            return None
+        content = bytes(row["content"])
+        if len(content) != row["size_bytes"]:
+            raise ValueError(f"artifact {artifact_id} payload size does not match metadata")
+        actual_checksum = self._checksum_bytes(content, row["checksum_algorithm"])
+        if actual_checksum != row["checksum"]:
+            raise ValueError(f"artifact {artifact_id} payload checksum verification failed")
+        return content
 
     def derive_artifact(
         self,
@@ -1109,9 +1123,7 @@ class AIDB:
                     SELECT c.* FROM home_changes c
                     JOIN home_resources src ON src.id=c.resource_id
                     WHERE src.visibility='public'
-                      AND (c.operation != 'relate' OR
-                           json_extract(c.payload, '$.target_resource_id') IN
-                           (SELECT id FROM home_resources WHERE visibility='public'))
+                      AND c.operation != 'relate'
                     """
                 ).fetchall()
             ]
@@ -1314,12 +1326,11 @@ class AIDB:
             JOIN home_resources source ON source.id = c.resource_id
             WHERE c.id > ?
               AND source.visibility = 'public'
-              AND (
-                  c.operation != 'relate'
-                  OR json_extract(c.payload, '$.target_resource_id') IN (
-                      SELECT id FROM home_resources WHERE visibility = 'public'
-                  )
-              )
+              -- Relation changes are omitted from the public feed. Public
+              -- relationships are available through the separately filtered
+              -- resource_relations export; omitting events avoids leaking a
+              -- private target through arbitrary or malformed event payloads.
+              AND c.operation != 'relate'
             ORDER BY c.id ASC
             LIMIT ?
             """,
