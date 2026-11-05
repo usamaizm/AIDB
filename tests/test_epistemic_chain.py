@@ -123,3 +123,24 @@ def test_trace_artifact_lineage(tmp_path):
     lineage = db.trace_artifact_lineage(normalized.id)
 
     assert [artifact.id for artifact in lineage] == [normalized.id, extracted.id, original.id]
+
+def test_record_extraction_output_rejects_mismatched_parent(tmp_path):
+    db = AIDB(tmp_path / "mismatched-provenance.sqlite3")
+    source = db.register_artifact_from_bytes(
+        name="source.pdf", data=b"source", media_type="application/pdf"
+    )
+    unrelated = db.register_artifact_from_bytes(
+        name="unrelated.pdf", data=b"unrelated", media_type="application/pdf"
+    )
+    output = db.derive_artifact(
+        parent_artifact_id=unrelated.id,
+        name="output.txt",
+        media_type="text/plain",
+        content=b"derived from unrelated",
+        transformation_step="extract",
+    )
+    extraction = db.create_extraction(
+        input_artifact_id=source.id, method="ocr", status="success"
+    )
+    with pytest.raises(ValueError, match="parent must match"):
+        db.record_extraction_output(extraction.id, output.id)
