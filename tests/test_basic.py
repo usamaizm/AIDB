@@ -1,7 +1,20 @@
 """Basic tests for AIDB core behavior."""
 
-from aidb.core import Agent, Artifact, KnowledgeRecord, Memory, Message, Session, Task, Tool, ToolCall, WorkflowEvent
+import base64
+import aidb
+import pytest
+from aidb.core import Agent, Artifact, EpistemicChainBrokenError, KnowledgeRecord, Memory, Message, Session, Task, Tool, ToolCall, WorkflowEvent
 from aidb.store import AIDB
+from aidb.errors import (
+    AlreadyExistsError,
+    IntegrityFailureError,
+    InvalidArgumentError,
+    NotFoundError,
+    PermissionDeniedError,
+    RevisionConflictError,
+    StorageIntegrityError,
+    UnsupportedVersionError,
+)
 
 __all__ = [
     "AIDB",
@@ -23,6 +36,13 @@ def test_package_exports() -> None:
     assert Agent.__name__ == "Agent"
     assert Artifact.__name__ == "Artifact"
     assert AIDB is not None
+    assert "WorkflowEngine" not in aidb.__all__
+    assert not hasattr(aidb, "WorkflowEngine")
+    assert aidb.UnauthenticatedError.code == "unauthenticated"
+    assert aidb.UnsupportedCapabilityError.code == "unsupported_capability"
+    assert aidb.TemporarilyUnavailableError.code == "temporarily_unavailable"
+    assert aidb.InternalError.code == "internal_error"
+    assert aidb.EpistemicChainBrokenError.code == "integrity_failure"
 
 
 def test_register_artifact_from_bytes() -> None:
@@ -62,4 +82,243 @@ def test_derive_artifact_tracks_transformation_history() -> None:
     assert derived.parent_artifact_id == parent.id
     assert derived.transformation_history[-1] == "ocr"
     assert parent.transformation_history == []
+    db.close()
+
+
+
+def test_resource_api_uses_stable_machine_readable_errors() -> None:
+    db = AIDB(":memory:")
+    db.register_agent("stable-errors")
+    with pytest.raises(AlreadyExistsError) as duplicate:
+        db.register_agent("stable-errors")
+    assert duplicate.value.code == "already_exists"
+
+    resource = db.create_resource("note", {"body": "first"}, owner="stable-errors")
+    with pytest.raises(RevisionConflictError) as conflict:
+        db.update_resource(resource.id, content={"body": "stale"}, expected_revision=99)
+    assert conflict.value.code == "revision_conflict"
+
+    with pytest.raises(PermissionDeniedError) as denied:
+        db.get_resource(resource.id, include_private=False)
+    assert denied.value.code == "permission_denied"
+
+    with pytest.raises(NotFoundError) as missing:
+        db.get_resource("res:missing")
+    assert missing.value.code == "not_found"
+    assert missing.value.details["resource_id"] == "res:missing"
+    db.close()
+
+
+
+def test_import_and_snapshot_failures_have_stable_error_codes() -> None:
+    db = AIDB(":memory:")
+    with pytest.raises(UnsupportedVersionError) as unsupported:
+        db.import_home({"format": "aidb-home-v99", "tables": {}})
+    assert unsupported.value.code == "unsupported_version"
+
+    snapshot = db.create_snapshot()
+    db.db.execute(
+        "UPDATE home_snapshots SET content=? WHERE snapshot_id=?",
+        ('{"format":"aidb-home-v1","tables":{}}', snapshot["snapshot_id"]),
+    )
+    db.db.commit()
+    with pytest.raises(IntegrityFailureError) as integrity:
+        db.restore_snapshot(snapshot["snapshot_id"])
+    assert integrity.value.code == "integrity_failure"
+    db.close()
+
+
+
+def test_import_rejects_unique_constraint_rows_instead_of_silently_skipping() -> None:
+    db = AIDB(":memory:")
+    source = db.create_resource("item", {"name": "source"})
+    target = db.create_resource("item", {"name": "target"})
+    db.relate_resources(source.id, target.id, "references")
+    payload = db.export_home()
+    relation = payload["tables"]["resource_relations"][0]
+    relation["id"] = relation["id"] + 1000
+
+    with pytest.raises(StorageIntegrityError) as failure:
+        db.import_home(payload)
+    assert failure.value.code == "integrity_failure"
+    assert db.db.execute("SELECT COUNT(*) FROM resource_relations").fetchone()[0] == 1
+    db.close()
+
+
+
+def test_import_rejects_artifact_blob_that_disagrees_with_metadata() -> None:
+    source = AIDB(":memory:")
+    source.register_artifact_from_bytes(
+        name="source.txt", data=b"trusted bytes", media_type="text/plain"
+    )
+    payload = source.export_home()
+    payload["tables"]["artifact_blobs"][0]["content"] = base64.b64encode(
+        b"tampered data"
+    ).decode("ascii")
+
+    target = AIDB(":memory:")
+    with pytest.raises(IntegrityFailureError) as failure:
+        target.import_home(payload)
+    assert failure.value.code == "integrity_failure"
+    assert target.list_artifacts() == []
+    source.close()
+    target.close()
+
+
+def test_import_rejects_malformed_artifact_checksum_metadata() -> None:
+    source = AIDB(":memory:")
+    source.register_artifact_from_bytes(
+        name="source.txt", data=b"trusted bytes", media_type="text/plain"
+    )
+    payload = source.export_home()
+    payload["tables"]["artifacts"][0]["checksum"] = "invalid"
+
+    target = AIDB(":memory:")
+    with pytest.raises(ValueError, match="invalid artifact checksum"):
+        target.import_home(payload)
+    assert target.list_artifacts() == []
+    source.close()
+    target.close()
+
+
+
+def test_store_uses_stable_codes_for_validation_and_missing_records() -> None:
+    db = AIDB(":memory:")
+    with pytest.raises(InvalidArgumentError) as invalid:
+        db.import_home({"format": "aidb-home-v1", "tables": {}, "unexpected": True})
+    assert invalid.value.code == "invalid_argument"
+
+    with pytest.raises(NotFoundError) as missing_resource:
+        db.update_resource("res:missing", content={"x": 1})
+    assert missing_resource.value.code == "not_found"
+
+    with pytest.raises(NotFoundError) as missing_extraction:
+        db.record_extraction_output(999, 1000)
+    assert missing_extraction.value.code == "not_found"
+
+    with pytest.raises(NotFoundError) as missing_memory:
+        db.trace_memory_to_source(999)
+    assert missing_memory.value.code == "not_found"
+    db.close()
+
+
+def test_artifact_payload_verification_uses_integrity_error_code() -> None:
+    db = AIDB(":memory:")
+    artifact = db.register_artifact_from_bytes(
+        name="verified.txt", data=b"original", media_type="text/plain"
+    )
+    db.db.execute(
+        "UPDATE artifact_blobs SET content=? WHERE artifact_id=?",
+        (b"tampered", artifact.id),
+    )
+    db.db.commit()
+
+    with pytest.raises(IntegrityFailureError) as failure:
+        db.get_artifact_bytes(artifact.id)
+    assert failure.value.code == "integrity_failure"
+    db.close()
+
+
+
+def test_import_conflicts_and_missing_lineage_use_stable_codes() -> None:
+    source = AIDB(":memory:")
+    resource = source.create_resource("item", {"version": 1})
+    payload = source.export_home()
+
+    target = AIDB(":memory:")
+    target.import_home(payload)
+    target.update_resource(resource.id, content={"version": 2})
+    with pytest.raises(RevisionConflictError) as conflict:
+        target.import_home(payload)
+    assert conflict.value.code == "revision_conflict"
+    assert target.get_resource(resource.id).content == {"version": 2}
+
+    with pytest.raises(NotFoundError) as missing:
+        target.trace_artifact_lineage(999)
+    assert missing.value.code == "not_found"
+    source.close()
+    target.close()
+
+
+
+def test_epistemic_operations_report_missing_references_as_not_found() -> None:
+    db = AIDB(":memory:")
+    operations = [
+        lambda: db.create_extraction(999, "ocr"),
+        lambda: db.create_interpretation(999, "claim", "test"),
+        lambda: db.create_knowledge(999),
+        lambda: db.create_knowledge_relation(999, 1000, "supports"),
+        lambda: db.remember_knowledge(999, 1000, "fact"),
+        lambda: db.register_artifact_from_bytes(
+            name="orphan.txt",
+            data=b"orphan",
+            media_type="text/plain",
+            parent_artifact_id=999,
+        ),
+    ]
+    for operation in operations:
+        with pytest.raises(NotFoundError) as missing:
+            operation()
+        assert missing.value.code == "not_found"
+    db.close()
+
+
+
+def test_broken_epistemic_chain_exposes_integrity_error_code() -> None:
+    db = AIDB(":memory:")
+    agent = db.register_agent("broken-chain-agent")
+    db.db.execute("PRAGMA foreign_keys = OFF")
+    db.db.execute(
+        "INSERT INTO epistemic_memory(agent_id, knowledge_id, kind) VALUES (?, ?, ?)",
+        (agent.id, 999, "fact"),
+    )
+    db.db.execute("PRAGMA foreign_keys = ON")
+    memory_id = db.db.execute(
+        "SELECT id FROM epistemic_memory ORDER BY id DESC LIMIT 1"
+    ).fetchone()[0]
+
+    with pytest.raises(EpistemicChainBrokenError) as broken:
+        db.trace_memory_to_source(memory_id)
+    assert broken.value.code == "integrity_failure"
+    assert broken.value.details == {}
+    db.close()
+
+
+
+def test_event_and_legacy_memory_missing_references_use_not_found() -> None:
+    db = AIDB(":memory:")
+    with pytest.raises(NotFoundError) as missing_agent:
+        db.remember(999, "legacy memory")
+    assert missing_agent.value.code == "not_found"
+
+    with pytest.raises(NotFoundError) as missing_event_agent:
+        db.add_event("test", agent_id=999)
+    assert missing_event_agent.value.code == "not_found"
+
+    with pytest.raises(NotFoundError) as missing_event_task:
+        db.add_event("test", task_id=999)
+    assert missing_event_task.value.code == "not_found"
+
+    with pytest.raises(NotFoundError) as missing_event_session:
+        db.add_event("test", session_id="session:missing")
+    assert missing_event_session.value.code == "not_found"
+    db.close()
+
+
+
+def test_resource_and_note_apis_reject_non_json_and_malformed_metadata() -> None:
+    db = AIDB(":memory:")
+    with pytest.raises(InvalidArgumentError) as non_finite:
+        db.create_resource("item", {"score": float("nan")})
+    assert non_finite.value.code == "invalid_argument"
+
+    with pytest.raises(InvalidArgumentError) as unsupported:
+        db.create_resource("item", {"value": object()})
+    assert unsupported.value.code == "invalid_argument"
+
+    with pytest.raises(InvalidArgumentError) as bad_metadata:
+        db.create_note("title", "body", metadata=["not", "an", "object"])
+    assert bad_metadata.value.code == "invalid_argument"
+    assert db.list_resources() == []
+    assert db.list_notes() == []
     db.close()

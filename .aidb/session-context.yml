@@ -1,6 +1,6 @@
 schema_version: 1
 kind: aidb_session_context
-updated_on: "2026-10-10"
+updated_on: "2026-11-05"
 project:
   name: AIDB
   repository: "https://github.com/usamaizm/AIDB"
@@ -34,6 +34,8 @@ session_bootstrap:
       reason: "Mandatory contributor workflow, safety invariants, and repo-specific lessons."
     - path: README.md
       reason: "Project overview and usage."
+    - path: DISCUSSION.md
+      reason: "Active coordination, decisions, blockers, and handoffs."
     - path: docs/repository-audit.md
       reason: "Audit snapshot, known risks, CI evidence, launch blockers, and open PR triage."
   before_any_change:
@@ -61,34 +63,46 @@ status:
     ci_matrix: ["3.10", "3.11", "3.12"]
     c_abi: "draft header only; not implemented as a stable ABI"
   last_verified_ci:
-    run_id: 38051116154
-    url: "https://github.com/usamaizm/AIDB/actions/runs/38051116154"
-    commit: "8e426af917c63f57efcc9399230f971c0a962003"
+    run_id: 41974601882
+    url: "https://github.com/usamaizm/AIDB/actions/runs/41974601882"
+    commit: "3de365d36f3f5bd353a24c8fa8a0bb01921b0ba1"
     result: success
     scope_note: >-
-      This successful run validates the documentation/audit commit above. A later
-      README onboarding commit triggered run 38051141963, which was still in
-      progress at the last check. Recheck CI for current main before claiming HEAD is green.
+      Verified on 2026-11-05: Python 3.10, 3.11, and 3.12 passed compile, Ruff,
+      and pytest (128 passed, 3 skipped, 1 xfailed; the xfail is E1 N4b).
+      Draft PR #55 has a separate passing run; it is not merged into main.
   implementation_caveats:
     - "Agent-home persistence, changes/checkpoints, export/import, provenance models, and HTTP server have source/tests; inspect exact operation semantics before relying on them."
     - "Universal file-format support, broad language bindings, stable C ABI, autonomous self-evolution, distributed storage, and petabyte/exabyte performance are not established runtime capabilities."
     - "Performance/context/storage documents specify goals and proposed designs; benchmark and implement incrementally."
   open_pull_requests_at_last_audit:
-    - number: 8
-      topic: "Online agent service; compare branch with server already on main and review public deployment security."
-      url: "https://github.com/usamaizm/AIDB/pull/8"
-    - number: 13
-      topic: "Atomic/schema-safe home import; core fix is already on main, reconcile duplicate branch."
-      url: "https://github.com/usamaizm/AIDB/pull/13"
     - number: 14
-      topic: "Agent discovery and contract-first evolution; review with PR 15."
+      topic: "Agent discovery and contract-first evolution; review against PR 15 and 49."
       url: "https://github.com/usamaizm/AIDB/pull/14"
     - number: 15
-      topic: "Agent network loop; overlaps discovery work in PR 14."
+      topic: "Executable agent network; parked pending product direction and comparison with PR 49."
       url: "https://github.com/usamaizm/AIDB/pull/15"
     - number: 16
-      topic: "Living context and agent identity; compare remaining unique changes with the new main-branch handoff."
+      topic: "Living project context and agent identity; closure/disposition pending."
       url: "https://github.com/usamaizm/AIDB/pull/16"
+    - number: 24
+      topic: "Agent onboarding and handoffs; reconcile with PR 45."
+      url: "https://github.com/usamaizm/AIDB/pull/24"
+    - number: 25
+      topic: "Phone-first contribution protocol; parked pending attribution and scope review."
+      url: "https://github.com/usamaizm/AIDB/pull/25"
+    - number: 45
+      topic: "Progressive agent onboarding and handoffs."
+      url: "https://github.com/usamaizm/AIDB/pull/45"
+    - number: 49
+      topic: "Durable agent discovery and collaboration; fix CLI surface mapping before merge."
+      url: "https://github.com/usamaizm/AIDB/pull/49"
+    - number: 50
+      topic: "E1 companion for PR 49; merge with or after PR 49 only."
+      url: "https://github.com/usamaizm/AIDB/pull/50"
+    - number: 55
+      topic: "Draft comprehensive audit remediation; first tranche only."
+      url: "https://github.com/usamaizm/AIDB/pull/55"
 canonical_docs:
   project_context: docs/PROJECT_CONTEXT.md
   contributor_rules: AGENTS.md
@@ -117,7 +131,9 @@ canonical_docs:
 priority_order:
   - "Recheck CI for current main and keep Python 3.10/3.11/3.12 green."
   - "Review export/import and snapshot restore for atomicity, idempotency, privacy, and failure recovery."
-  - "Reconcile PRs 8, 13, 14, 15, and 16; do not blind-merge stale branches."
+  - "Continue draft audit remediation in PR 55; do not merge before independent review and full CI."
+  - "Reconcile PRs 14, 15, 16, 24, 25, 45, 49, and 50; do not blind-merge stale branches."
+  - "Resolve the E1 N4b portable-integrity gap with a versioned, backward-compatible integrity policy."
   - "Harden HTTP boundary before public exposure: authorization, TLS deployment, request limits, timeouts, and rate limiting."
   - "Implement bounded/paginated retrieval, streaming, resource budgets, and compact context assembly in tested increments."
   - "Establish reproducible performance and storage benchmarks before scale claims."

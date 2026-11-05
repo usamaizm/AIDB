@@ -6,6 +6,7 @@ from .core import (
     Resource,
     Specification,
     Artifact,
+    EpistemicChainBrokenError,
     KnowledgeRecord,
     Memory,
     Message,
@@ -15,16 +16,44 @@ from .core import (
     ToolCall,
     WorkflowEvent,
 )
-from .engine import WorkflowEngine
 from .store import AIDB
+from .errors import (
+    AIDBError,
+    AlreadyExistsError,
+    IntegrityFailureError,
+    InvalidArgumentError,
+    NotFoundError,
+    PermissionDeniedError,
+    RevisionConflictError,
+    StorageIntegrityError,
+    UnsupportedVersionError,
+    UnsupportedCapabilityError,
+    UnauthenticatedError,
+    TemporarilyUnavailableError,
+    InternalError,
+)
 
 __all__ = [
     "AIDB",
+    "AIDBError",
+    "AlreadyExistsError",
+    "IntegrityFailureError",
+    "InvalidArgumentError",
+    "NotFoundError",
+    "PermissionDeniedError",
+    "RevisionConflictError",
+    "StorageIntegrityError",
+    "UnsupportedVersionError",
+    "UnsupportedCapabilityError",
+    "UnauthenticatedError",
+    "TemporarilyUnavailableError",
+    "InternalError",
     "Agent",
     "Note",
     "Resource",
     "Specification",
     "Artifact",
+    "EpistemicChainBrokenError",
     "KnowledgeRecord",
     "Memory",
     "Message",
@@ -33,6 +62,5 @@ __all__ = [
     "Tool",
     "ToolCall",
     "WorkflowEvent",
-    "WorkflowEngine",
 ]
 __version__ = "0.9.0"

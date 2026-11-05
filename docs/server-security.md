@@ -8,7 +8,8 @@ The built-in HTTP adapter is a small self-hosted transport, not a public cloud g
 - GET endpoints expose only public resources, public notes, the public specification, and the filtered public change feed.
 - Network writes are disabled unless a bearer token is configured.
 - Request bodies are size-limited and must be JSON objects.
-- SQLite operations are serialized behind the connection lock.
+- Accepted sockets have a 10-second read timeout; worker threads are daemonized and the listen backlog is bounded.
+- HTTP request bodies are authenticated and read before acquiring the store's connection guard; database operations are serialized inside the guard, and response writes occur after releasing it. A stalled upload therefore cannot hold the SQLite lock.
 
 ## Remote binding
 
@@ -31,4 +32,4 @@ The certificate must be valid for the hostname clients use. Protect the private 
 
 ## Limitations
 
-The adapter is intentionally minimal. It does not currently implement user-level authorization scopes, rate limiting, audit-grade identity, or multi-tenant isolation. A bearer token grants write access to the exposed write endpoints; it is not a substitute for per-agent authorization. Do not treat the service as production-ready for untrusted multi-tenant workloads.
+The adapter is intentionally minimal. It does not currently implement user-level authorization scopes, rate limiting, audit-grade identity, or multi-tenant isolation. A bearer token grants write access to the exposed write endpoints; it is not a substitute for per-agent authorization. The socket timeout and request-size limit reduce slow-client and oversized-body exposure, but are not a complete denial-of-service defense. Do not treat the service as production-ready for untrusted multi-tenant workloads.
