@@ -96,6 +96,7 @@ canonical_docs:
   architecture:
     substrate: docs/one-stop-agent-substrate.md
     modularity: docs/modular-architecture.md
+    evolution_compatibility: docs/evolution-and-compatibility.md
     self_evolution: docs/self-evolving-architecture.md
     performance_context_scale: docs/performance-context-and-scale.md
     storage_numeric_data: docs/storage-efficiency-and-numeric-data.md
