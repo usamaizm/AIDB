@@ -557,3 +557,19 @@ def test_public_store_methods_reject_wrong_container_and_status_types() -> None:
             status=[],
         )
     db.close()
+
+
+
+def test_verify_home_detects_invalid_resource_json() -> None:
+    db = AIDB(":memory:")
+    resource = db.create_resource("item", {"valid": True})
+    db.db.execute(
+        "UPDATE home_resources SET content=? WHERE id=?",
+        ("not-json", resource.id),
+    )
+    db.db.commit()
+
+    verification = db.verify_home()
+    assert verification["ok"] is False
+    assert any("invalid resource content:" in issue for issue in verification["issues"])
+    db.close()
