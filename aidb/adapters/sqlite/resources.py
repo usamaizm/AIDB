@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from uuid import uuid4
 from collections.abc import Callable
 from threading import RLock
 from typing import Any
@@ -83,7 +84,7 @@ class SQLiteResourceRepository:
                     "INSERT INTO home_changes(change_id,resource_id,operation,actor,new_revision,payload) "
                     "VALUES(?,?,?,?,?,?)",
                     (
-                        "chg:" + str(__import__("uuid").uuid4()),
+                        "chg:" + str(uuid4()),
                         resource.id,
                         "create",
                         resource.owner,
