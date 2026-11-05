@@ -89,3 +89,79 @@ def test_public_changes_hide_private_resources():
     changes = db.public_changes()
     assert all(c["resource_id"] != private.id for c in changes)
     assert any(c["resource_id"] == public.id for c in changes)
+
+def test_note_update_keeps_resource_and_note_views_consistent():
+    db = AIDB(":memory:")
+    note = db.create_note("title", "before", metadata={"source": "test"})
+    updated = db.update_resource(
+        note.id,
+        content={"title": "new title", "content": "after", "kind": "observation"},
+        metadata={"source": "updated"},
+        expected_revision=1,
+    )
+    current_note = db.get_note(note.id)
+    assert updated.content == {
+        "title": "new title", "content": "after", "kind": "observation"
+    }
+    assert current_note.title == updated.content["title"]
+    assert current_note.content == updated.content["content"]
+    assert current_note.kind == updated.content["kind"]
+    assert current_note.metadata == updated.metadata
+    assert current_note.revision == updated.revision
+
+
+def test_note_scalar_update_preserves_title_and_kind():
+    db = AIDB(":memory:")
+    note = db.create_note("title", "before", kind="question")
+    db.update_resource(note.id, content="after")
+    assert db.get_note(note.id).title == "title"
+    assert db.get_note(note.id).content == "after"
+    assert db.get_note(note.id).kind == "question"
+
+
+def test_public_export_excludes_private_relation_endpoints_and_history():
+    db = AIDB(":memory:")
+    public = db.create_resource("document", {"text": "public"}, visibility="public")
+    private = db.create_resource("secret", {"text": "private-secret-marker"})
+    db.relate_resources(public.id, private.id, "references")
+
+    exported = db.export_home(include_private=False)
+    serialized = repr(exported)
+    assert private.id not in serialized
+    assert "private-secret-marker" not in serialized
+    assert exported["tables"]["resource_relations"] == []
+    assert all(
+        row["resource_id"] != private.id
+        for row in exported["tables"]["home_changes"]
+    )
+
+
+def test_public_change_feed_hides_relation_to_private_target():
+    db = AIDB(":memory:")
+    public = db.create_resource("document", {"text": "public"}, visibility="public")
+    private = db.create_resource("secret", {"text": "private"})
+    db.relate_resources(public.id, private.id, "references")
+    changes = db.public_changes()
+    assert all(
+        not (c["operation"] == "relate" and private.id in c["payload"])
+        for c in changes
+    )
+
+
+def test_snapshots_do_not_embed_prior_snapshots():
+    db = AIDB(":memory:")
+    db.create_note("n", "v1")
+    first = db.create_snapshot()
+    first_row = db.db.execute(
+        "SELECT content FROM home_snapshots WHERE snapshot_id=?", (first["snapshot_id"],)
+    ).fetchone()
+    first_payload = __import__("json").loads(first_row["content"])
+    assert "home_snapshots" not in first_payload["tables"]
+
+    db.create_note("n2", "v2")
+    second = db.create_snapshot()
+    second_row = db.db.execute(
+        "SELECT content FROM home_snapshots WHERE snapshot_id=?", (second["snapshot_id"],)
+    ).fetchone()
+    second_payload = __import__("json").loads(second_row["content"])
+    assert "home_snapshots" not in second_payload["tables"]
