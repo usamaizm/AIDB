@@ -15,11 +15,30 @@ from .core import (
     ToolCall,
     WorkflowEvent,
 )
-from .engine import WorkflowEngine
 from .store import AIDB
+from .errors import (
+    AIDBError,
+    AlreadyExistsError,
+    IntegrityFailureError,
+    InvalidArgumentError,
+    NotFoundError,
+    PermissionDeniedError,
+    RevisionConflictError,
+    StorageIntegrityError,
+    UnsupportedVersionError,
+)
 
 __all__ = [
     "AIDB",
+    "AIDBError",
+    "AlreadyExistsError",
+    "IntegrityFailureError",
+    "InvalidArgumentError",
+    "NotFoundError",
+    "PermissionDeniedError",
+    "RevisionConflictError",
+    "StorageIntegrityError",
+    "UnsupportedVersionError",
     "Agent",
     "Note",
     "Resource",
@@ -33,6 +52,5 @@ __all__ = [
     "Tool",
     "ToolCall",
     "WorkflowEvent",
-    "WorkflowEngine",
 ]
 __version__ = "0.9.0"
