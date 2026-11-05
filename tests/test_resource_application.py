@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from aidb import AIDB, HomeApplication, Resource
+from aidb import AIDB, HomeApplication, Resource, ResourceRepository
 from aidb.application.resources import ResourceService
 
 
@@ -128,6 +128,7 @@ def test_sqlite_backed_facade_satisfies_http_application_contract() -> None:
     db = AIDB(":memory:")
     try:
         assert isinstance(db, HomeApplication)
+        assert isinstance(db._resource_repository, ResourceRepository)
         resource = db.create_resource("document", {"body": "hello"})
         assert db.get_resource(resource.id).content == {"body": "hello"}
     finally:
