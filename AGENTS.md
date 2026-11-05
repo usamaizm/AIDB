@@ -1,8 +1,8 @@
 # Agent Maintenance Notes
 
-**Fast bootstrap: read [.aidb/session-context.yml](.aidb/session-context.yml), then [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).** The YAML is the compact machine-readable map; the Markdown explains the reasoning and project state. Next follow this file and check live CI/PR state. Do not rely on chat history, old model memory, or design docs as proof that a feature is implemented.
+**New-session entry point: [docs/agent-onboarding.md](docs/agent-onboarding.md).** For each task, read [.aidb/session-context.yml](.aidb/session-context.yml) and this file, inspect the task issue/PR plus relevant source/tests, and load broader context only when the task needs it. Use the [task handoff template](.aidb/templates/agent-handoff.md) for substantive work. Do not rely on chat history, old model memory, stale status snapshots, or design docs as proof that a feature is implemented.
 
-This file is a durable handoff for human and AI contributors working on AIDB.
+This file contains mandatory contributor rules and durable engineering lessons; it is not a substitute for task-specific evidence.
 
 ## What currently works
 
@@ -26,24 +26,6 @@ This file is a durable handoff for human and AI contributors working on AIDB.
 - Do not claim CI/tests are green unless a current run has actually been observed.
 - Review stacked PRs against the current main; old PRs may be based on superseded commits.
 
-## AI-first development requirements
-
-AIDB's development model is AI-first: agents should perform routine repository work end-to-end when they have the required tools and permissions. Human collaboration is welcome, but avoid making humans the default execution path for tasks that can be automated and verified.
-
-For each task, an agent should:
-
-1. Bootstrap from the current repository manifest, handoff, and relevant contracts.
-2. State the intended behavior and a bounded acceptance criterion before editing.
-3. Inspect existing code, tests, history, and open PRs to avoid duplicating work.
-4. Implement the smallest coherent change and add regression coverage.
-5. Run the narrowest relevant checks, then the configured full suite when possible; report exact evidence.
-6. If a check fails, use the actual failure output to diagnose and attempt a bounded repair rather than claiming success.
-7. Leave a handoff with changed paths, verification, limitations, risks, and the next action.
-
-Do not equate autonomy with unrestricted authority. Never bypass authorization, provenance, review gates, resource limits, or isolation controls. Do not execute untrusted code or artifacts unless the relevant isolated runtime and permissions are implemented and verified. For actions with external, destructive, security-sensitive, or irreversible effects, follow the applicable approval policy. When a required tool or permission is unavailable, say so plainly and leave the work in a reviewable state.
-
-An autonomy capability is described as implemented only when repeatable evidence demonstrates the complete workflow and its failure paths. Plans, prompts, documentation, and model-generated predictions alone are not proof.
-
 ## Contributor workflow
 
 1. Inspect current main before starting work.
@@ -53,9 +35,9 @@ An autonomy capability is described as implemented only when repeatable evidence
 5. Preserve provenance, privacy, portability, and compatibility invariants.
 6. Update this file when a bug, invariant, architectural decision, or contributor workflow lesson is important enough to help the next agent.
 
-## Known status
+## Status freshness
 
-As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the atomic, schema-safe home-import hardening pass. The repository remains experimental; treat architecture and protocol details as evolving unless explicitly frozen.
+Repository and PR status changes quickly. Treat dates and status notes in this file as historical unless they are backed by a current source, commit, or CI run. Before making status claims, inspect current `main`, live issue/PR state, and current CI. The repository remains experimental; treat architecture and protocol details as evolving unless explicitly frozen.
 ## Agent and file-format compatibility
 
 - Keep `AGENTS.md` as repository-level contributor instructions; keep `README.md` human-facing and `docs/` authoritative for architecture and contracts.
@@ -115,43 +97,6 @@ As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the
 - Persist job state, bounded logs, toolchain versions, input/output hashes, and artifact lineage; do not rely on model context as durable state.
 - Never execute files during ingest, indexing, inspection, preview, or export. Treat code and binaries as untrusted.
 - Do not expose a real code-execution adapter until isolation, resource limits, cancellation, and permissions have tests.
-
-## Mandatory multi-agent contribution attribution
-
-These rules apply to every human or AI contributor, including ChatGPT, Muse, Grok, and agents not yet known to the project. Contributors must follow them without requiring project-owner-specific onboarding.
-
-Before opening or updating a pull request:
-
-1. Use the repository's `.github/pull_request_template.md` and complete every field in its **AIDB contribution attribution** section.
-2. Set `agent_id` to the stable declared contributor ID (for example, `agent-chatgpt`, `agent-muse`, `agent-grok`, or `human-owner`). Do not invent an identity for another contributor.
-3. Set `github_actor` to the actual GitHub account that authenticated and opened the PR. This is the GitHub actor, not the agent's display name.
-4. Set `attribution_status` honestly: `self_declared` for an agent's own unverified claim, `user_confirmed` only when the project owner has confirmed the attribution, or `independently_verified` only when an independent mechanism genuinely verifies it.
-5. Set `contribution_role` to the work actually performed (such as `implementation`, `testing`, `review`, `documentation`, or `design`).
-6. List exact checks run and their observed results. Never claim tests, reviews, or security checks passed unless they were actually performed.
-7. Disclose relevant privacy, security, authorization, provenance, compatibility, and migration implications. Never include secrets, credentials, private user data, or private identifiers in PR descriptions, commits, logs, or examples.
-
-The `.github/workflows/pr-attribution.yml` workflow validates the required PR fields and checks that the declared `github_actor` matches the authenticated PR author. Contributors must resolve its failures by correcting the PR description; do not bypass or disable the check to get a PR merged.
-
-**Trust boundary:** `agent_id` identifies the contributor claimed by the PR; it does not authenticate that agent. A shared GitHub login cannot prove which app or model produced a change. Preserve the actual GitHub actor separately, and never describe self-declared or user-confirmed attribution as cryptographic verification.
-
-All contributors must read and follow this section and the PR template before contributing. If a tool cannot provide required identity or verification evidence, state the limitation explicitly and use the least-privileged, reviewable workflow rather than guessing.
-
-
-## Shared agent discussion journal
-
-- Check `DISCUSSION.md` before starting repository work for current handoffs, decisions, blockers, and review requests.
-- Add a concise, timestamped entry to `DISCUSSION.md` when claiming or handing off work, making a cross-agent decision, encountering a blocker, requesting review, or completing a task.
-- Follow the journal's entry template and provenance rules. Never put secrets or private user data in the journal.
-- The journal is a coordination log, not an atomic task lock, authentication mechanism, or grant of permissions. Confirm task ownership in the linked GitHub issue and follow existing approval/security rules.
-
-
-## Shared informal chat
-
-- Use `CHAT.md` for informal, agent-neutral dialogue: thinking aloud, questions, exploratory ideas, useful tips, and short replies among humans and all AI contributors.
-- Keep `DISCUSSION.md` for structured task coordination, decisions needing action, blockers, review requests, and handoffs. Do not duplicate every chat exchange in the coordination journal.
-- Keep `CHAT.md` exploratory. An idea there is not an accepted decision or an implementation claim; promote reviewed conclusions into the relevant issue, contract, test, or decision log.
-- Follow the attribution, privacy, timestamp, and append-oriented history rules in `CHAT.md`. Never imply that a message was delivered to or read by another agent.
-
 
 ## Contributor attribution
 
