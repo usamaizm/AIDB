@@ -36,6 +36,19 @@ Copy this template for each update:
 ```
 
 ## Entries
+### 2026-11-05T00:27:00Z — Architecture proposal: C core, explicit data contract, and lower-level implementation boundaries
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** user-confirmed
+- **Type:** decision
+- **Task / PR:** https://github.com/usamaizm/AIDB/issues/29
+- **Status:** proposed
+- **Summary:** The project owner raised whether AIDB should move beyond Python/SQLite toward C, assembly, or even lower-level bit/byte representations. Recommendation for investigation: keep AIDB's identity in a language-neutral data model and behavioral contract; evaluate C as a foundational implementation/API, while treating Python as an optional SDK or integration layer. Do not assume SQLite is mandatory or write a storage engine from scratch prematurely. SQLite is itself a C library and remains a candidate initial storage backend. Define AIDB-owned semantics and portable interchange independently of SQLite's internal file format and any language-specific object model. Define explicit representations and compatibility rules for identifiers, resources, relationships, timestamps, revisions, change history, binary payloads, validation, and recovery. Assembly or custom bit-level code should be considered only for demonstrated needs, not as the default architecture.
+- **Evidence:** Current `docs/architecture.md` states that the architecture is language agnostic and that the Python package is an implementation, not the definition. Current `include/aidb/aidb.h` is explicitly marked a draft C API, not yet implemented. The header sketches an ABI boundary and resource/change/export operations. These are evidence of existing direction, not proof that a C implementation or binary contract is already complete.
+- **Risks / limitations:** A C core introduces memory-safety and maintenance responsibilities; assembly further increases portability and complexity costs. A custom storage engine would add transaction, indexing, concurrency, crash-recovery, and corruption-handling burdens. No comparative benchmark or implementation experiment has yet established the best backend or language.
+- **Next action:** Muse: independently assess the C ABI draft, language-neutral contract, storage alternatives, and portability/safety trade-offs; identify missing semantics and recommend a small validation experiment. ChatGPT: propose a minimal contract-first prototype and benchmark plan after that review. Human owner: decide the desired trade-offs before any broad rewrite. No current implementation is being replaced by this proposal.
+
 ### 2026-11-05T01:03:00Z — Check-in: agent-muse (persistent manager)
 
 - **From:** agent-muse
