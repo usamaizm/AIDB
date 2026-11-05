@@ -1,0 +1,303 @@
+{
+  "contract": "aidb-interchange-v1",
+  "profile": "e1-golden-fixtures",
+  "fixtures": [
+    {
+      "name": "basic-resource",
+      "package": {
+        "format": "aidb-package-v1",
+        "resources": [
+          {
+            "id": "urn:aidb:resource:alpha",
+            "type": "note",
+            "revision": 1,
+            "content": "hello",
+            "metadata": {},
+            "created_at": "2026-01-02T03:04:05Z",
+            "updated_at": "2026-01-02T03:04:05Z"
+          }
+        ],
+        "relationships": [],
+        "provenance": []
+      }
+    },
+    {
+      "name": "related-resources",
+      "package": {
+        "format": "aidb-package-v1",
+        "resources": [
+          {
+            "id": "urn:aidb:resource:a",
+            "type": "concept",
+            "revision": 1,
+            "content": {
+              "label": "A"
+            },
+            "metadata": {},
+            "created_at": "2026-01-02T03:04:05Z",
+            "updated_at": "2026-01-02T03:04:05Z"
+          },
+          {
+            "id": "urn:aidb:resource:b",
+            "type": "concept",
+            "revision": 2,
+            "content": {
+              "label": "B"
+            },
+            "metadata": {},
+            "created_at": "2026-01-02T03:04:05Z",
+            "updated_at": "2026-01-03T03:04:05Z"
+          }
+        ],
+        "relationships": [
+          {
+            "source": "urn:aidb:resource:a",
+            "target": "urn:aidb:resource:b",
+            "type": "supports",
+            "metadata": {}
+          }
+        ],
+        "provenance": []
+      }
+    },
+    {
+      "name": "opaque-external-identifiers",
+      "package": {
+        "format": "aidb-package-v1",
+        "resources": [
+          {
+            "id": "urn:aidb:resource:01HZX7",
+            "type": "record",
+            "revision": 1,
+            "content": null,
+            "metadata": {
+              "source_key": "legacy:42"
+            },
+            "created_at": "2026-01-02T03:04:05Z",
+            "updated_at": "2026-01-02T03:04:05Z"
+          }
+        ],
+        "relationships": [],
+        "provenance": []
+      }
+    },
+    {
+      "name": "provenance-attribution",
+      "package": {
+        "format": "aidb-package-v1",
+        "resources": [
+          {
+            "id": "urn:aidb:resource:claim",
+            "type": "claim",
+            "revision": 1,
+            "content": {
+              "claim": "water is wet"
+            },
+            "metadata": {},
+            "created_at": "2026-01-02T03:04:05Z",
+            "updated_at": "2026-01-02T03:04:05Z"
+          }
+        ],
+        "relationships": [],
+        "provenance": [
+          {
+            "resource_id": "urn:aidb:resource:claim",
+            "actor_id": "agent:muse",
+            "source": "fixture:review-1",
+            "activity": "created"
+          }
+        ]
+      }
+    },
+    {
+      "name": "revision-history",
+      "package": {
+        "format": "aidb-package-v1",
+        "resources": [
+          {
+            "id": "urn:aidb:resource:rev",
+            "type": "document",
+            "revision": 3,
+            "content": {
+              "text": "revised"
+            },
+            "metadata": {
+              "revision_note": "third revision"
+            },
+            "created_at": "2026-01-02T03:04:05Z",
+            "updated_at": "2026-01-04T03:04:05Z"
+          }
+        ],
+        "relationships": [],
+        "provenance": [],
+        "changes": [
+          {
+            "id": "urn:aidb:change:1",
+            "resource_id": "urn:aidb:resource:rev",
+            "revision": 1,
+            "operation": "create"
+          },
+          {
+            "id": "urn:aidb:change:2",
+            "resource_id": "urn:aidb:resource:rev",
+            "revision": 2,
+            "operation": "update"
+          },
+          {
+            "id": "urn:aidb:change:3",
+            "resource_id": "urn:aidb:resource:rev",
+            "revision": 3,
+            "operation": "update"
+          }
+        ]
+      }
+    },
+    {
+      "name": "optional-opaque-artifact",
+      "package": {
+        "format": "aidb-package-v1",
+        "resources": [
+          {
+            "id": "urn:aidb:resource:media",
+            "type": "artifact",
+            "revision": 1,
+            "content": {
+              "caption": "sample"
+            },
+            "metadata": {},
+            "created_at": "2026-01-02T03:04:05Z",
+            "updated_at": "2026-01-02T03:04:05Z"
+          }
+        ],
+        "relationships": [],
+        "provenance": [],
+        "artifacts": [
+          {
+            "id": "urn:aidb:artifact:blob1",
+            "media_type": "application/octet-stream",
+            "size_bytes": 3,
+            "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            "included": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "unicode-and-mixed-script",
+      "package": {
+        "format": "aidb-package-v1",
+        "resources": [
+          {
+            "id": "urn:aidb:resource:unicode",
+            "type": "note",
+            "revision": 1,
+            "content": {
+              "text": "café — 東京 — مرحبا — 🧠"
+            },
+            "metadata": {
+              "language": "mul"
+            },
+            "created_at": "2026-01-02T03:04:05Z",
+            "updated_at": "2026-01-02T03:04:05Z"
+          }
+        ],
+        "relationships": [],
+        "provenance": []
+      }
+    },
+    {
+      "name": "extensions-and-null",
+      "package": {
+        "format": "aidb-package-v1",
+        "resources": [
+          {
+            "id": "urn:aidb:resource:extension",
+            "type": "example:custom",
+            "revision": 1,
+            "content": null,
+            "metadata": {
+              "example:extension": {
+                "enabled": true
+              }
+            },
+            "created_at": "2026-01-02T03:04:05Z",
+            "updated_at": "2026-01-02T03:04:05Z"
+          }
+        ],
+        "relationships": [],
+        "provenance": [],
+        "extensions": {
+          "example:extension": {
+            "version": "1.0",
+            "optional": true
+          }
+        }
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "numeric-internal-id",
+      "package": {
+        "format": "aidb-package-v1",
+        "resources": [
+          {
+            "id": 42,
+            "type": "note",
+            "revision": 1,
+            "content": null,
+            "metadata": {},
+            "created_at": "2026-01-02T03:04:05Z",
+            "updated_at": "2026-01-02T03:04:05Z"
+          }
+        ],
+        "relationships": [],
+        "provenance": []
+      }
+    },
+    {
+      "name": "dangling-relationship",
+      "package": {
+        "format": "aidb-package-v1",
+        "resources": [
+          {
+            "id": "urn:aidb:resource:only",
+            "type": "note",
+            "revision": 1,
+            "content": null,
+            "metadata": {},
+            "created_at": "2026-01-02T03:04:05Z",
+            "updated_at": "2026-01-02T03:04:05Z"
+          }
+        ],
+        "relationships": [
+          {
+            "source": "urn:aidb:resource:only",
+            "target": "urn:aidb:resource:missing",
+            "type": "links",
+            "metadata": {}
+          }
+        ],
+        "provenance": []
+      }
+    },
+    {
+      "name": "malformed-digest",
+      "package": {
+        "format": "aidb-package-v1",
+        "resources": [],
+        "relationships": [],
+        "provenance": [],
+        "artifacts": [
+          {
+            "id": "urn:aidb:artifact:bad",
+            "media_type": "application/octet-stream",
+            "size_bytes": 3,
+            "sha256": "not-a-sha256",
+            "included": false
+          }
+        ]
+      }
+    }
+  ]
+}
