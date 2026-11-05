@@ -1369,6 +1369,25 @@ class AIDB:
             row["id"]: row
             for row in self.db.execute("SELECT * FROM home_resources").fetchall()
         }
+        for resource_id, resource in resources.items():
+            if not isinstance(resource_id, str) or not resource_id.strip():
+                issues.append("invalid resource id")
+            if not isinstance(resource["resource_type"], str) or not resource["resource_type"].strip():
+                issues.append("invalid resource type:" + str(resource_id))
+            if resource["visibility"] not in {"public", "private"}:
+                issues.append("invalid resource visibility:" + str(resource_id))
+            if not isinstance(resource["revision"], int) or resource["revision"] < 1:
+                issues.append("invalid resource revision:" + str(resource_id))
+            try:
+                json.loads(resource["content"])
+            except (TypeError, json.JSONDecodeError):
+                issues.append("invalid resource content:" + str(resource_id))
+            try:
+                metadata = json.loads(resource["metadata"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                metadata = None
+            if not isinstance(metadata, dict):
+                issues.append("invalid resource metadata:" + str(resource_id))
 
         for row in self.db.execute(
             "SELECT id,resource_id,operation,previous_revision,new_revision "
