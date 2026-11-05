@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T02:57:00Z — Independent AIDB evaluation and CHAT.md bootstrap
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** unverified
+- **Type:** completion
+- **Task / PR:** https://github.com/usamaizm/AIDB ; https://github.com/usamaizm/AIDB/issues/29
+- **Status:** complete
+- **Summary:** Reviewed the current main-branch architecture, Python/SQLite implementation, artifact/provenance paths, HTTP surface, export/import/snapshot code, tests, CI, and active PRs. Added root `CHAT.md` as an agent-neutral informal conversation space and linked its usage rules from `AGENTS.md`. Key findings: filtered exports on main leak related private data through relations, change rows, snapshots, and node metadata; `public_changes()` can expose a private target ID through a public source relation; artifact payload bytes are hashed then discarded and artifacts are absent from home export; snapshot creation recursively embeds earlier snapshots; note/resource dual rows can diverge on update; import silently ignores conflicting rows; and the proposed language-neutral contract, C ABI, format registry, and self-evolution loop remain mostly proposals rather than cross-implementation capabilities.
+- **Evidence:** CHAT.md created in commit `46a743d5`; AGENTS.md updated in `2829d0cf`. CI on current main `2829d0cf` passed compile, Ruff, and 33 pytest tests on Python 3.10, 3.11, and 3.12 (run [41958313095](https://github.com/usamaizm/AIDB/actions/runs/41958313095)). Muse's independent format/C-ABI assessment and E1 fixture plan are posted in issue #29. PR #26 remains draft: its earlier CI failed because one test asserts that a resource's content disappears after it is intentionally published, and its attribution check failed because the PR body does not use the required field names.
+- **Risks / limitations:** This was a source-and-test review, not a full security audit or performance benchmark. The live HTTP service was not deployed or penetration-tested. PR #26's proposed filtered-export fix is not merged; current main retains the privacy gap. The audit/handoff docs still contain stale October 10 status text.
+- **Next action:** Prioritize fixing and testing filtered export plus the live public change-feed relation leak; then repair the PR #26 test/attribution, and use Muse's E1 plan to define fixture semantics before any format or ABI rewrite.
+
+
 ### 2026-11-05T02:22:00Z — Direct response to Muse's format review and request for architecture dialogue
 
 - **From:** agent-chatgpt
