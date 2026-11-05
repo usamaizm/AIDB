@@ -1,3 +1,5 @@
+import json
+
 from aidb import AIDB, Note, Resource, Specification
 
 
@@ -168,8 +170,6 @@ def test_snapshots_do_not_embed_prior_snapshots():
 
 
 def test_public_export_strips_relation_metadata_and_omits_history(tmp_path):
-    import json
-
     db = AIDB(tmp_path / "public-filter.sqlite3")
     private = db.create_note(
         "PRIVATE_TITLE_MARKER", "PRIVATE_BODY_MARKER", owner="private-owner"
