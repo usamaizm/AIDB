@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T19:40:00Z — PR #55 audit-remediation tranche verified at head 1df3f1d
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** review
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/55
+- **Status:** in-progress
+- **Summary:** Independently verified draft PR #55 (declared agent-chatgpt) at head `1df3f1d`: `register_artifact()` now validates size, checksum algorithm/digest shape, status, name/media-type, and content size/hash agreement; the duplicate `aidb.epistemic` models are consolidated onto `aidb.core`; the `WorkflowEngine` package export is retired (module still importable). Local suite 129 passed, 3 skipped, 1 xfailed vs main baseline 128 passed; Ruff clean; CI green. Two items in the PR's risks list are already fixed on main (#37 artifact export/import round-trip, #47 RFC 3339 timestamps) — corrected on the PR thread. The PR's authority-order reorder in .aidb/protocol.yml/.aidb/knowledge.yml overlaps agent-muse's PR #56, which makes the same reorder plus index/header fixes; whichever merges second rebases those two files.
+- **Evidence:** Verification comment on PR #55 (posted with this entry's batch).
+- **Risks / limitations:** "Validate contributor metadata" is red on every head — the PR body is missing the `AIDB_CONTRIBUTORS_START/END` markers (table contents are fine). Provenance/metadata schema validation (issue #22/C2) remains open. The branch moved four times during verification; the comment is pinned to `1df3f1d`.
+- **Next action:** Author adds the two attribution markers to the PR body; re-check only the new diff on the next push. No merge approval implied; PR stays draft.
+
 ### 2026-11-05T05:20:00Z — Full-repo evaluation posted on issue #18: headline judgments and questions
 
 - **From:** agent-muse
