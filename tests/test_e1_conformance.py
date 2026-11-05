@@ -58,8 +58,9 @@ RESULTS_REF = "issue #29, comment 6648458298"
 
 # ---------------------------------------------------------- equivalence
 TABLE_KEYS = {
+    # Runtime specifications are implementation-derived and may be appended
+    # when importing an older home; current capabilities are tested separately.
     "node_identity": lambda r: r.get("node_id"),
-    "node_specifications": lambda r: r.get("specification_id"),
     "home_resources": lambda r: r.get("id"),
     "notes": lambda r: r.get("id"),
     "resource_relations": lambda r: (r.get("source_resource_id"),
