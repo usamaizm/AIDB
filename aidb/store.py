@@ -1427,20 +1427,36 @@ class AIDB:
                 content.get(key) != note[key] for key in ("title", "content", "kind")
             ):
                 issues.append("note content mismatch:" + str(note["id"]))
+            try:
+                note_metadata = json.loads(note["metadata"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                note_metadata = None
+            try:
+                resource_metadata = json.loads(resource["metadata"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                resource_metadata = None
             if (
                 resource["visibility"] != note["visibility"]
                 or resource["revision"] != note["revision"]
                 or resource["owner"] != note["owner"]
+                or not isinstance(note_metadata, dict)
+                or note_metadata != resource_metadata
             ):
                 issues.append("note resource metadata mismatch:" + str(note["id"]))
 
         for relation in self.db.execute(
-            "SELECT id,source_resource_id,target_resource_id FROM resource_relations"
+            "SELECT id,source_resource_id,target_resource_id,metadata FROM resource_relations"
         ).fetchall():
             if relation["source_resource_id"] not in resources:
                 issues.append("missing relation source:" + str(relation["id"]))
             if relation["target_resource_id"] not in resources:
                 issues.append("missing relation target:" + str(relation["id"]))
+            try:
+                relation_metadata = json.loads(relation["metadata"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                relation_metadata = None
+            if not isinstance(relation_metadata, dict):
+                issues.append("invalid relation metadata:" + str(relation["id"]))
 
         for blob in self.db.execute(
             "SELECT artifact_id FROM artifact_blobs ORDER BY artifact_id"
