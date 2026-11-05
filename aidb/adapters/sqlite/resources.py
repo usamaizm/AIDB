@@ -9,8 +9,7 @@ import json
 import sqlite3
 from uuid import uuid4
 from collections.abc import Callable
-from threading import RLock
-from typing import Any
+from typing import Any, ContextManager
 
 from ...core import Resource
 
@@ -19,7 +18,7 @@ class SQLiteResourceRepository:
     def __init__(
         self,
         connection: sqlite3.Connection,
-        lock: RLock,
+        lock: ContextManager[Any],
         record_event: Callable[..., Any],
     ) -> None:
         self._db = connection
