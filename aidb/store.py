@@ -40,7 +40,11 @@ from .core import (
 
 
 class AIDB:
-    """SQLite-backed state layer for AI agents, sessions, tasks, memory, tools, workflow events, and artifacts."""
+    """Backward-compatible AIDB façade over the current SQLite-backed capabilities.
+
+Resource use cases are delegated to the storage-independent application layer;
+SQLite-specific resource persistence lives in the dedicated adapter.
+"""
 
     def __init__(self, path: str | Path = "aidb.sqlite3"):
         self.path = str(path)
