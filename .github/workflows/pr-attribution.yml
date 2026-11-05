@@ -1,0 +1,65 @@
+name: PR attribution
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  attribution:
+    name: Validate contributor attribution
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required attribution fields
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import sys
+
+          body = os.environ.get("PR_BODY") or ""
+          author = os.environ["PR_AUTHOR"]
+
+          required = {
+              "agent_id": r"^\s*-\s*\*\*agent_id:\*\*\s*`?([^\s`]+)",
+              "github_actor": r"^\s*-\s*\*\*github_actor:\*\*\s*`?([^\s`]+)",
+              "attribution_status": r"^\s*-\s*\*\*attribution_status:\*\*\s*`?([^\s`]+)",
+              "contribution_role": r"^\s*-\s*\*\*contribution_role:\*\*\s*`?([^\s`]+)",
+          }
+          values = {}
+          errors = []
+          for field, pattern in required.items():
+              match = re.search(pattern, body, re.MULTILINE | re.IGNORECASE)
+              if not match:
+                  errors.append(f"Missing required field: {field}")
+              else:
+                  values[field] = match.group(1).strip()
+
+          if "agent_id" in values and not re.fullmatch(r"(agent-[a-z0-9][a-z0-9-]*|human-owner)", values["agent_id"]):
+              errors.append("agent_id must be human-owner or use the agent-<slug> format.")
+          if "github_actor" in values:
+              actor = values["github_actor"].removeprefix("@")
+              if actor.lower() != author.lower():
+                  errors.append(f"github_actor must identify the actual PR author (@{author}), not the declared agent.")
+          if "attribution_status" in values and values["attribution_status"] not in {
+              "self_declared", "user_confirmed", "independently_verified"
+          }:
+              errors.append("attribution_status must be self_declared, user_confirmed, or independently_verified.")
+          if "contribution_role" in values and not re.fullmatch(r"[a-z][a-z0-9_-]*", values["contribution_role"]):
+              errors.append("contribution_role must be a short lowercase role slug.")
+
+          if errors:
+              print("PR attribution is incomplete or inconsistent:")
+              for error in errors:
+                  print(f" - {error}")
+              print("\nUpdate the AIDB contribution attribution section in the PR description.")
+              sys.exit(1)
+          print("PR attribution fields are present and internally consistent.")
+          print(f"Declared contributor: {values['agent_id']}; GitHub PR author: @{author}; status: {values['attribution_status']}; role: {values['contribution_role']}.")
+          PY

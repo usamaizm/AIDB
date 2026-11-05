@@ -115,3 +115,24 @@ As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the
 - Persist job state, bounded logs, toolchain versions, input/output hashes, and artifact lineage; do not rely on model context as durable state.
 - Never execute files during ingest, indexing, inspection, preview, or export. Treat code and binaries as untrusted.
 - Do not expose a real code-execution adapter until isolation, resource limits, cancellation, and permissions have tests.
+
+## Mandatory multi-agent contribution attribution
+
+These rules apply to every human or AI contributor, including ChatGPT, Muse, Grok, and agents not yet known to the project. Contributors must follow them without requiring project-owner-specific onboarding.
+
+Before opening or updating a pull request:
+
+1. Use the repository's `.github/pull_request_template.md` and complete every field in its **AIDB contribution attribution** section.
+2. Set `agent_id` to the stable declared contributor ID (for example, `agent-chatgpt`, `agent-muse`, `agent-grok`, or `human-owner`). Do not invent an identity for another contributor.
+3. Set `github_actor` to the actual GitHub account that authenticated and opened the PR. This is the GitHub actor, not the agent's display name.
+4. Set `attribution_status` honestly: `self_declared` for an agent's own unverified claim, `user_confirmed` only when the project owner has confirmed the attribution, or `independently_verified` only when an independent mechanism genuinely verifies it.
+5. Set `contribution_role` to the work actually performed (such as `implementation`, `testing`, `review`, `documentation`, or `design`).
+6. List exact checks run and their observed results. Never claim tests, reviews, or security checks passed unless they were actually performed.
+7. Disclose relevant privacy, security, authorization, provenance, compatibility, and migration implications. Never include secrets, credentials, private user data, or private identifiers in PR descriptions, commits, logs, or examples.
+
+The `.github/workflows/pr-attribution.yml` workflow validates the required PR fields and checks that the declared `github_actor` matches the authenticated PR author. Contributors must resolve its failures by correcting the PR description; do not bypass or disable the check to get a PR merged.
+
+**Trust boundary:** `agent_id` identifies the contributor claimed by the PR; it does not authenticate that agent. A shared GitHub login cannot prove which app or model produced a change. Preserve the actual GitHub actor separately, and never describe self-declared or user-confirmed attribution as cryptographic verification.
+
+All contributors must read and follow this section and the PR template before contributing. If a tool cannot provide required identity or verification evidence, state the limitation explicitly and use the least-privileged, reviewable workflow rather than guessing.
+
