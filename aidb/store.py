@@ -12,6 +12,16 @@ from threading import RLock
 from pathlib import Path
 from typing import Any
 
+from .errors import (
+    AlreadyExistsError,
+    IntegrityFailureError,
+    InvalidArgumentError,
+    NotFoundError,
+    PermissionDeniedError,
+    RevisionConflictError,
+    StorageIntegrityError,
+    UnsupportedVersionError,
+)
 from .core import (
     Agent,
     Artifact,
@@ -331,27 +341,27 @@ class AIDB:
         content = row.get("content")
         if encoding is None:
             if not isinstance(content, bytes):
-                raise ValueError("artifact blob content must be bytes or base64 text")
+                raise InvalidArgumentError("artifact blob content must be bytes or base64 text")
             return row
         if encoding != "base64" or not isinstance(content, str):
-            raise ValueError("unsupported artifact blob content encoding: " + str(encoding))
+            raise InvalidArgumentError("unsupported artifact blob content encoding: " + str(encoding))
         try:
             row["content"] = base64.b64decode(content, validate=True)
         except (ValueError, base64.binascii.Error) as exc:
-            raise ValueError("invalid base64 artifact blob content") from exc
+            raise InvalidArgumentError("invalid base64 artifact blob content") from exc
         return row
 
     @staticmethod
     def _checksum_bytes(data: bytes, algorithm: str = "sha-256") -> str:
         normalized = (algorithm or "sha-256").lower()
         if normalized not in {"sha-256", "sha1", "md5"}:
-            raise ValueError(f"unsupported checksum algorithm: {algorithm}")
+            raise InvalidArgumentError(f"unsupported checksum algorithm: {algorithm}")
         return hashlib.new(normalized, data).hexdigest()
 
     @staticmethod
     def _require_confidence(confidence: float, label: str) -> float:
         if not 0.0 <= confidence <= 1.0:
-            raise ValueError(f"{label} confidence must be between 0.0 and 1.0")
+            raise InvalidArgumentError(f"{label} confidence must be between 0.0 and 1.0")
         return confidence
 
     def _append_workflow_event(
@@ -376,8 +386,9 @@ class AIDB:
             (checksum_algorithm, checksum),
         ).fetchone()
         if existing is not None:
-            raise ValueError(
-                f"duplicate artifact checksum for algorithm={checksum_algorithm} checksum={checksum}"
+            raise AlreadyExistsError(
+                f"duplicate artifact checksum for algorithm={checksum_algorithm} checksum={checksum}",
+                details={"checksum_algorithm": checksum_algorithm, "checksum": checksum},
             )
 
     def _metadata_claims_derived(self, artifact: Artifact, interpretation: Interpretation | None = None) -> bool:
@@ -414,7 +425,7 @@ class AIDB:
         current_id = artifact_id
         while current_id is not None:
             if current_id in seen:
-                raise ValueError("cycle detected in artifact lineage")
+                raise InvalidArgumentError("cycle detected in artifact lineage")
             seen.add(current_id)
             row = self.db.execute(
                 "SELECT parent_artifact_id FROM artifacts WHERE id = ?",
@@ -434,8 +445,9 @@ class AIDB:
         capabilities: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> Agent:
-        cur = self.db.execute(
-            "INSERT INTO agents(name, description, model, role, permissions, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        try:
+            cur = self.db.execute(
+                "INSERT INTO agents(name, description, model, role, permissions, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 name,
                 description,
@@ -444,8 +456,17 @@ class AIDB:
                 self._json(permissions or []),
                 self._json(capabilities or []),
                 self._json(metadata or {}),
-            ),
-        )
+                ),
+            )
+        except sqlite3.IntegrityError as exc:
+            if "UNIQUE constraint failed: agents.name" in str(exc):
+                raise AlreadyExistsError(
+                    "agent name already exists", details={"name": name}
+                ) from exc
+            raise StorageIntegrityError(
+                "agent could not be stored because a database constraint failed",
+                details={"table": "agents"},
+            ) from exc
         self.db.commit()
         return Agent(name, description, model, role, permissions or [], capabilities or [], metadata or {}, cur.lastrowid)
 
@@ -457,6 +478,11 @@ class AIDB:
         confidence: float = 0.5,
         metadata: dict[str, Any] | None = None,
     ) -> Extraction:
+        if self.db.execute("SELECT 1 FROM artifacts WHERE id = ?", (input_artifact_id,)).fetchone() is None:
+            raise NotFoundError(
+                f"input artifact {input_artifact_id} does not exist",
+                details={"artifact_id": input_artifact_id},
+            )
         self._require_confidence(confidence, "extraction")
         try:
             self.db.execute("BEGIN")
@@ -473,6 +499,12 @@ class AIDB:
             )
             self.db.commit()
             return extraction
+        except sqlite3.IntegrityError as exc:
+            self.db.rollback()
+            raise StorageIntegrityError(
+                "create_extraction violated a database constraint",
+                details={"operation": "create_extraction"},
+            ) from exc
         except Exception:
             self.db.rollback()
             raise
@@ -490,11 +522,11 @@ class AIDB:
             "SELECT parent_artifact_id FROM artifacts WHERE id = ?", (output_artifact_id,)
         ).fetchone()
         if extraction is None:
-            raise ValueError(f"extraction {extraction_id} does not exist")
+            raise NotFoundError(f"extraction {extraction_id} does not exist", details={"extraction_id": extraction_id})
         if output is None:
-            raise ValueError(f"output artifact {output_artifact_id} does not exist")
+            raise NotFoundError(f"output artifact {output_artifact_id} does not exist", details={"artifact_id": output_artifact_id})
         if output["parent_artifact_id"] != extraction["input_artifact_id"]:
-            raise ValueError(
+            raise InvalidArgumentError(
                 "output artifact parent must match the extraction input artifact"
             )
         if sequence is None:
@@ -531,6 +563,11 @@ class AIDB:
         confidence: float = 0.5,
         metadata: dict[str, Any] | None = None,
     ) -> Interpretation:
+        if self.db.execute("SELECT 1 FROM artifacts WHERE id = ?", (output_artifact_id,)).fetchone() is None:
+            raise NotFoundError(
+                f"output artifact {output_artifact_id} does not exist",
+                details={"artifact_id": output_artifact_id},
+            )
         self._require_confidence(confidence, "interpretation")
         try:
             self.db.execute("BEGIN")
@@ -547,6 +584,12 @@ class AIDB:
             )
             self.db.commit()
             return interpretation
+        except sqlite3.IntegrityError as exc:
+            self.db.rollback()
+            raise StorageIntegrityError(
+                "create_interpretation violated a database constraint",
+                details={"operation": "create_interpretation"},
+            ) from exc
         except Exception:
             self.db.rollback()
             raise
@@ -558,6 +601,11 @@ class AIDB:
         confidence: float = 0.5,
         metadata: dict[str, Any] | None = None,
     ) -> Knowledge:
+        if self.db.execute("SELECT 1 FROM interpretations WHERE id = ?", (interpretation_id,)).fetchone() is None:
+            raise NotFoundError(
+                f"interpretation {interpretation_id} does not exist",
+                details={"interpretation_id": interpretation_id},
+            )
         self._require_confidence(confidence, "knowledge")
         try:
             self.db.execute("BEGIN")
@@ -574,6 +622,12 @@ class AIDB:
             )
             self.db.commit()
             return knowledge
+        except sqlite3.IntegrityError as exc:
+            self.db.rollback()
+            raise StorageIntegrityError(
+                "create_knowledge violated a database constraint",
+                details={"operation": "create_knowledge"},
+            ) from exc
         except Exception:
             self.db.rollback()
             raise
@@ -588,6 +642,19 @@ class AIDB:
         created_by: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> KnowledgeRelation:
+        for knowledge_id in (source_knowledge_id, target_knowledge_id):
+            if self.db.execute("SELECT 1 FROM epistemic_knowledge WHERE id = ?", (knowledge_id,)).fetchone() is None:
+                raise NotFoundError(
+                    f"knowledge {knowledge_id} does not exist",
+                    details={"knowledge_id": knowledge_id},
+                )
+        if evidence_artifact_id is not None and self.db.execute(
+            "SELECT 1 FROM artifacts WHERE id = ?", (evidence_artifact_id,)
+        ).fetchone() is None:
+            raise NotFoundError(
+                f"evidence artifact {evidence_artifact_id} does not exist",
+                details={"artifact_id": evidence_artifact_id},
+            )
         self._require_confidence(confidence, "knowledge relation")
         try:
             self.db.execute("BEGIN")
@@ -609,6 +676,12 @@ class AIDB:
             )
             self.db.commit()
             return relation_obj
+        except sqlite3.IntegrityError as exc:
+            self.db.rollback()
+            raise StorageIntegrityError(
+                "create_knowledge_relation violated a database constraint",
+                details={"operation": "create_knowledge_relation"},
+            ) from exc
         except Exception:
             self.db.rollback()
             raise
@@ -623,6 +696,10 @@ class AIDB:
         context: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> Memory:
+        if self.db.execute("SELECT 1 FROM agents WHERE id = ?", (agent_id,)).fetchone() is None:
+            raise NotFoundError(f"agent {agent_id} does not exist", details={"agent_id": agent_id})
+        if self.db.execute("SELECT 1 FROM epistemic_knowledge WHERE id = ?", (knowledge_id,)).fetchone() is None:
+            raise NotFoundError(f"knowledge {knowledge_id} does not exist", details={"knowledge_id": knowledge_id})
         self._require_confidence(confidence, "memory")
         try:
             self.db.execute("BEGIN")
@@ -639,17 +716,30 @@ class AIDB:
             )
             self.db.commit()
             return memory
+        except sqlite3.IntegrityError as exc:
+            self.db.rollback()
+            raise StorageIntegrityError(
+                "remember_knowledge violated a database constraint",
+                details={"operation": "remember_knowledge"},
+            ) from exc
         except Exception:
             self.db.rollback()
             raise
 
     def trace_artifact_lineage(self, artifact_id: int) -> list[Artifact]:
+        if self.db.execute(
+            "SELECT 1 FROM artifacts WHERE id = ?", (artifact_id,)
+        ).fetchone() is None:
+            raise NotFoundError(
+                f"artifact {artifact_id} does not exist",
+                details={"artifact_id": artifact_id},
+            )
         seen: set[int] = set()
         chain: list[Artifact] = []
         current_id = artifact_id
         while current_id is not None:
             if current_id in seen:
-                raise ValueError("cycle detected in artifact lineage")
+                raise InvalidArgumentError("cycle detected in artifact lineage")
             seen.add(current_id)
             row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (current_id,)).fetchone()
             if row is None:
@@ -662,7 +752,7 @@ class AIDB:
     def trace_memory_to_source(self, memory_id: int) -> EpistemicChain:
         row = self.db.execute("SELECT * FROM epistemic_memory WHERE id = ?", (memory_id,)).fetchone()
         if row is None:
-            raise ValueError(f"memory {memory_id} does not exist")
+            raise NotFoundError(f"memory {memory_id} does not exist", details={"memory_id": memory_id})
         memory = self._memory_from_row(row)
 
         knowledge_row = self.db.execute("SELECT * FROM epistemic_knowledge WHERE id = ?", (memory.knowledge_id,)).fetchone()
@@ -737,6 +827,39 @@ class AIDB:
         checksum_algorithm: str = "sha-256",
         content: bytes | None = None,
     ) -> Artifact:
+        if not isinstance(name, str) or not name.strip():
+            raise InvalidArgumentError("artifact name must be a non-empty string")
+        if not isinstance(media_type, str) or not media_type.strip():
+            raise InvalidArgumentError("artifact media_type must be a non-empty string")
+        if not isinstance(checksum_algorithm, str):
+            raise InvalidArgumentError("checksum algorithm must be a string")
+        if isinstance(size_bytes, bool) or not isinstance(size_bytes, int) or size_bytes < 0:
+            raise InvalidArgumentError("artifact size_bytes must be a non-negative integer")
+        if checksum_algorithm not in {"sha-256", "sha1", "md5"}:
+            raise InvalidArgumentError(f"unsupported checksum algorithm: {checksum_algorithm}")
+        digest_size = hashlib.new(checksum_algorithm).digest_size * 2
+        if not isinstance(checksum, str) or len(checksum) != digest_size or any(
+            char not in "0123456789abcdefABCDEF" for char in checksum
+        ):
+            raise InvalidArgumentError("checksum must be a hexadecimal digest of the selected algorithm")
+        checksum = checksum.lower()
+        if status not in {"raw", "derived", "processed"}:
+            raise InvalidArgumentError("artifact status must be raw, derived, or processed")
+        if parent_artifact_id is not None and self.db.execute(
+            "SELECT 1 FROM artifacts WHERE id = ?", (parent_artifact_id,)
+        ).fetchone() is None:
+            raise NotFoundError(
+                f"parent artifact {parent_artifact_id} does not exist",
+                details={"artifact_id": parent_artifact_id},
+            )
+        if content is not None:
+            if not isinstance(content, (bytes, bytearray)):
+                raise InvalidArgumentError("artifact content must be bytes-like")
+            content = bytes(content)
+            if len(content) != size_bytes:
+                raise InvalidArgumentError("artifact content size does not match size_bytes")
+            if self._checksum_bytes(content, checksum_algorithm) != checksum:
+                raise InvalidArgumentError("artifact checksum does not match provided content")
         self._assert_no_duplicate_checksum(checksum_algorithm, checksum)
         try:
             self.db.execute("BEGIN")
@@ -771,6 +894,12 @@ class AIDB:
             )
             self.db.commit()
             return artifact
+        except sqlite3.IntegrityError as exc:
+            self.db.rollback()
+            raise StorageIntegrityError(
+                "artifact registration violated a database constraint",
+                details={"table": "artifacts"},
+            ) from exc
         except Exception:
             self.db.rollback()
             raise
@@ -792,7 +921,7 @@ class AIDB:
     ) -> Artifact:
         actual_checksum = checksum or self._checksum_bytes(data, checksum_algorithm)
         if checksum is not None and checksum != actual_checksum:
-            raise ValueError("checksum does not match provided bytes")
+            raise InvalidArgumentError("checksum does not match provided bytes")
         return self.register_artifact(
             name=name,
             media_type=media_type,
@@ -824,10 +953,10 @@ class AIDB:
             return None
         content = bytes(row["content"])
         if len(content) != row["size_bytes"]:
-            raise ValueError(f"artifact {artifact_id} payload size does not match metadata")
+            raise IntegrityFailureError(f"artifact {artifact_id} payload size does not match metadata", details={"artifact_id": artifact_id})
         actual_checksum = self._checksum_bytes(content, row["checksum_algorithm"])
         if actual_checksum != row["checksum"]:
-            raise ValueError(f"artifact {artifact_id} payload checksum verification failed")
+            raise IntegrityFailureError(f"artifact {artifact_id} payload checksum verification failed", details={"artifact_id": artifact_id})
         return content
 
     def derive_artifact(
@@ -846,7 +975,7 @@ class AIDB:
     ) -> Artifact:
         parent = self.get_artifact(parent_artifact_id)
         if parent is None:
-            raise ValueError(f"artifact {parent_artifact_id} does not exist")
+            raise NotFoundError(f"artifact {parent_artifact_id} does not exist", details={"artifact_id": parent_artifact_id})
         history = list(parent.transformation_history)
         history.append(transformation_step)
         return self.register_artifact_from_bytes(
@@ -872,7 +1001,32 @@ class AIDB:
         session_id: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> WorkflowEvent:
-        return self._append_workflow_event(kind, message, agent_id, task_id, session_id, metadata)
+        if not isinstance(kind, str) or not kind.strip():
+            raise InvalidArgumentError("event kind must be a non-empty string")
+        for table, value, label, detail_key in (
+            ("agents", agent_id, "agent", "agent_id"),
+            ("tasks", task_id, "task", "task_id"),
+            ("sessions", session_id, "session", "session_id"),
+        ):
+            if value is not None and self.db.execute(
+                f"SELECT 1 FROM {table} WHERE "
+                + ("session_id" if table == "sessions" else "id")
+                + " = ?",
+                (value,),
+            ).fetchone() is None:
+                raise NotFoundError(
+                    f"{label} {value} does not exist",
+                    details={detail_key: value},
+                )
+        try:
+            return self._append_workflow_event(
+                kind, message, agent_id, task_id, session_id, metadata
+            )
+        except sqlite3.IntegrityError as exc:
+            raise StorageIntegrityError(
+                "workflow event violated a database constraint",
+                details={"table": "workflow_events"},
+            ) from exc
 
     def list_artifacts(self, media_type: str | None = None, parent_artifact_id: int | None = None) -> list[Artifact]:
         if media_type is not None and parent_artifact_id is not None:
@@ -907,6 +1061,8 @@ class AIDB:
             DeprecationWarning,
             stacklevel=2,
         )
+        if self.db.execute("SELECT 1 FROM agents WHERE id = ?", (agent_id,)).fetchone() is None:
+            raise NotFoundError(f"agent {agent_id} does not exist", details={"agent_id": agent_id})
         cur = self.db.execute(
             "INSERT INTO memories(agent_id, content, kind, importance, metadata) VALUES (?, ?, ?, ?, ?)",
             (agent_id, content, kind, importance, self._json(metadata or {})),
@@ -946,7 +1102,7 @@ class AIDB:
 
 
     def initialize_home(self, node_id=None, owner=None, visibility="private", metadata=None):
-        if visibility not in {"public", "private"}: raise ValueError("visibility must be public or private")
+        if visibility not in {"public", "private"}: raise InvalidArgumentError("visibility must be public or private")
         row = self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone()
         if row: return dict(row)
         node_id = node_id or "node:" + str(uuid.uuid4())
@@ -955,7 +1111,7 @@ class AIDB:
         return dict(self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone())
 
     def create_resource(self, resource_type, content=None, owner=None, visibility="private", metadata=None):
-        if visibility not in {"public", "private"}: raise ValueError("visibility must be public or private")
+        if visibility not in {"public", "private"}: raise InvalidArgumentError("visibility must be public or private")
         rid = "res:" + str(uuid.uuid4())
         self.db.execute("INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)", (rid, resource_type, json.dumps(content), owner, visibility, self._json(metadata or {})))
         self._append_workflow_event("resource_created", "resource created", metadata={"resource_id": rid, "resource_type": resource_type, "owner": owner, "visibility": visibility})
@@ -965,8 +1121,8 @@ class AIDB:
 
     def get_resource(self, resource_id, include_private=True):
         row = self.db.execute("SELECT * FROM home_resources WHERE id=?", (resource_id,)).fetchone()
-        if row is None: raise ValueError("resource does not exist")
-        if row["visibility"] == "private" and not include_private: raise PermissionError("private resource")
+        if row is None: raise NotFoundError("resource does not exist", details={"resource_id": resource_id})
+        if row["visibility"] == "private" and not include_private: raise PermissionDeniedError("private resource", details={"resource_id": resource_id})
         return Resource(row["resource_type"], json.loads(row["content"]), row["owner"], row["visibility"], json.loads(row["metadata"]), row["id"], row["revision"], row["created_at"], row["updated_at"])
 
     def list_resources(self, resource_type=None, visibility=None, include_private=True, limit=None, offset=0):
@@ -977,9 +1133,9 @@ class AIDB:
         where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
         sql="SELECT id FROM home_resources"+where+" ORDER BY updated_at DESC, id ASC"
         if limit is not None:
-            if not isinstance(limit, int) or limit < 1: raise ValueError("limit must be a positive integer")
+            if not isinstance(limit, int) or limit < 1: raise InvalidArgumentError("limit must be a positive integer")
             sql += " LIMIT ?"; params.append(limit)
-        if not isinstance(offset, int) or offset < 0: raise ValueError("offset must be a non-negative integer")
+        if not isinstance(offset, int) or offset < 0: raise InvalidArgumentError("offset must be a non-negative integer")
         if offset:
             if limit is None: sql += " LIMIT -1"
             sql += " OFFSET ?"; params.append(offset)
@@ -988,7 +1144,7 @@ class AIDB:
 
     def create_note(self, title, content, owner=None, visibility="private", kind="note", metadata=None):
         if visibility not in {"public", "private"}:
-            raise ValueError("visibility must be public or private")
+            raise InvalidArgumentError("visibility must be public or private")
         resource_id = "res:" + str(uuid.uuid4())
         resource_content = {"title": title, "content": content, "kind": kind}
         try:
@@ -1018,8 +1174,8 @@ class AIDB:
 
     def get_note(self, note_id, include_private=True):
         row=self.db.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
-        if row is None: raise ValueError("note does not exist")
-        if row["visibility"] == "private" and not include_private: raise PermissionError("private note")
+        if row is None: raise NotFoundError("note does not exist", details={"note_id": note_id})
+        if row["visibility"] == "private" and not include_private: raise PermissionDeniedError("private note", details={"note_id": note_id})
         return Note(row["title"],row["content"],row["owner"],row["visibility"],row["kind"],json.loads(row["metadata"]),row["id"],row["resource_id"],row["revision"],row["created_at"],row["updated_at"])
 
     def list_notes(self, owner=None, visibility=None, include_private=True, limit=None, offset=0):
@@ -1030,9 +1186,9 @@ class AIDB:
         where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
         sql="SELECT id FROM notes"+where+" ORDER BY updated_at DESC, id ASC"
         if limit is not None:
-            if not isinstance(limit, int) or limit < 1: raise ValueError("limit must be a positive integer")
+            if not isinstance(limit, int) or limit < 1: raise InvalidArgumentError("limit must be a positive integer")
             sql += " LIMIT ?"; params.append(limit)
-        if not isinstance(offset, int) or offset < 0: raise ValueError("offset must be a non-negative integer")
+        if not isinstance(offset, int) or offset < 0: raise InvalidArgumentError("offset must be a non-negative integer")
         if offset:
             if limit is None: sql += " LIMIT -1"
             sql += " OFFSET ?"; params.append(offset)
@@ -1040,7 +1196,7 @@ class AIDB:
 
     def publish_resource(self, resource_id):
         row=self.db.execute("SELECT revision,owner,visibility FROM home_resources WHERE id=?", (resource_id,)).fetchone()
-        if row is None: raise ValueError("resource does not exist")
+        if row is None: raise NotFoundError("resource does not exist", details={"resource_id": resource_id})
         if row["visibility"] == "public":
             return self.get_resource(resource_id)
         old_revision=row["revision"]
@@ -1155,18 +1311,18 @@ class AIDB:
         result = {}
         for key, value in pairs:
             if key in result:
-                raise ValueError("duplicate JSON object key: " + str(key))
+                raise InvalidArgumentError("duplicate JSON object key: " + str(key))
             result[key] = value
         return result
 
     @staticmethod
     def _reject_json_constant(value):
-        raise ValueError("non-standard JSON numeric constant: " + value)
+        raise InvalidArgumentError("non-standard JSON numeric constant: " + value)
 
     def import_home_json(self, content: str | bytes):
         """Import a JSON wire payload while rejecting duplicate keys and NaN/Infinity."""
         if not isinstance(content, (str, bytes)):
-            raise ValueError("home JSON content must be text or bytes")
+            raise InvalidArgumentError("home JSON content must be text or bytes")
         try:
             payload = json.loads(
                 content,
@@ -1174,33 +1330,33 @@ class AIDB:
                 parse_constant=self._reject_json_constant,
             )
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise ValueError("invalid home JSON") from exc
+            raise InvalidArgumentError("invalid home JSON") from exc
         return self.import_home(payload)
 
     def import_home(self, payload):
         if not isinstance(payload, dict) or payload.get("format") != "aidb-home-v1":
-            raise ValueError("unsupported home format")
+            raise UnsupportedVersionError("unsupported home format", details={"format": payload.get("format") if isinstance(payload, dict) else None})
 
         allowed_top_level = {"format", "tables", "verification", "required_extensions"}
         if set(payload) - allowed_top_level:
-            raise ValueError("unknown home import field")
+            raise InvalidArgumentError("unknown home import field")
         required_extensions = payload.get("required_extensions", [])
         if (
             not isinstance(required_extensions, list)
             or any(not isinstance(item, str) for item in required_extensions)
         ):
-            raise ValueError("invalid required_extensions")
+            raise InvalidArgumentError("invalid required_extensions")
         if required_extensions:
-            raise ValueError(
+            raise InvalidArgumentError(
                 "unsupported required home extension: " + ", ".join(required_extensions)
             )
         verification = payload.get("verification")
         if verification is not None and not isinstance(verification, dict):
-            raise ValueError("invalid home verification metadata")
+            raise InvalidArgumentError("invalid home verification metadata")
 
         tables = payload.get("tables", {})
         if not isinstance(tables, dict):
-            raise ValueError("invalid home tables")
+            raise InvalidArgumentError("invalid home tables")
 
         columns_by_table = {
             "node_identity": {
@@ -1240,31 +1396,31 @@ class AIDB:
         }
         unknown_tables = set(tables) - set(columns_by_table)
         if unknown_tables:
-            raise ValueError("unknown home import table")
+            raise InvalidArgumentError("unknown home import table")
 
         # Validate the entire payload before touching durable state.
         validated_rows = {}
         for table, allowed_columns in columns_by_table.items():
             rows = tables.get(table, [])
             if not isinstance(rows, list):
-                raise ValueError(f"invalid rows for table: {table}")
+                raise InvalidArgumentError(f"invalid rows for table: {table}")
             validated_rows[table] = []
             for row in rows:
                 if not isinstance(row, dict) or not row:
-                    raise ValueError(f"invalid home import row for table: {table}")
+                    raise InvalidArgumentError(f"invalid home import row for table: {table}")
                 columns = list(row)
                 if any(column not in allowed_columns for column in columns):
-                    raise ValueError(f"invalid column in home import row for table: {table}")
+                    raise InvalidArgumentError(f"invalid column in home import row for table: {table}")
                 if any(
                     not isinstance(value, (str, int, float, bytes, bool, type(None)))
                     for value in row.values()
                 ):
-                    raise ValueError(f"invalid value in home import row for table: {table}")
+                    raise InvalidArgumentError(f"invalid value in home import row for table: {table}")
                 if any(
                     isinstance(value, float) and not math.isfinite(value)
                     for value in row.values()
                 ):
-                    raise ValueError(f"non-finite number in home import row for table: {table}")
+                    raise InvalidArgumentError(f"non-finite number in home import row for table: {table}")
 
                 string_fields = {
                     "node_identity": ("node_id",),
@@ -1278,7 +1434,7 @@ class AIDB:
                 }.get(table, ())
                 for field in string_fields:
                     if field in row and row[field] is not None and not isinstance(row[field], str):
-                        raise ValueError(f"invalid {field} in home import row for table: {table}")
+                        raise InvalidArgumentError(f"invalid {field} in home import row for table: {table}")
                 nonempty_fields = {
                     "node_identity": ("node_id",),
                     "node_specifications": ("specification_id", "node_id"),
@@ -1293,7 +1449,7 @@ class AIDB:
                     if field in row and (
                         not isinstance(row[field], str) or not row[field].strip()
                     ):
-                        raise ValueError(f"invalid {field} in home import row for table: {table}")
+                        raise InvalidArgumentError(f"invalid {field} in home import row for table: {table}")
                 integer_fields = {
                     "node_identity": ("id",),
                     "node_specifications": ("version",),
@@ -1302,26 +1458,62 @@ class AIDB:
                     "resource_relations": ("id",),
                     "home_changes": ("id", "previous_revision", "new_revision"),
                     "home_snapshots": ("id",),
-                    "artifacts": ("id", "size_bytes"),
+                    "artifacts": ("id", "size_bytes", "parent_artifact_id"),
                     "artifact_blobs": ("artifact_id",),
                 }.get(table, ())
                 for field in integer_fields:
                     if field in row and row[field] is not None and (
                         isinstance(row[field], bool) or not isinstance(row[field], int)
                     ):
-                        raise ValueError(f"invalid integer {field} in home import row for table: {table}")
+                        raise InvalidArgumentError(f"invalid integer {field} in home import row for table: {table}")
                 if table == "home_resources" and "id" in row and not isinstance(row["id"], str):
-                    raise ValueError("resource IDs must be non-empty strings")
+                    raise InvalidArgumentError("resource IDs must be non-empty strings")
                 if table == "notes" and "id" in row and not isinstance(row["id"], str):
-                    raise ValueError("note IDs must be non-empty strings")
+                    raise InvalidArgumentError("note IDs must be non-empty strings")
                 if table == "home_changes" and row.get("resource_id") is not None and (
                     not isinstance(row["resource_id"], str) or not row["resource_id"].strip()
                 ):
-                    raise ValueError("change resource_id must be a non-empty string or null")
+                    raise InvalidArgumentError("change resource_id must be a non-empty string or null")
                 if table in {"home_resources", "notes", "node_identity", "node_specifications"}:
                     visibility = row.get("visibility")
                     if visibility is not None and visibility not in {"public", "private"}:
-                        raise ValueError(f"invalid visibility in home import row for table: {table}")
+                        raise InvalidArgumentError(f"invalid visibility in home import row for table: {table}")
+                if table == "artifacts":
+                    algorithm = row.get("checksum_algorithm", "sha-256")
+                    digest = row.get("checksum")
+                    size_bytes = row.get("size_bytes", 0)
+                    status = row.get("status", "raw")
+                    if isinstance(size_bytes, bool) or not isinstance(size_bytes, int) or size_bytes < 0:
+                        raise InvalidArgumentError("artifact size_bytes must be a non-negative integer")
+                    if not isinstance(algorithm, str) or algorithm not in {"sha-256", "sha1", "md5"}:
+                        raise InvalidArgumentError("unsupported artifact checksum algorithm")
+                    try:
+                        digest_size = hashlib.new(algorithm).digest_size * 2
+                    except (TypeError, ValueError) as exc:
+                        raise InvalidArgumentError("unsupported artifact checksum algorithm") from exc
+                    if not isinstance(digest, str) or not re.fullmatch(
+                        rf"[0-9a-fA-F]{{{digest_size}}}", digest
+                    ):
+                        raise InvalidArgumentError("invalid artifact checksum")
+                    if status not in {"raw", "derived", "processed"}:
+                        raise InvalidArgumentError("invalid artifact status")
+                    for field in ("provenance", "metadata"):
+                        raw_value = row.get(field, "{}")
+                        try:
+                            parsed_value = json.loads(raw_value) if isinstance(raw_value, str) else None
+                        except (TypeError, json.JSONDecodeError) as exc:
+                            raise InvalidArgumentError(f"invalid artifact {field} JSON") from exc
+                        if not isinstance(parsed_value, dict):
+                            raise InvalidArgumentError(f"artifact {field} must encode a JSON object")
+                    history = row.get("transformation_history", "[]")
+                    try:
+                        parsed_history = json.loads(history) if isinstance(history, str) else None
+                    except (TypeError, json.JSONDecodeError) as exc:
+                        raise InvalidArgumentError("invalid artifact transformation_history JSON") from exc
+                    if not isinstance(parsed_history, list) or any(
+                        not isinstance(step, str) for step in parsed_history
+                    ):
+                        raise InvalidArgumentError("artifact transformation_history must be a JSON string array")
                 if table == "home_snapshots":
                     content = row.get("content")
                     digest = row.get("content_hash")
@@ -1333,10 +1525,45 @@ class AIDB:
                         or hashlib.sha256(content.encode("utf-8")).hexdigest() != digest
                         or row.get("snapshot_id") != "snap:" + digest
                     ):
-                        raise ValueError("snapshot integrity check failed during import")
+                        raise IntegrityFailureError("snapshot integrity check failed during import", details={"snapshot_id": row.get("snapshot_id")})
                 if table == "artifact_blobs":
                     row = self._decode_artifact_blob_row(row)
                 validated_rows[table].append(row)
+
+        imported_artifacts = {
+            row.get("id"): row for row in validated_rows["artifacts"]
+            if row.get("id") is not None
+        }
+        for blob in validated_rows["artifact_blobs"]:
+            artifact = imported_artifacts.get(blob["artifact_id"])
+            if artifact is None:
+                existing_artifact = self.db.execute(
+                    "SELECT size_bytes, checksum, checksum_algorithm FROM artifacts WHERE id=?",
+                    (blob["artifact_id"],),
+                ).fetchone()
+                if existing_artifact is None:
+                    raise IntegrityFailureError(
+                        "imported artifact blob has no matching artifact: "
+                        + str(blob["artifact_id"]),
+                        details={"artifact_id": blob["artifact_id"]},
+                    )
+                artifact = dict(existing_artifact)
+            content = blob["content"]
+            algorithm = artifact.get("checksum_algorithm", "sha-256")
+            if len(content) != artifact.get("size_bytes", 0):
+                raise IntegrityFailureError(
+                    "artifact blob size does not match artifact metadata",
+                    details={"artifact_id": blob["artifact_id"]},
+                )
+            try:
+                digest = self._checksum_bytes(content, algorithm)
+            except ValueError as exc:
+                raise InvalidArgumentError("unsupported artifact checksum algorithm") from exc
+            if digest != artifact.get("checksum"):
+                raise IntegrityFailureError(
+                    "artifact blob checksum verification failed: digest does not match artifact metadata",
+                    details={"artifact_id": blob["artifact_id"]},
+                )
 
         # Change rows have no schema-level FK, so validate their targets
         # against both incoming resources and resources already in this home.
@@ -1351,7 +1578,7 @@ class AIDB:
         for row in validated_rows["home_changes"]:
             resource_id = row.get("resource_id")
             if resource_id is not None and resource_id not in valid_resource_ids:
-                raise ValueError("home change references a missing resource")
+                raise IntegrityFailureError("home change references a missing resource", details={"resource_id": resource_id})
 
         # A savepoint makes restore atomic and also works when the caller already
         # has an outer transaction. Existing rows are preserved for idempotency.
@@ -1361,17 +1588,18 @@ class AIDB:
                 for row in rows:
                     columns = list(row)
                     placeholders = ",".join("?" for _ in columns)
-                    cursor = self.db.execute(
-                        "INSERT OR IGNORE INTO " + table + " ("
-                        + ",".join(columns) + ") VALUES (" + placeholders + ")",
-                        [row[column] for column in columns],
-                    )
-                    if cursor.rowcount == 0:
-                        primary_keys = [
-                            info["name"] for info in self.db.execute(
-                                "PRAGMA table_info(" + table + ")"
-                            ).fetchall() if info["pk"]
-                        ]
+                    primary_keys = [
+                        info["name"] for info in self.db.execute(
+                            "PRAGMA table_info(" + table + ")"
+                        ).fetchall() if info["pk"]
+                    ]
+                    try:
+                        self.db.execute(
+                            "INSERT INTO " + table + " ("
+                            + ",".join(columns) + ") VALUES (" + placeholders + ")",
+                            [row[column] for column in columns],
+                        )
+                    except sqlite3.IntegrityError as exc:
                         existing = None
                         if primary_keys and all(key in row for key in primary_keys):
                             where = " AND ".join(key + " = ?" for key in primary_keys)
@@ -1379,15 +1607,26 @@ class AIDB:
                                 "SELECT * FROM " + table + " WHERE " + where,
                                 [row[key] for key in primary_keys],
                             ).fetchone()
-                        if existing is None or any(existing[key] != value for key, value in row.items()):
-                            raise ValueError(
-                                "conflicting existing row while importing table: " + table
-                            )
+                        if existing is not None:
+                            if any(existing[key] != value for key, value in row.items()):
+                                raise RevisionConflictError(
+                                    "conflicting existing row while importing table: " + table,
+                                    details={"table": table},
+                                ) from exc
+                            # Identical primary-key rows are idempotent.
+                            continue
+                        # Do not turn NOT NULL / UNIQUE / FK failures into a
+                        # successful import that silently drops the row.
+                        raise StorageIntegrityError(
+                            f"{exc} (home import table: {table})",
+                            details={"table": table},
+                        ) from exc
             for row in validated_rows["artifact_blobs"]:
                 if self.get_artifact_bytes(row["artifact_id"]) is None:
-                    raise ValueError(
+                    raise IntegrityFailureError(
                         "imported artifact blob has no matching artifact: "
-                        + str(row["artifact_id"])
+                        + str(row["artifact_id"]),
+                        details={"artifact_id": row["artifact_id"]},
                     )
             self.db.execute("RELEASE SAVEPOINT aidb_import_home")
         except Exception:
@@ -1399,10 +1638,10 @@ class AIDB:
 
     def relate_resources(self, source_resource_id, target_resource_id, relation, metadata=None):
         if source_resource_id == target_resource_id:
-            raise ValueError("a resource cannot relate to itself")
+            raise InvalidArgumentError("a resource cannot relate to itself")
         for rid in (source_resource_id, target_resource_id):
             if self.db.execute("SELECT 1 FROM home_resources WHERE id=?", (rid,)).fetchone() is None:
-                raise ValueError("resource does not exist: " + rid)
+                raise NotFoundError("resource does not exist: " + rid, details={"resource_id": rid})
         self.db.execute("INSERT OR IGNORE INTO resource_relations(source_resource_id,target_resource_id,relation,metadata) VALUES(?,?,?,?)", (source_resource_id,target_resource_id,relation,self._json(metadata or {})))
         self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,payload) VALUES(?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),source_resource_id,"relate",None,self._json({"target_resource_id":target_resource_id,"relation":relation})))
         self.db.commit()
@@ -1416,11 +1655,11 @@ class AIDB:
             "SELECT * FROM home_resources WHERE id=?", (resource_id,)
         ).fetchone()
         if row is None:
-            raise ValueError("resource does not exist")
+            raise NotFoundError("resource does not exist", details={"resource_id": resource_id})
         if owner is not None and row["owner"] != owner:
-            raise PermissionError("owner mismatch")
+            raise PermissionDeniedError("owner mismatch", details={"resource_id": resource_id})
         if expected_revision is not None and row["revision"] != expected_revision:
-            raise ValueError("revision conflict")
+            raise RevisionConflictError("revision conflict", details={"resource_id": resource_id, "expected_revision": expected_revision, "actual_revision": row["revision"]})
 
         old_revision = row["revision"]
         new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
@@ -1437,7 +1676,7 @@ class AIDB:
             if note is not None:
                 if isinstance(new_content, dict):
                     if not {"title", "content"}.issubset(new_content):
-                        raise ValueError("note resource content must include title and content")
+                        raise InvalidArgumentError("note resource content must include title and content")
                     note_title = new_content["title"]
                     note_content = new_content["content"]
                     note_kind = new_content.get("kind", note["kind"])
@@ -1472,7 +1711,7 @@ class AIDB:
 
     def public_changes(self, after_id=0, limit=100):
         if limit < 1:
-            raise ValueError("limit must be positive")
+            raise InvalidArgumentError("limit must be positive")
         # Visibility is mutable: a resource may be private when its create
         # and update events are written, then published later. Filter history
         # by the first public transition, not merely current resource state.
@@ -1546,15 +1785,15 @@ class AIDB:
     def restore_snapshot(self, snapshot_id):
         row=self.db.execute("SELECT content,content_hash FROM home_snapshots WHERE snapshot_id=?", (snapshot_id,)).fetchone()
         if row is None:
-            raise ValueError("snapshot does not exist")
+            raise NotFoundError("snapshot does not exist", details={"snapshot_id": snapshot_id})
         digest=hashlib.sha256(row["content"].encode("utf-8")).hexdigest()
         if digest != row["content_hash"]:
-            raise ValueError("snapshot integrity check failed")
+            raise IntegrityFailureError("snapshot integrity check failed", details={"snapshot_id": snapshot_id})
         return self.import_home_json(row["content"])
 
     def list_changes(self, after_id=0, limit=100, resource_id=None):
         if limit < 1:
-            raise ValueError("limit must be positive")
+            raise InvalidArgumentError("limit must be positive")
         if resource_id is None:
             rows = self.db.execute("SELECT * FROM home_changes WHERE id>? ORDER BY id ASC LIMIT ?", (after_id, limit)).fetchall()
         else:
