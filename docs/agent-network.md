@@ -68,7 +68,7 @@ The separate distributed placement/transport architecture is proposed in [PR #61
 
 ## Specification and trust boundary
 
-The current runtime specification exposes a limited node description (logical node ID, capabilities, resource types, transports, extensions, constraints, and issue time). It does not yet implement the full proposed specification in [PR #61](https://github.com/usamaizm/AIDB/pull/61): there are no authenticated endpoint records, cryptographic node-key binding, contract negotiation, optional-extension negotiation, or superseding-spec history.
+The current runtime specification exposes a limited node description (specification ID and version, logical node ID, visibility, capabilities, resource types, transports, extensions, constraints, and issue time). It is statically published; it is not a capability-negotiation protocol. It does not yet implement the full proposed specification in [PR #61](https://github.com/usamaizm/AIDB/pull/61): there are no authenticated endpoint records, cryptographic node-key binding, contract negotiation, optional-extension negotiation, or superseding-spec history.
 
 In this PR, `agent_network` and `public_discovery` describe local resource-backed collaboration helpers and the existing inbound HTTP read surface. They do not mean peer discovery, remote node authentication, chunk retrieval, or replication. The profile's `agent_id` is a stable declaration, not a cryptographically verified identity; the runtime `node.id` is likewise not a public-key-bound identity.
 
