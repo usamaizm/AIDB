@@ -2,6 +2,8 @@
 
 **Fast bootstrap: read [.aidb/session-context.yml](.aidb/session-context.yml), then [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).** The YAML is the compact machine-readable map; the Markdown explains the reasoning and project state. Next follow this file and check live CI/PR state. Do not rely on chat history, old model memory, or design docs as proof that a feature is implemented.
 
+For a deliberately lightweight, evolving orientation, also consult [context.md](context.md) and [notes.md](notes.md). These are exploratory shared working surfaces, not a fixed roadmap or binding specifications; ideas in them remain provisional until explicitly accepted and supported by evidence.
+
 This file is a durable handoff for human and AI contributors working on AIDB.
 
 ## What currently works
