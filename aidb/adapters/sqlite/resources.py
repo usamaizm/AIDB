@@ -214,7 +214,7 @@ class SQLiteResourceRepository:
                     "INSERT INTO home_changes(change_id,resource_id,operation,actor,"
                     "previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)",
                     (
-                        "chg:" + str(__import__("uuid").uuid4()),
+                        "chg:" + str(uuid4()),
                         resource_id,
                         "update",
                         owner or row["owner"],
@@ -269,7 +269,7 @@ class SQLiteResourceRepository:
                     "INSERT INTO home_changes(change_id,resource_id,operation,actor,payload) "
                     "VALUES(?,?,?,?,?)",
                     (
-                        "chg:" + str(__import__("uuid").uuid4()),
+                        "chg:" + str(uuid4()),
                         source_resource_id,
                         "relate",
                         None,
