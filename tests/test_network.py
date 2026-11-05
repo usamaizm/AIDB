@@ -135,7 +135,7 @@ def test_knowledge_review_is_independent_and_linked_to_offer():
 def test_agent_profile_requires_stable_agent_id(agent_id):
     db = AIDB(":memory:")
     agent = db.register_agent("Muse")
-    with pytest.raises(ValueError, match="stable agent"):
+    with pytest.raises(ValueError, match="agent_id"):
         publish_agent_profile(db, agent, agent_id=agent_id)
 
 
