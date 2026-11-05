@@ -66,3 +66,7 @@ AIDB should preserve provenance and uncertainty, but the current Artifact -> Ext
 HTTP, A2A, MCP, local IPC, queues, and SDKs may expose AIDB. None is the database itself.
 
 The same operation must have the same semantic result regardless of transport.
+
+For any transport crossing a machine or trust boundary, the adapter must provide authenticated encryption and must not silently downgrade to plaintext. HTTPS is the initial request/response transport; mutual TLS may be used for peer authentication, but transport authentication is not a substitute for AIDB node identity or operation-level authorization.
+
+The distributed protocol direction, including node identity, content-addressed chunks, manifests, discovery, partial replication, and partition behavior, is specified provisionally in [Distributed Networking Architecture](distributed-networking.md). The existing Python HTTP adapter is inbound-only and must not be described as a peer replication implementation.
