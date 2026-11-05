@@ -1,35 +1,68 @@
+"""A runnable tour of the current AIDB API.
+
+    python examples/demo.py
+
+Uses a throwaway in-memory home and prints each step, so a new
+contributor can see the substrate work end to end: resources, notes,
+relations, publication, the public change feed, filtered export,
+artifacts, and snapshots. (The previous demo targeted a long-removed
+document/search API and could not run.)
+"""
+
 from __future__ import annotations
 
-import argparse
+import json
+import sys
+from pathlib import Path
 
-from .store import AIDB
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from aidb import AIDB
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="AIDB: local AI knowledge base")
-    parser.add_argument("--db", default="aidb.json", help="Path to the database JSON file")
-    parser.add_argument("--title", help="Document title")
-    parser.add_argument("--content", help="Document content")
-    parser.add_argument("--tags", nargs="*", default=[], help="Optional tags for the document")
-    parser.add_argument("--query", help="Search query to run")
-    args = parser.parse_args()
+    db = AIDB(":memory:")
 
-    store = AIDB(args.db)
+    print("== resources ==")
+    paper = db.create_resource(
+        "document", {"title": "Attention notes", "body": "draft"}, owner="demo"
+    )
+    dataset = db.create_resource(
+        "dataset", {"title": "Token counts", "rows": 1200}, owner="demo"
+    )
+    print(f"created {paper.id} and {dataset.id}")
 
-    if args.title and args.content:
-        store.add_document(args.title, args.content, tags=args.tags)
-        print(f"Added document: {args.title}")
+    note = db.create_note("Reading note", "The draft cites the dataset.", owner="demo")
+    print(f"note created: {note.id}")
 
-    if args.query:
-        results = store.search(args.query)
-        if not results:
-            print("No results found.")
-            return
-        for item in results:
-            print(f"[{item.score}] {item.title} - {item.content[:120]}")
+    db.relate_resources(paper.id, dataset.id, "cites", {"via": "demo"})
+    print(f"related {paper.id} -cites-> {dataset.id}")
 
-    if not args.title and not args.query:
-        print("AIDB is ready. Add documents or run a search query.")
+    print("\n== publication and the public feed ==")
+    db.publish_resource(paper.id)
+    for event in db.public_changes():
+        print(f"  change {event['operation']} on {event['resource_id']}")
+
+    print("\n== filtered public export ==")
+    public = db.export_home(include_private=False)
+    counts = {name: len(rows) for name, rows in public["tables"].items() if rows}
+    print(f"non-empty public tables: {counts}")
+    print(f"payload is JSON-safe: {bool(json.dumps(public))}")
+
+    print("\n== artifacts ==")
+    artifact = db.register_artifact_from_bytes(
+        name="counts.csv", data=b"token,count\na,3\n", media_type="text/csv"
+    )
+    print(f"artifact {artifact.id} checksum {artifact.checksum[:16]}…")
+    assert db.get_artifact_bytes(artifact.id) == b"token,count\na,3\n"
+    print("bytes round-trip verified")
+
+    print("\n== snapshot / restore ==")
+    snapshot = db.create_snapshot()
+    print(f"snapshot {snapshot['snapshot_id'][:21]}… recorded")
+    print(f"verify_home ok: {db.verify_home()['ok']}")
+
+    print("\ndemo complete")
 
 
 if __name__ == "__main__":
