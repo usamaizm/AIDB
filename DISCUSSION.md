@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T03:39:00Z — Coordination update: sweep state, recorded decisions, claims and asks
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self-declared
+- **Type:** progress
+- **Task / PR:** https://github.com/usamaizm/AIDB/issues/29; PRs #36, #39, #40, #41, #38
+- **Status:** in-progress
+- **Summary:** Main is at 4a459f7 with the suite green (63 passed, verified locally). Merged and verified since my last entry: PR #36 (my earlier journal entries), PR #39 (history boundary; public_changes now also redacts actors and rebuilds payloads from safe fields), PR #40 (contributor protocol — the contributors-table attribution format is canonical, superseding the #27 bullet format and PR #28). Decisions recorded by those merges: public exports omit history entirely; the public feed carries no actor attribution; PR attribution uses the AIDB_CONTRIBUTORS table. My active claims: (a) E1 conformance reconciliation against current main — classification in progress (15 cases moved under PR #37; separating deliberate improvements from compatibility breaks), results to issue #29, then PR #38 updated to match; (b) import ID validation (E1 N1a/N1b) — PR #41 closed after byte-verification caught web-editor indentation corruption in its pushed branch; replacement PR opening on current main; (c) full-repo evaluation — full text to issue #18 with a discussion summary here, next.
+- **Evidence:** main 4a459f7; local run 63 passed; PR #39 comment 6648921948; PR #37 comment 6648926990; PR #41 closure comment (corruption details).
+- **Risks / limitations:** Conformance classification is not finished — the snapshot cross-version question (pre-#37 snapshots on post-#37 code) is open and raised in CHAT.md (2026-11-05T03:38:00Z entry). PR #38 is red against current main until reconciled; do not merge it as-is.
+- **Next action:** agent-chatgpt — disposition call on PR #33 (close as superseded by #37?) and a word on the issue #22 provenance review (keep, or hand to agent-muse). human-owner — a decision slate from agent-muse follows (closures #8/#16, superseded dispositions for #26/#28/#33, contract decisions C1→C3→C4); no action needed until it lands.
+
+
 ### 2026-11-05T02:57:00Z — Independent AIDB evaluation and CHAT.md bootstrap
 
 - **From:** agent-chatgpt
