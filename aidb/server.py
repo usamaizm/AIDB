@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ipaddress
 import json
 import secrets
+import ssl
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -31,8 +33,13 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
                 raise ValueError("invalid Content-Length")
             if length > max_body_bytes:
                 raise OverflowError("request body too large")
+            if self.headers.get("Transfer-Encoding"):
+                raise ValueError("Transfer-Encoding is not supported")
             raw = self.rfile.read(length) if length else b"{}"
-            return json.loads(raw)
+            payload = json.loads(raw)
+            if not isinstance(payload, dict):
+                raise ValueError("request body must be a JSON object")
+            return payload
 
         def do_GET(self):
             # SQLite connections are shared by the threaded HTTP handler.
@@ -129,18 +136,73 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
     return Handler
 
 
+def _is_loopback_host(host: str) -> bool:
+    if host.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        return False
+
+
+def validate_bind_security(
+    host: str,
+    auth_token: str | None,
+    tls_certfile: str | None,
+    tls_keyfile: str | None,
+) -> None:
+    if bool(tls_certfile) != bool(tls_keyfile):
+        raise ValueError("TLS certificate and key must be configured together")
+    if _is_loopback_host(host):
+        return
+    if not auth_token:
+        raise ValueError("non-loopback binds require an authorization token")
+    if len(auth_token) < 32:
+        raise ValueError("non-loopback authorization tokens must be at least 32 characters")
+    if not tls_certfile or not tls_keyfile:
+        raise ValueError("non-loopback binds require TLS certificate and key")
+
+
+def create_server(
+    db: AIDB,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    auth_token: str | None = None,
+    tls_certfile: str | None = None,
+    tls_keyfile: str | None = None,
+) -> ThreadingHTTPServer:
+    validate_bind_security(host, auth_token, tls_certfile, tls_keyfile)
+    server = ThreadingHTTPServer((host, port), create_handler(db, auth_token))
+    if tls_certfile and tls_keyfile:
+        try:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
+            context.load_cert_chain(tls_certfile, tls_keyfile)
+            server.socket = context.wrap_socket(server.socket, server_side=True)
+        except Exception:
+            server.server_close()
+            raise
+    return server
+
+
 def serve(
     db_path: str = "aidb.sqlite3",
     host: str = "127.0.0.1",
     port: int = 8765,
     auth_token: str | None = None,
     visibility: str = "private",
+    tls_certfile: str | None = None,
+    tls_keyfile: str | None = None,
 ) -> None:
     db = AIDB(db_path)
-    db.initialize_home(visibility=visibility)
-    server = ThreadingHTTPServer((host, port), create_handler(db, auth_token))
+    server = None
     try:
+        db.initialize_home(visibility=visibility)
+        server = create_server(db, host, port, auth_token, tls_certfile, tls_keyfile)
+        scheme = "https" if tls_certfile else "http"
+        print(f"AIDB listening at {scheme}://{host}:{server.server_port}")
         server.serve_forever()
     finally:
-        server.server_close()
+        if server is not None:
+            server.server_close()
         db.close()
