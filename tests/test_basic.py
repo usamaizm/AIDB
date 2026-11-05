@@ -322,3 +322,64 @@ def test_resource_and_note_apis_reject_non_json_and_malformed_metadata() -> None
     assert db.list_resources() == []
     assert db.list_notes() == []
     db.close()
+
+
+
+def test_create_resource_rolls_back_if_change_event_fails() -> None:
+    db = AIDB(":memory:")
+    before_resources = db.db.execute("SELECT COUNT(*) FROM home_resources").fetchone()[0]
+    before_changes = db.db.execute("SELECT COUNT(*) FROM home_changes").fetchone()[0]
+
+    def fail_event(*_args, **_kwargs):
+        raise RuntimeError("simulated event failure")
+
+    db._append_workflow_event = fail_event
+    with pytest.raises(RuntimeError, match="simulated event failure"):
+        db.create_resource("item", {"value": 1})
+
+    assert db.db.execute("SELECT COUNT(*) FROM home_resources").fetchone()[0] == before_resources
+    assert db.db.execute("SELECT COUNT(*) FROM home_changes").fetchone()[0] == before_changes
+    db.close()
+
+
+def test_publish_resource_rolls_back_if_change_event_fails() -> None:
+    db = AIDB(":memory:")
+    resource = db.create_resource("item", {"value": 1}, visibility="private")
+
+    def fail_event(*_args, **_kwargs):
+        raise RuntimeError("simulated event failure")
+
+    db._append_workflow_event = fail_event
+    with pytest.raises(RuntimeError, match="simulated event failure"):
+        db.publish_resource(resource.id)
+
+    assert db.get_resource(resource.id).visibility == "private"
+    assert db.db.execute(
+        "SELECT COUNT(*) FROM home_changes WHERE operation='publish'"
+    ).fetchone()[0] == 0
+    db.close()
+
+
+def test_relate_resources_rolls_back_if_change_serialization_fails() -> None:
+    db = AIDB(":memory:")
+    source = db.create_resource("item", {"name": "source"})
+    target = db.create_resource("item", {"name": "target"})
+    original_json = db._json
+    calls = 0
+
+    def fail_second_json(value):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("simulated serialization failure")
+        return original_json(value)
+
+    db._json = fail_second_json
+    with pytest.raises(RuntimeError, match="simulated serialization failure"):
+        db.relate_resources(source.id, target.id, "references")
+
+    assert db.resource_relations(source.id) == []
+    assert db.db.execute(
+        "SELECT COUNT(*) FROM home_changes WHERE operation='relate'"
+    ).fetchone()[0] == 0
+    db.close()
