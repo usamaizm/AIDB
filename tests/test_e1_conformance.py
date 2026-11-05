@@ -592,20 +592,12 @@ def test_f8_tier_ii_private_at_creation_history(tmp_path):
 
 
 # ---------------------------------------------------------- N1
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 N1a: an integer resource ID is silently coerced by SQLite TEXT "
-    f"affinity to '123' instead of being rejected ({RESULTS_REF})"))
 def test_n1a_integer_id_rejected(tmp_path):
     db = make_db(tmp_path, "n1a")
     with pytest.raises(ValueError):
         db.import_home(wire(load_fixture("n1a.json")))
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 N1b: a NULL resource ID is silently imported, persisted, and "
-    "re-exported as id: null -- SQLite permits NULLs in a TEXT PRIMARY "
-    "KEY column and the import value-type check admits None "
-    f"({RESULTS_REF})"))
 def test_n1b_null_id_rejected(tmp_path):
     db = make_db(tmp_path, "n1b")
     with pytest.raises(Exception):
@@ -627,26 +619,13 @@ def test_n2a_relation_to_nonexistent_resource_rejected(tmp_path):
     assert_nothing_imported(db)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 N2b: a change event referencing a nonexistent resource imports "
-    "silently (home_changes.resource_id has no foreign key); the "
-    f"dangling reference surfaces only in verify output ({RESULTS_REF})"))
 def test_n2b_change_for_nonexistent_resource_rejected(tmp_path):
+    # PR #42 closes E1 N2b by validating change.resource_id against
+    # incoming and already-stored resources before any writes.
     db = make_db(tmp_path, "n2b")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="home change references a missing resource"):
         db.import_home(wire(load_fixture("n2b.json")))
-
-
-def test_n2b_observed_fallback_surfaces_in_verification(tmp_path):
-    # Companion pin for the N2b xfail above: until import rejects the
-    # dangling reference, the next export's verification block is the
-    # only surface that flags it (observed behaviour, E1 results).
-    db = make_db(tmp_path, "n2b_obs")
-    db.import_home(wire(load_fixture("n2b.json")))
-    verification = db.export_home()["verification"]
-    assert verification["ok"] is False
-    assert any(i.startswith("missing resource:")
-               for i in verification["issues"])
+    assert_nothing_imported(db)
 
 
 # ---------------------------------------------------------- N3
@@ -657,11 +636,9 @@ def test_n3a_unknown_format_version_rejected(tmp_path):
     assert_nothing_imported(db)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 N3b: a declared required_extensions entry is silently "
-    "accepted and ignored -- no required-extension mechanism exists "
-    f"({RESULTS_REF})"))
 def test_n3b_required_extensions_honored_or_rejected(tmp_path):
+    # PR #42 closes this by explicitly rejecting unsupported required
+    # extensions rather than silently accepting them.
     db = make_db(tmp_path, "n3b")
     try:
         db.import_home(wire(load_fixture("n3b.json")))
@@ -674,11 +651,8 @@ def test_n3b_required_extensions_honored_or_rejected(tmp_path):
 
 
 # ---------------------------------------------------------- N4
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 N4a import path: a snapshot row whose content no longer "
-    "matches its recorded content_hash is accepted silently -- "
-    f"import_home never recomputes the hash ({RESULTS_REF})"))
 def test_n4a_tampered_snapshot_rejected_at_import(tmp_path):
+    # PR #42 validates snapshot format, content hash, and content-addressed ID.
     db = make_db(tmp_path, "n4a_imp")
     with pytest.raises(ValueError):
         db.import_home(wire(load_fixture("n4a.json")))
@@ -735,23 +709,18 @@ def test_n5a_duplicate_keys_v1_then_v2_rejected(tmp_path):
         db.import_home(parsed)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 N5a: duplicate JSON keys are accepted by the default parser "
-    "(last value wins); with v2 first, the payload sails through "
-    f"import as aidb-home-v1 with no duplicate ever reported ({RESULTS_REF})"))
 def test_n5a_duplicate_keys_v2_then_v1_rejected(tmp_path):
-    parsed = json.loads(load_fixture_text("n5a_v2_then_v1.txt"))
-    assert parsed["format"] == "aidb-home-v1"
+    # Exercise the raw JSON boundary; parsing first with json.loads
+    # would discard evidence of duplicate keys before AIDB sees it.
+    raw = load_fixture_text("n5a_v2_then_v1.txt")
     db = make_db(tmp_path, "n5a_b")
-    with pytest.raises(ValueError):
-        db.import_home(parsed)
+    with pytest.raises(ValueError, match="duplicate JSON object key"):
+        db.import_home_json(raw)
+    assert_nothing_imported(db)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 N5b: a raw NaN in the payload is accepted by the default "
-    "parser, passes the import value-type check as a float, and is "
-    f"silently laundered to NULL by the sqlite3 binding ({RESULTS_REF})"))
 def test_n5b_nan_value_rejected(tmp_path):
+    # PR #42 rejects non-finite numeric values even after parsing.
     parsed = json.loads(load_fixture_text("n5b_nan.txt"))
     db = make_db(tmp_path, "n5b")
     with pytest.raises(ValueError):
