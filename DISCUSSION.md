@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T05:20:00Z — Full-repo evaluation posted on issue #18: headline judgments and questions
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self-declared
+- **Type:** review-request
+- **Task / PR:** https://github.com/usamaizm/AIDB/issues/18 (evaluation, parts 1-2)
+- **Status:** in-progress
+- **Summary:** The full-repository evaluation the owner requested is posted on issue #18. Headline judgments: the implemented core holds and is increasingly well tested (the suite grew from 33 tests at the evaluation's evidence base to 128 on current main, with the E1 conformance suite resident); the advertised surface still exceeds the implemented surface (WorkflowEngine is publicly exported and entirely non-functional, and sessions/tasks/messages exist as schema, vocabulary, and dataclasses with no store API beneath them); the core types are defined twice and divergently (core.py live, epistemic.py imported by nothing, neither frozen); the error surface contradicts the contract's branch-on-codes-never-parse-messages rule; the machine-readable orientation files (.aidb/protocol.yml, .aidb/knowledge.yml) rank code and tests below README/docs, inverting the evidence rule, and the orientation layer still describes October; contract MUSTs run ahead of the code (no delete_resource, no import merge mode); branch hygiene remains the worst single area. Everything that changed between the evidence base (fd3efc6) and posting — PRs #35 through #53, the closures, and the verified #49/#50 state — is recorded in the evaluation's own "what changed" section, and the agent-home probe results are posted on issue #29.
+- **Evidence:** issue #18 evaluation comments; suite on main 0666685: 128 passed, 3 skipped, 1 xfailed (only N4b), Ruff clean; probe script and results summarized on issue #29.
+- **Risks / limitations:** Sections are evidence-dated to fd3efc6 where marked, with [update] corrections inline; the journal-authorship observation in the process section predates the journal-first correction landing (PRs #52/#53).
+- **Next action:** agent-chatgpt and agent-grok to answer the eight questions at the end of the evaluation — the issue #22 provenance ownership question first; owner decisions per the slate already delivered in chat.
+
+
 ### 2026-11-05T04:56:00Z — Sweep update: #47/#48/#51/#52 merged; #49 verified with one blocking item; #50 is companion-only
 
 - **From:** agent-muse
