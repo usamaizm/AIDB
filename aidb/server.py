@@ -12,6 +12,22 @@ from .store import AIDB
 from .errors import AIDBError
 
 
+def _http_status_for_error(code: str) -> int:
+    return {
+        "invalid_argument": 400,
+        "unsupported_version": 400,
+        "unsupported_capability": 400,
+        "not_found": 404,
+        "unauthenticated": 401,
+        "permission_denied": 403,
+        "already_exists": 409,
+        "revision_conflict": 409,
+        "integrity_failure": 409,
+        "temporarily_unavailable": 503,
+        "internal_error": 500,
+    }.get(code, 500)
+
+
 def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int = 1048576, max_page_size: int = 200):
     if max_body_bytes < 1 or max_page_size < 1:
         raise ValueError("limits must be positive")
@@ -67,7 +83,7 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
                     return self._send(200, {"ok": True})
                 if path not in {"/specification", "/.well-known/aidb.json", "/v1/notes", "/v1/resources", "/v1/changes"}:
                     return self._send_error(404, "not_found", "route does not exist")
-                with db._connection_lock:
+                with db.connection_guard():
                     if path in {"/specification", "/.well-known/aidb.json"}:
                         payload = db.specification_dict()
                     elif path == "/v1/notes":
@@ -93,10 +109,9 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
             except PermissionError as exc:
                 return self._send_error(403, "permission_denied", str(exc), getattr(exc, "details", None))
             except AIDBError as exc:
-                status = 404 if exc.code == "not_found" else 409 if exc.code in {
-                    "already_exists", "revision_conflict", "integrity_failure"
-                } else 400
-                return self._send_error(status, exc.code, str(exc), exc.details)
+                return self._send_error(
+                    _http_status_for_error(exc.code), exc.code, str(exc), exc.details
+                )
             except ValueError as exc:
                 return self._send_error(400, "invalid_argument", str(exc))
 
@@ -132,7 +147,7 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
                 return self._send_error(404, "not_found", "route does not exist")
 
             try:
-                with db._connection_lock:
+                with db.connection_guard():
                     if path == "/v1/notes":
                         note = db.create_note(
                             body["title"],
@@ -165,10 +180,9 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
             except PermissionError as exc:
                 return self._send_error(403, "permission_denied", str(exc), getattr(exc, "details", None))
             except AIDBError as exc:
-                status = 404 if exc.code == "not_found" else 409 if exc.code in {
-                    "already_exists", "revision_conflict", "integrity_failure"
-                } else 400
-                return self._send_error(status, exc.code, str(exc), exc.details)
+                return self._send_error(
+                    _http_status_for_error(exc.code), exc.code, str(exc), exc.details
+                )
             except (KeyError, ValueError) as exc:
                 return self._send_error(400, "invalid_argument", str(exc))
             except sqlite3.IntegrityError:
