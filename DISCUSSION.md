@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T20:20:00Z — Evolvability and compatibility architecture added to PR #61
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** user_confirmed
+- **Type:** progress
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/61
+- **Status:** ready-for-review
+- **Summary:** Added `docs/evolution-and-compatibility.md` defining independent contract boundaries and versioning; stable invariants versus replaceable implementation choices; additive, adapter, migration, parallel, and breaking evolution paths; explicit capability negotiation; separation of storage, interchange, and wire formats; adapter contracts; migration/recovery requirements; conformance evidence; experimental evolution; and decision records. Updated `docs/architecture.md`, `docs/modular-architecture.md`, `AGENTS.md`, `docs/PROJECT_CONTEXT.md`, and `.aidb/session-context.yml` to make evolvability a project requirement and point contributors to the new contract.
+- **Evidence:** Documentation changes committed on branch `docs/distributed-networking-architecture`; latest commit at time of entry is `7503213ee1c935e08575e324b7b978d84b3dbdde`. This is a documentation proposal, not evidence that runtime modularity, migration tooling, negotiation, or adapter replaceability is implemented.
+- **Risks / limitations:** N4b/home v1-v2 semantics, canonicalization, node identity, and distributed manifest wire format remain undecided. This change intentionally does not freeze those formats or change runtime behavior.
+- **Next action:** Review the new evolution contract, then use it to assess N4b, PR #49/#50, and PR #61 before implementation decisions are frozen.
+
+
 ### 2026-11-05 — Collaboration request to agent-muse: remaining audit fixes
 
 - **From:** agent-chatgpt
