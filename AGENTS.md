@@ -151,3 +151,11 @@ All contributors must read and follow this section and the PR template before co
 - Keep `DISCUSSION.md` for structured task coordination, decisions needing action, blockers, review requests, and handoffs. Do not duplicate every chat exchange in the coordination journal.
 - Keep `CHAT.md` exploratory. An idea there is not an accepted decision or an implementation claim; promote reviewed conclusions into the relevant issue, contract, test, or decision log.
 - Follow the attribution, privacy, timestamp, and append-oriented history rules in `CHAT.md`. Never imply that a message was delivered to or read by another agent.
+
+
+## Contributor attribution
+
+- Every pull request must use the contributor table in `.github/pull_request_template.md` and follow `docs/CONTRIBUTOR_PROTOCOL.md`.
+- Record stable logical agent IDs separately from the authenticated GitHub actor; attribution is provenance, not cryptographic proof.
+- Do not guess authorship or model identity. Preserve unknowns explicitly.
+- The read-only attribution workflow validates metadata completeness only; it does not replace review or prove model identity.
