@@ -325,6 +325,27 @@ class AIDB:
         )
         self.db.commit()
 
+    @contextmanager
+    def _atomic(self, operation: str) -> Iterator[None]:
+        """Run a compound mutation atomically, including inside an outer transaction."""
+        savepoint = "aidb_" + operation
+        self.db.execute(f"SAVEPOINT {savepoint}")
+        try:
+            yield
+        except sqlite3.IntegrityError as exc:
+            self.db.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+            self.db.execute(f"RELEASE SAVEPOINT {savepoint}")
+            raise StorageIntegrityError(
+                f"{operation} violated a database constraint",
+                details={"operation": operation},
+            ) from exc
+        except Exception:
+            self.db.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+            self.db.execute(f"RELEASE SAVEPOINT {savepoint}")
+            raise
+        else:
+            self.db.execute(f"RELEASE SAVEPOINT {savepoint}")
+
     @staticmethod
     def _json(value: Any) -> str:
         try:
@@ -1131,10 +1152,10 @@ class AIDB:
             raise InvalidArgumentError("resource metadata must be an object")
         content_json = self._json_value(content)
         rid = "res:" + str(uuid.uuid4())
-        self.db.execute("INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)", (rid, resource_type, content_json, owner, visibility, self._json(metadata or {})))
-        self._append_workflow_event("resource_created", "resource created", metadata={"resource_id": rid, "resource_type": resource_type, "owner": owner, "visibility": visibility})
-        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,new_revision,payload) VALUES(?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), rid, "create", owner, 1, self._json({"resource_type":resource_type,"visibility":visibility})))
-        self.db.commit()
+        with self._atomic("create_resource"):
+            self.db.execute("INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)", (rid, resource_type, content_json, owner, visibility, self._json(metadata or {})))
+            self._append_workflow_event("resource_created", "resource created", metadata={"resource_id": rid, "resource_type": resource_type, "owner": owner, "visibility": visibility})
+            self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,new_revision,payload) VALUES(?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), rid, "create", owner, 1, self._json({"resource_type":resource_type,"visibility":visibility})))
         return self.get_resource(rid)
 
     def get_resource(self, resource_id, include_private=True):
@@ -1224,11 +1245,11 @@ class AIDB:
         if row["visibility"] == "public":
             return self.get_resource(resource_id)
         old_revision=row["revision"]
-        self.db.execute("UPDATE home_resources SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=?", (resource_id,))
-        self.db.execute("UPDATE notes SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE resource_id=?", (resource_id,))
-        self._append_workflow_event("resource_published", "resource published", metadata={"resource_id":resource_id})
-        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), resource_id, "publish", row["owner"], old_revision, old_revision+1, self._json({})))
-        self.db.commit()
+        with self._atomic("publish_resource"):
+            self.db.execute("UPDATE home_resources SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=?", (resource_id,))
+            self.db.execute("UPDATE notes SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE resource_id=?", (resource_id,))
+            self._append_workflow_event("resource_published", "resource published", metadata={"resource_id":resource_id})
+            self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), resource_id, "publish", row["owner"], old_revision, old_revision+1, self._json({})))
         return self.get_resource(resource_id)
 
     def current_specification(self):
@@ -1670,9 +1691,9 @@ class AIDB:
         for rid in (source_resource_id, target_resource_id):
             if self.db.execute("SELECT 1 FROM home_resources WHERE id=?", (rid,)).fetchone() is None:
                 raise NotFoundError("resource does not exist: " + rid, details={"resource_id": rid})
-        self.db.execute("INSERT OR IGNORE INTO resource_relations(source_resource_id,target_resource_id,relation,metadata) VALUES(?,?,?,?)", (source_resource_id,target_resource_id,relation,self._json(metadata or {})))
-        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,payload) VALUES(?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),source_resource_id,"relate",None,self._json({"target_resource_id":target_resource_id,"relation":relation})))
-        self.db.commit()
+        with self._atomic("relate_resources"):
+            self.db.execute("INSERT OR IGNORE INTO resource_relations(source_resource_id,target_resource_id,relation,metadata) VALUES(?,?,?,?)", (source_resource_id,target_resource_id,relation,self._json(metadata or {})))
+            self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,payload) VALUES(?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),source_resource_id,"relate",None,self._json({"target_resource_id":target_resource_id,"relation":relation})))
 
     def resource_relations(self, resource_id):
         rows=self.db.execute("SELECT * FROM resource_relations WHERE source_resource_id=? OR target_resource_id=? ORDER BY id ASC", (resource_id,resource_id)).fetchall()
