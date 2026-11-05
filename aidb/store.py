@@ -327,7 +327,17 @@ class AIDB:
 
     @staticmethod
     def _json(value: Any) -> str:
-        return json.dumps(value if value is not None else {})
+        try:
+            return json.dumps(value if value is not None else {}, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise InvalidArgumentError("value must be valid JSON data") from exc
+
+    @staticmethod
+    def _json_value(value: Any) -> str:
+        try:
+            return json.dumps(value, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise InvalidArgumentError("content must be valid JSON data") from exc
 
     @staticmethod
     def _decode_artifact_blob_row(row):
@@ -1104,6 +1114,8 @@ class AIDB:
 
     def initialize_home(self, node_id=None, owner=None, visibility="private", metadata=None):
         if visibility not in {"public", "private"}: raise InvalidArgumentError("visibility must be public or private")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise InvalidArgumentError("home metadata must be an object")
         row = self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone()
         if row: return dict(row)
         node_id = node_id or "node:" + str(uuid.uuid4())
@@ -1112,9 +1124,14 @@ class AIDB:
         return dict(self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone())
 
     def create_resource(self, resource_type, content=None, owner=None, visibility="private", metadata=None):
+        if not isinstance(resource_type, str) or not resource_type.strip():
+            raise InvalidArgumentError("resource_type must be a non-empty string")
         if visibility not in {"public", "private"}: raise InvalidArgumentError("visibility must be public or private")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise InvalidArgumentError("resource metadata must be an object")
+        content_json = self._json_value(content)
         rid = "res:" + str(uuid.uuid4())
-        self.db.execute("INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)", (rid, resource_type, json.dumps(content), owner, visibility, self._json(metadata or {})))
+        self.db.execute("INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)", (rid, resource_type, content_json, owner, visibility, self._json(metadata or {})))
         self._append_workflow_event("resource_created", "resource created", metadata={"resource_id": rid, "resource_type": resource_type, "owner": owner, "visibility": visibility})
         self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,new_revision,payload) VALUES(?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), rid, "create", owner, 1, self._json({"resource_type":resource_type,"visibility":visibility})))
         self.db.commit()
@@ -1144,8 +1161,14 @@ class AIDB:
         return [self.get_resource(r["id"]) for r in rows]
 
     def create_note(self, title, content, owner=None, visibility="private", kind="note", metadata=None):
+        if not isinstance(title, str) or not isinstance(content, str):
+            raise InvalidArgumentError("note title and content must be strings")
+        if not isinstance(kind, str) or not kind.strip():
+            raise InvalidArgumentError("note kind must be a non-empty string")
         if visibility not in {"public", "private"}:
             raise InvalidArgumentError("visibility must be public or private")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise InvalidArgumentError("note metadata must be an object")
         resource_id = "res:" + str(uuid.uuid4())
         resource_content = {"title": title, "content": content, "kind": kind}
         try:
@@ -1638,6 +1661,10 @@ class AIDB:
         return self.current_specification()
 
     def relate_resources(self, source_resource_id, target_resource_id, relation, metadata=None):
+        if not isinstance(relation, str) or not relation.strip():
+            raise InvalidArgumentError("relation must be a non-empty string")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise InvalidArgumentError("relation metadata must be an object")
         if source_resource_id == target_resource_id:
             raise InvalidArgumentError("a resource cannot relate to itself")
         for rid in (source_resource_id, target_resource_id):
@@ -1652,6 +1679,8 @@ class AIDB:
         return [dict(r) for r in rows]
 
     def update_resource(self, resource_id, content=None, metadata=None, owner=None, expected_revision=None):
+        if metadata is not None and not isinstance(metadata, dict):
+            raise InvalidArgumentError("resource metadata must be an object")
         row = self.db.execute(
             "SELECT * FROM home_resources WHERE id=?", (resource_id,)
         ).fetchone()
@@ -1665,11 +1694,12 @@ class AIDB:
         old_revision = row["revision"]
         new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
         new_content = json.loads(row["content"]) if content is None else content
+        content_json = self._json_value(new_content)
         try:
             self.db.execute("BEGIN")
             self.db.execute(
                 "UPDATE home_resources SET content=?, metadata=?, revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=?",
-                (json.dumps(new_content), self._json(new_metadata), resource_id),
+                (content_json, self._json(new_metadata), resource_id),
             )
             note = self.db.execute(
                 "SELECT * FROM notes WHERE resource_id=?", (resource_id,)
@@ -1692,7 +1722,7 @@ class AIDB:
                     }
                     self.db.execute(
                         "UPDATE home_resources SET content=? WHERE id=?",
-                        (json.dumps(new_content), resource_id),
+                        (self._json_value(new_content), resource_id),
                     )
                 self.db.execute(
                     "UPDATE notes SET title=?, content=?, kind=?, metadata=?, revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE resource_id=?",
