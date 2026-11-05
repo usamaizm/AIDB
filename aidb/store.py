@@ -1193,8 +1193,7 @@ class AIDB:
             raise InvalidArgumentError("note metadata must be an object")
         resource_id = "res:" + str(uuid.uuid4())
         resource_content = {"title": title, "content": content, "kind": kind}
-        try:
-            self.db.execute("BEGIN")
+        with self._atomic("create_note"):
             self.db.execute(
                 "INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)",
                 (resource_id, "note", json.dumps(resource_content), owner, visibility, self._json(metadata or {})),
@@ -1212,11 +1211,7 @@ class AIDB:
                 ("chg:" + str(uuid.uuid4()), resource_id, "create", owner, 1,
                  self._json({"resource_type": "note", "visibility": visibility})),
             )
-            self.db.commit()
-        except Exception:
-            self.db.rollback()
-            raise
-        return self.get_note(resource_id)
+         return self.get_note(resource_id)
 
     def get_note(self, note_id, include_private=True):
         row=self.db.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
@@ -1786,8 +1781,7 @@ class AIDB:
         new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
         new_content = json.loads(row["content"]) if content is None else content
         content_json = self._json_value(new_content)
-        try:
-            self.db.execute("BEGIN")
+        with self._atomic("update_resource"):
             self.db.execute(
                 "UPDATE home_resources SET content=?, metadata=?, revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=?",
                 (content_json, self._json(new_metadata), resource_id),
@@ -1825,11 +1819,7 @@ class AIDB:
                  old_revision, old_revision + 1,
                  self._json({"content_changed": content is not None, "metadata_changed": metadata is not None})),
             )
-            self.db.commit()
-        except Exception:
-            self.db.rollback()
-            raise
-        return self.get_resource(resource_id)
+         return self.get_resource(resource_id)
 
     def public_changes(self, after_id=0, limit=100):
         if limit < 1:
