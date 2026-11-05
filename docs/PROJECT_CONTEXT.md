@@ -108,7 +108,7 @@ Verified against live GitHub state on 2026-11-05:
 - Other open PRs at the time of this refresh: #14, #15, #16, #24, #25, #45, #49, #50, #55, and #61. Reconcile them against current main and the latest issue #18 evaluation; do not blind-merge.
 - The most recent full-repository evaluation and updated findings are recorded on [issue #18](https://github.com/usamaizm/AIDB/issues/18); the accepted design exchanges and outstanding owner decisions are on [issue #29](https://github.com/usamaizm/AIDB/issues/29). The portable-home N4b/v1 decision slate is in issue #29 comment 6667844633.
 - Keep CI green; preserve the E1 N4b xfail until a backward-compatible integrity/versioning decision is made.
-- PR #49's `test_cli_surface` mapping is patched, but its latest CI run has 7 E1 failures tied to node-specification append-on-import; rebase and reconcile with current main before merge. PR #50 remains companion-only.
+- PR #49's `test_cli_surface` mapping is patched and its E1 expected capability/resource vocabulary was updated in commit `3879087`; the previous 7 E1 failures predate that update, so current-head CI is pending. PR #49 is 27 commits behind main and must be rebased; PR #50 remains companion-only.
 - Follow [the implementation roadmap](IMPLEMENTATION_ROADMAP.md) as the canonical actionable backlog. Mark work complete only with source, regression tests, and current CI evidence.
 - Add benchmark baselines before making performance claims.
 - Implement context-budgeted retrieval, bounded/paginated APIs, streaming, resource controls, and storage improvements in small tested increments.
