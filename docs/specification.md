@@ -73,7 +73,7 @@ An endpoint identifies a way to access a capability. It is not an IP address.
 
 Endpoint metadata may contain transport, protocol, address/reference, serialization, authentication mechanisms, capabilities served, priority, and validity.
 
-The specification must not require IPv4, IPv6, DNS, HTTP, or any particular network topology.
+The specification must not require IPv4, IPv6, DNS, HTTP, or any particular network topology. A distributed deployment may advertise multiple independently authenticated endpoints and capabilities for chunk retrieval, publication, discovery, and replication. Endpoint discovery is not authorization; clients must authenticate the peer and bind it to the advertised node identity before trusting its claims.
 
 ## Identity, authorization, provenance, trust
 
@@ -98,6 +98,12 @@ This connects dynamic discovery directly to survivability and provenance.
 The architecture does not yet freeze a single serialization. A canonical representation must eventually define deterministic field semantics, stable identifiers, explicit null/absence behavior, version compatibility, extension rules, and integrity/signature representation where required.
 
 JSON is a practical initial representation. CBOR or other representations may be adapters over the same semantics.
+
+## Distributed endpoint and trust requirements
+
+A node specification may advertise endpoint transport, protocol version, address/reference, serialization, authentication mechanisms, capabilities served, priority, and validity. Remote endpoint metadata must describe supported authenticated transport and peer identity mechanisms without exposing credentials or implying that possession of an endpoint grants access.
+
+Node identity must remain stable across IP address, hostname, and certificate changes. Agent identity is separate. Capabilities describe what a node offers; authorization is evaluated independently for every operation.
 
 ## Design rule
 
