@@ -71,6 +71,11 @@ As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the
 - Prefer documented interfaces and conformance tests over directory-only separation. Do not split modules into services/packages prematurely.
 - New optional capabilities must declare their contract version, dependencies, capabilities, configuration, and permissions; unsupported capabilities should return stable errors.
 - Refactor incrementally after inspecting current dependencies and tests. Do not claim the architecture is implemented or tests pass without evidence.
+- Before changing a public or persisted boundary, identify its independent contract version and classify the change as additive, adapter-based, migration-based, parallel, or breaking.
+- Keep storage, interchange, and wire formats separate unless an explicit contract requires them to coincide; do not let legacy formats dictate new internal designs.
+- Never silently reinterpret legacy data, discard unknown content, or claim stronger integrity guarantees than were verified.
+- Require conformance tests and a recoverable migration plan before treating an adapter or format replacement as complete.
+- Follow `docs/evolution-and-compatibility.md`; it is proposed architecture until each boundary is demonstrated by implementation and tests.
 ## Product direction: one-stop substrate for agents
 
 - Treat `docs/one-stop-agent-substrate.md` as the product-scope proposal: shared agent data/memory/artifacts with a small stable core and optional modules.
