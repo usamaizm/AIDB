@@ -8,9 +8,10 @@ import re
 import sqlite3
 import uuid
 import warnings
+from contextlib import contextmanager
 from threading import RLock
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from .errors import (
     AlreadyExistsError,
@@ -1799,6 +1800,16 @@ class AIDB:
         else:
             rows = self.db.execute("SELECT * FROM home_changes WHERE id>? AND resource_id=? ORDER BY id ASC LIMIT ?", (after_id, resource_id, limit)).fetchall()
         return [dict(r) for r in rows]
+
+    @contextmanager
+    def connection_guard(self) -> Iterator[None]:
+        """Serialize adapter access to this shared SQLite connection.
+
+        Network handlers must read and validate request bodies before entering
+        this guard so slow clients cannot block unrelated database work.
+        """
+        with self._connection_lock:
+            yield
 
     def close(self) -> None:
         self.db.close()
