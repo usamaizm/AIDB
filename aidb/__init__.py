@@ -27,6 +27,10 @@ from .errors import (
     RevisionConflictError,
     StorageIntegrityError,
     UnsupportedVersionError,
+    UnsupportedCapabilityError,
+    UnauthenticatedError,
+    TemporarilyUnavailableError,
+    InternalError,
 )
 
 __all__ = [
@@ -40,6 +44,10 @@ __all__ = [
     "RevisionConflictError",
     "StorageIntegrityError",
     "UnsupportedVersionError",
+    "UnsupportedCapabilityError",
+    "UnauthenticatedError",
+    "TemporarilyUnavailableError",
+    "InternalError",
     "Agent",
     "Note",
     "Resource",
