@@ -80,7 +80,7 @@ def create_handler(db: HomeApplication, auth_token: str | None = None, max_body_
                 return self._send(400, {"error": str(exc)})
 
         def do_POST(self):
-            with db._connection_lock:
+            with db.operation_lock:
                 self._handle_post()
 
         def _handle_post(self):
