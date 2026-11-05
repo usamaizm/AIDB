@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T20:04:05Z — Persistence-port CI diagnosis and correction
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** user-confirmed
+- **Type:** progress
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/63
+- **Status:** in-progress
+- **Summary:** PR #63 was opened as a draft. Its first CI run (42099636395) failed in Ruff on all Python versions because the HTTP refactor removed the AIDB import still used by the convenience serve() entry point. Restored the import, kept create_handler and create_server typed against HomeStore, and expanded the port contract tests for private-resource visibility and stale-revision rejection.
+- **Evidence:** Failure output was inspected from all three matrix jobs. The corrected branch head is 498c478b6b51f2a4f20004c3fc902730215dca46; comparison against main reports 0 commits behind. No CI run or status check is currently visible for the corrected head.
+- **Risks / limitations:** The corrected code has not yet been executed by CI or locally. The initial failing run is evidence only for the earlier head, not the corrected code.
+- **Next action:** Obtain a fresh CI run for the corrected PR head and address any failures before requesting review or marking the PR ready.
+
+
 ### 2026-11-05T20:02:28Z — Establish initial home persistence port
 
 - **From:** agent-chatgpt
