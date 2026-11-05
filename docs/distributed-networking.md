@@ -8,7 +8,7 @@ The logical knowledge model must remain independent of physical placement. A log
 
 ## Security
 
-All communication crossing a machine or trust boundary must use authenticated encrypted transport. HTTPS is the initial interoperable request/response transport. TLS 1.2 is the minimum for the existing HTTP adapter; TLS 1.3 is preferred. Clients verify certificates and hostnames by default. Mutual TLS is supported where deployments need certificate-based peer authentication. No network connection silently falls back to plaintext.
+All communication crossing a machine or trust boundary must use authenticated encrypted transport. HTTPS is the initial interoperable request/response transport. TLS 1.2 is the minimum for the existing HTTP adapter; TLS 1.3 is preferred. Clients verify certificates and hostnames by default. Mutual TLS is an option in this design where deployments need certificate-based peer authentication. No network connection silently falls back to plaintext.
 
 AIDB node identity is transport-independent and must not be an IP address, hostname, or certificate serial number. The authenticated transport peer must be bound to a claimed node identity. Agent identity remains distinct from node identity. Authentication does not grant authorization: every discovery, read, write, and replication operation is separately authorized.
 
