@@ -1,3 +1,5 @@
+import json
+
 from aidb import AIDB, Note, Resource, Specification
 
 
@@ -165,3 +167,65 @@ def test_snapshots_do_not_embed_prior_snapshots():
     ).fetchone()
     second_payload = __import__("json").loads(second_row["content"])
     assert "home_snapshots" not in second_payload["tables"]
+
+
+def test_public_export_strips_relation_metadata_and_omits_history(tmp_path):
+    db = AIDB(tmp_path / "public-filter.sqlite3")
+    private = db.create_note(
+        "PRIVATE_TITLE_MARKER", "PRIVATE_BODY_MARKER", owner="private-owner"
+    )
+    first = db.create_note("public one", "shareable", visibility="public")
+    second = db.create_note("public two", "shareable", visibility="public")
+    db.relate_resources(
+        first.id, second.id, "related",
+        metadata={"secret": "PRIVATE_RELATION_METADATA_MARKER"},
+    )
+    db.relate_resources(first.id, private.id, "references")
+    db.create_snapshot(include_private=True)
+
+    exported = db.export_home(include_private=False)
+    serialized = json.dumps(exported, sort_keys=True)
+
+    assert "PRIVATE_TITLE_MARKER" not in serialized
+    assert "PRIVATE_BODY_MARKER" not in serialized
+    assert "PRIVATE_RELATION_METADATA_MARKER" not in serialized
+    assert private.id not in serialized
+    assert len(exported["tables"]["resource_relations"]) == 1
+    assert exported["tables"]["resource_relations"][0]["metadata"] == "{}"
+    assert exported["tables"]["home_changes"] == []
+    assert exported["verification"] == {
+        "ok": None, "issues": [], "scope": "filtered_public_export"
+    }
+
+
+def test_public_changes_do_not_reveal_events_before_resource_publication():
+    db = AIDB(":memory:")
+    note = db.create_note(
+        "HISTORIC_PRIVATE_TITLE", "HISTORIC_PRIVATE_BODY",
+        owner="HISTORIC_PRIVATE_OWNER",
+    )
+    db.update_resource(note.id, content="HISTORIC_PRIVATE_UPDATE")
+    db.publish_resource(note.id)
+    db.update_resource(note.id, content="public after publication")
+
+    events = db.public_changes()
+    assert events
+    assert all(event["id"] > 0 for event in events)
+    assert all(
+        marker not in json.dumps(events)
+        for marker in (
+            "HISTORIC_PRIVATE_TITLE",
+            "HISTORIC_PRIVATE_BODY",
+            "HISTORIC_PRIVATE_OWNER",
+            "HISTORIC_PRIVATE_UPDATE",
+        )
+    )
+    assert [event["operation"] for event in events] == ["publish", "update"]
+
+
+def test_public_changes_include_public_creation_and_updates():
+    db = AIDB(":memory:")
+    note = db.create_note("public", "initial", visibility="public")
+    db.update_resource(note.id, content="updated")
+    events = db.public_changes()
+    assert [event["operation"] for event in events] == ["create", "update"]

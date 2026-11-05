@@ -1139,8 +1139,11 @@ class AIDB:
                     "SELECT * FROM notes WHERE visibility='public'"
                 ).fetchall()
             ]
+            # Relation metadata is an opaque caller-controlled field and may
+            # contain private annotations even when both endpoints are public.
             payload["tables"]["resource_relations"] = [
-                dict(row) for row in self.db.execute(
+                {**dict(row), "metadata": "{}"}
+                for row in self.db.execute(
                     """
                     SELECT rel.* FROM resource_relations rel
                     JOIN home_resources src ON src.id=rel.source_resource_id
@@ -1149,24 +1152,24 @@ class AIDB:
                     """
                 ).fetchall()
             ]
-            payload["tables"]["home_changes"] = [
-                dict(row) for row in self.db.execute(
-                    """
-                    SELECT c.* FROM home_changes c
-                    JOIN home_resources src ON src.id=c.resource_id
-                    WHERE src.visibility='public'
-                      AND c.operation != 'relate'
-                    """
-                ).fetchall()
-            ]
+            # Change payloads are historical snapshots of state. Current
+            # visibility cannot prove that an event was public when written;
+            # omit the history from filtered exports until events carry an
+            # independently enforced visibility classification.
+            payload["tables"]["home_changes"] = []
             # Artifacts currently have no independent visibility/ownership
             # contract. Exclude them from public-only exports until one exists.
             payload["tables"]["artifacts"] = []
             payload["tables"]["artifact_blobs"] = []
-        verification = self.verify_home()
-        payload["verification"] = (
-            verification if include_private else {"ok": verification["ok"], "issues": []}
-        )
+        if include_private:
+            payload["verification"] = self.verify_home()
+        else:
+            # Whole-home verification can leak private row state through its
+            # aggregate result or diagnostics. A filtered export deliberately
+            # does not claim whole-database verification.
+            payload["verification"] = {
+                "ok": None, "issues": [], "scope": "filtered_public_export"
+            }
         return payload
 
     def import_home(self, payload):
@@ -1359,24 +1362,66 @@ class AIDB:
     def public_changes(self, after_id=0, limit=100):
         if limit < 1:
             raise ValueError("limit must be positive")
+        # Visibility is mutable: a resource may be private when its create
+        # and update events are written, then published later. Filter history
+        # by the first public transition, not merely current resource state.
         rows = self.db.execute(
             """
             SELECT c.*
             FROM home_changes c
             JOIN home_resources source ON source.id = c.resource_id
-            WHERE c.id > ?
-              AND source.visibility = 'public'
-              -- Relation changes are omitted from the public feed. Public
-              -- relationships are available through the separately filtered
-              -- resource_relations export; omitting events avoids leaking a
-              -- private target through arbitrary or malformed event payloads.
+            WHERE source.visibility = 'public'
               AND c.operation != 'relate'
             ORDER BY c.id ASC
-            LIMIT ?
-            """,
-            (after_id, limit),
+            """
         ).fetchall()
-        return [dict(row) for row in rows]
+        public_from = {}
+        for row in rows:
+            if row["operation"] == "create":
+                try:
+                    event_payload = json.loads(row["payload"] or "{}")
+                except (TypeError, json.JSONDecodeError):
+                    continue
+                if event_payload.get("visibility") == "public":
+                    public_from[row["resource_id"]] = row["id"]
+            elif row["operation"] == "publish":
+                public_from.setdefault(row["resource_id"], row["id"])
+        visible = []
+        for row in rows:
+            if (
+                row["id"] <= after_id
+                or row["resource_id"] not in public_from
+                or row["id"] < public_from[row["resource_id"]]
+                or row["operation"] not in {"create", "publish", "update"}
+            ):
+                continue
+            # The actor can be a private owner, including on the publication
+            # event itself. Return only the event's safe structural fields;
+            # never forward opaque historical payloads or actor identifiers.
+            safe_payload = {}
+            if row["operation"] == "create":
+                try:
+                    original = json.loads(row["payload"] or "{}")
+                except (TypeError, json.JSONDecodeError):
+                    original = {}
+                safe_payload = {
+                    "resource_type": original.get("resource_type"),
+                    "visibility": "public",
+                }
+            elif row["operation"] == "update":
+                try:
+                    original = json.loads(row["payload"] or "{}")
+                except (TypeError, json.JSONDecodeError):
+                    original = {}
+                safe_payload = {
+                    "content_changed": bool(original.get("content_changed")),
+                    "metadata_changed": bool(original.get("metadata_changed")),
+                }
+            event = dict(row)
+            event["actor"] = None
+            event["payload"] = self._json(safe_payload)
+            visible.append(event)
+        return visible[:limit]
 
     def create_snapshot(self, include_private=True):
         payload=self.export_home(include_private=include_private)
