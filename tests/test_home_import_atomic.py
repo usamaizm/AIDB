@@ -89,7 +89,7 @@ def test_artifact_payload_reads_verify_checksum(tmp_path):
     )
     db.db.execute(
         "UPDATE artifact_blobs SET content=? WHERE artifact_id=?",
-        (b"tampered", artifact.id),
+        (b"tamper!", artifact.id),
     )
     db.db.commit()
     with pytest.raises(ValueError, match="checksum verification failed"):
