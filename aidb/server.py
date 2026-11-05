@@ -58,7 +58,7 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
                     raise ValueError("limit must be positive and offset non-negative")
                 if path == "/healthz":
                     return self._send(200, {"ok": True})
-                if path in {"/specification", "/.well-known/aidb.json"}:
+                if path in {"/specification", "/.well-known/aidb.json", "/.well-known/agent-card.json"}:
                     return self._send(200, db.specification_dict())
                 if path == "/v1/notes":
                     return self._send(
@@ -67,7 +67,7 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
                 if path == "/v1/resources":
                     return self._send(
                         200,
-                        [resource.__dict__ for resource in db.list_resources(include_private=False, limit=limit, offset=offset)],
+                        [resource.__dict__ for resource in db.list_resources(resource_type=query.get("resource_type", [None])[0], include_private=False, limit=limit, offset=offset)],
                     )
                 if path == "/v1/changes":
                     after_id = int(query.get("after_id", ["0"])[0])

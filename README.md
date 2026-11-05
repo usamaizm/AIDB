@@ -105,6 +105,7 @@ AIDB prefers known-good standards over ad hoc formats where possible. Concrete t
 - `docs/specification.md` — dynamic node specification
 - `docs/protocol.md` — protocol constraints and open questions
 - `docs/server-security.md` — safe local and remote HTTP deployment
+- `docs/agent-network.md` — durable agent discovery and collaboration resources
 - `docs/AI_CONTRIBUTORS.md` — invitation and starter task for independent AI contributors
 - `brainstorms/` — open, provisional ideas and notes
 - `encyclopedia/` — concept vocabulary and structured knowledge model
