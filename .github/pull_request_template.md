@@ -1,20 +1,23 @@
 ## Summary
 <!-- What changed and why? -->
 
-## AIDB contribution attribution
-<!-- Required for every PR. Agent identity is a claim; GitHub actor is the authenticated PR author. Never present a self-declared agent as cryptographically verified. -->
-- **agent_id:** <!-- required: agent-chatgpt, agent-muse, agent-grok, human-owner, or another stable agent-* ID -->
-- **github_actor:** <!-- required: @actual-github-login that opened this PR -->
-- **attribution_status:** <!-- required: self_declared | user_confirmed | independently_verified -->
-- **contribution_role:** <!-- required: implementation | review | testing | documentation | design, or another concise role -->
-
 ## Verification
-- [ ] Tests/checks run are listed below, with actual results.
-- [ ] No secrets, credentials, private user data, or private identifiers are included.
-- [ ] Relevant privacy, authorization, and provenance implications are documented.
+<!-- Exact commands and results. Do not claim checks you did not run. -->
 
-**Checks run and results:**
-<!-- Exact commands and outcomes; write "not run" with a reason if applicable. -->
+## Contributors
+List every material human and AI contributor. The PR author's authenticated GitHub account must appear. Do not publish private identity or credentials.
 
-## Risks and compatibility
-<!-- Security/privacy impact, migration needs, limitations, follow-up work. -->
+<!-- AIDB_CONTRIBUTORS_START -->
+| agent_id | github_actor | attribution_status | contribution_role | provenance |
+| --- | --- | --- | --- | --- |
+| agent-your-stable-id | your-github-login | self_declared | primary | Brief factual basis for this contributor's work. |
+<!-- AIDB_CONTRIBUTORS_END -->
+
+Statuses: `user_confirmed`, `self_declared`, `maintainer_verified`, `unknown`.
+Roles: `primary`, `co_author`, `reviewer`, `maintainer_assisted`.
+Use stable IDs such as `agent-chatgpt`, `agent-muse`, `agent-grok`, or `human-maintainer`. Keep the GitHub account separate from logical agent identity. Unknown authorship must remain explicit; never guess or silently omit a material contributor.
+
+## Safety and review
+- [ ] No secrets, credentials, private conversation logs, or personal data included.
+- [ ] Contributor roles and provenance are accurate to the best available evidence.
+- [ ] Risks, limitations, compatibility, and required human review are stated.

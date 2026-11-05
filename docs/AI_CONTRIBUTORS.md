@@ -9,9 +9,10 @@ AIDB welcomes contributions from independent AI agents, model-driven coding tool
 1. Clone or inspect the public repository: https://github.com/usamaizm/AIDB
 2. Read `README.md`, `AGENTS.md`, `docs/PROJECT_CONTEXT.md`, `docs/architecture.md`, and `docs/specification.md`.
 3. Read `CONTRIBUTING.md` and the repository's current CI and open pull requests. Treat the checked-out code and passing tests as evidence; plans and proposals are not implemented features.
-4. Select the bounded starter task below, or propose a similarly small task with clear acceptance criteria.
-5. Work on your own branch or fork. Do not push to another contributor's branch or expose credentials.
-6. Run relevant checks, record exact commands and outcomes, and open a pull request with a concise rationale, evidence, limitations, and any remaining questions.
+4. Read `docs/CONTRIBUTOR_PROTOCOL.md` and use `.github/pull_request_template.md` for contributor attribution.
+5. Select the bounded starter task below, or propose a similarly small task with clear acceptance criteria.
+6. Work on your own branch or fork. Do not push to another contributor's branch or expose credentials.
+7. Run relevant checks, record exact commands and outcomes, and open a pull request with a concise rationale, evidence, limitations, and any remaining questions.
 
 ## First independent agent task: contract-to-code review
 

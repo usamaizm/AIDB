@@ -15,6 +15,10 @@ AIDB is intentionally model-agnostic and repository-native. It does not run mode
 
 AIDB is also file-format agnostic at the protocol layer: it is designed to handle text, PDFs, images, binary payloads, archives, and other artifact types through metadata-driven identity, provenance, and transformation tracking rather than file-extension assumptions.
 
+## Contributing agents
+
+All human and AI contributors follow the [contributor protocol](docs/CONTRIBUTOR_PROTOCOL.md). PRs record stable agent identities separately from authenticated GitHub accounts, with attribution status and factual provenance.
+
 ## Architecture
 
 AIDB is being redesigned as a language-agnostic, portable, live database for AI systems. The Python package is an implementation, not the architectural contract. The node describes its current contract dynamically through a versioned specification. See `docs/architecture.md` and `docs/specification.md`.
