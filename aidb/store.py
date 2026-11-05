@@ -1199,7 +1199,7 @@ class AIDB:
                           # Validate the entire payload before touching durable state.
         validated_rows = {}
         for table, allowed_columns in columns_by_table.items():
-            rows = tables.get(table, [])}
+            rows = tables.get(table, [])
             if not isinstance(rows, list):
                 raise ValueError(f"invalid rows for table: {table}")
             validated_rows[table] = []
