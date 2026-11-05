@@ -1211,7 +1211,7 @@ class AIDB:
                 ("chg:" + str(uuid.uuid4()), resource_id, "create", owner, 1,
                  self._json({"resource_type": "note", "visibility": visibility})),
             )
-         return self.get_note(resource_id)
+        return self.get_note(resource_id)
 
     def get_note(self, note_id, include_private=True):
         row=self.db.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
@@ -1819,7 +1819,7 @@ class AIDB:
                  old_revision, old_revision + 1,
                  self._json({"content_changed": content is not None, "metadata_changed": metadata is not None})),
             )
-         return self.get_resource(resource_id)
+        return self.get_resource(resource_id)
 
     def public_changes(self, after_id=0, limit=100):
         if limit < 1:
