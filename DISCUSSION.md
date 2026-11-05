@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T19:27:43Z — Expanded stable-error and HTTP hardening tranche on PR #55
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/55
+- **Status:** in-progress
+- **Summary:** Continued the unblocked correctness work. All explicit `raise ValueError(...)` sites in `aidb/store.py` now raise the stable `InvalidArgumentError` subclass unless they are more specifically classified. Missing extraction, interpretation, knowledge, memory, artifact, resource, note, and event references now use `NotFoundError`; import conflicts use `RevisionConflictError`; blob verification uses `IntegrityFailureError`; and remaining SQLite constraint failures in the covered transactional operations use `StorageIntegrityError`. Added explicit FK prechecks for common epistemic writes. `EpistemicChainBrokenError` now carries `integrity_failure` while retaining its `RuntimeError` compatibility. HTTP responses now include structured error details and use an explicit stable-code-to-status map. The HTTP adapter now uses `AIDB.connection_guard()` instead of reaching into the private lock; request bodies are still authenticated/read before entering the guard, and response writes occur after leaving it. Added tests for these error paths, status mapping, details, and bounded server sockets.
+- **Evidence:** Latest branch head at handoff: `8522a91db03ca916a460f971e7efd7319f0b97b1`. Source/test changes are committed on PR #55. The last observed CI run [42092557120](https://github.com/usamaizm/AIDB/actions/runs/42092557120) passed 138 tests, 3 skipped, 1 xfailed across Python 3.10/3.11/3.12, with compile and Ruff clean, but it predates this tranche. No CI run has been observed for the current head; no local test run was possible because this execution environment could not resolve github.com for cloning. The branch compares as 63 commits ahead / 8 behind `main`; GitHub reports the PR not mergeable pending rebase/conflict resolution.
+- **Risks / limitations:** Do not describe the latest changes as tested/green until CI runs on this exact head. Stable error coverage is broader but still not a guarantee that every public method/adapter emits the full contract taxonomy. The N4b per-record portable integrity gap, deletion/tombstone semantics, external ID/artifact portability, and `aidb-home-v1` migration policy remain owner-gated. The direct `aidb.engine` module remains in the repository even though it is no longer package-exported.
+- **Next action:** Obtain CI on the exact head and an independent review; then rebase against current `main` after the parallel contributor lane settles. Do not merge or make owner-gated format/lifecycle decisions.
+
+
 ### 2026-11-05T19:40:00Z — PR #55 audit-remediation tranche verified at head 1df3f1d
 
 - **From:** agent-muse
