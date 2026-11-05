@@ -1288,27 +1288,60 @@ class AIDB:
                 ):
                     raise ValueError(f"non-finite number in home import row for table: {table}")
 
-                required_strings = {
+                string_fields = {
+                    "node_identity": ("node_id",),
+                    "node_specifications": ("specification_id", "node_id"),
+                    "home_resources": ("id", "resource_type", "content", "metadata"),
+                    "notes": ("id", "resource_id", "title", "content", "kind", "metadata"),
+                    "resource_relations": ("source_resource_id", "target_resource_id", "relation", "metadata"),
+                    "home_changes": ("change_id", "operation", "actor", "payload"),
+                    "artifacts": ("name", "media_type", "checksum", "provenance", "transformation_history", "metadata"),
+                    "home_snapshots": ("snapshot_id", "home_format", "content", "content_hash"),
+                }.get(table, ())
+                for field in string_fields:
+                    if field in row and row[field] is not None and not isinstance(row[field], str):
+                        raise ValueError(f"invalid {field} in home import row for table: {table}")
+                nonempty_fields = {
                     "node_identity": ("node_id",),
                     "node_specifications": ("specification_id", "node_id"),
                     "home_resources": ("id", "resource_type"),
-                    "notes": ("id", "resource_id", "title", "content", "kind"),
+                    "notes": ("id", "resource_id", "kind"),
                     "resource_relations": ("source_resource_id", "target_resource_id", "relation"),
                     "home_changes": ("change_id", "operation"),
                     "artifacts": ("name", "media_type", "checksum"),
                     "home_snapshots": ("snapshot_id", "home_format", "content", "content_hash"),
                 }.get(table, ())
-                for field in required_strings:
-                    if field in row and (
-                        not isinstance(row[field], str) or not row[field].strip()
-                    ):
+                for field in nonempty_fields:
+                    if field in row and not row[field].strip():
                         raise ValueError(f"invalid {field} in home import row for table: {table}")
+                integer_fields = {
+                    "node_identity": ("id",),
+                    "node_specifications": ("version",),
+                    "home_resources": ("revision",),
+                    "notes": ("revision",),
+                    "resource_relations": ("id",),
+                    "home_changes": ("id", "previous_revision", "new_revision"),
+                    "home_snapshots": ("id",),
+                    "artifacts": ("id", "size_bytes"),
+                    "artifact_blobs": ("artifact_id",),
+                }.get(table, ())
+                for field in integer_fields:
+                    if field in row and row[field] is not None and (
+                        isinstance(row[field], bool) or not isinstance(row[field], int)
+                    ):
+                        raise ValueError(f"invalid integer {field} in home import row for table: {table}")
                 if table == "home_resources" and "id" in row and not isinstance(row["id"], str):
                     raise ValueError("resource IDs must be non-empty strings")
                 if table == "notes" and "id" in row and not isinstance(row["id"], str):
                     raise ValueError("note IDs must be non-empty strings")
-                if table == "home_changes" and row.get("resource_id") is not None and not isinstance(row["resource_id"], str):
-                    raise ValueError("change resource_id must be a string or null")
+                if table == "home_changes" and row.get("resource_id") is not None and (
+                    not isinstance(row["resource_id"], str) or not row["resource_id"].strip()
+                ):
+                    raise ValueError("change resource_id must be a non-empty string or null")
+                if table in {"home_resources", "notes", "node_identity", "node_specifications"}:
+                    visibility = row.get("visibility")
+                    if visibility is not None and visibility not in {"public", "private"}:
+                        raise ValueError(f"invalid visibility in home import row for table: {table}")
                 if table == "home_snapshots":
                     content = row.get("content")
                     digest = row.get("content_hash")
