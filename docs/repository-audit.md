@@ -40,15 +40,15 @@ AIDB can be described as a local experimental reference implementation. It shoul
 
 The following audit items have been addressed on [draft PR #55](https://github.com/usamaizm/AIDB/pull/55), not merged to main:
 
-- The broken WorkflowEngine is no longer part of the package-level public API. The direct `aidb.engine` module remains importable and is not claimed removed.
+- The nonfunctional WorkflowEngine package export and its implementation module have both been removed.
 - Artifact registration and portable import validate algorithm/digest shape, size, status, JSON metadata, and blob-to-metadata checksum agreement.
 - Portable import no longer silently ignores non-primary-key SQLite constraint failures. Identical rows with matching primary keys remain idempotent; conflicting rows still reject atomically.
 - Duplicate epistemic dataclasses are replaced by compatibility exports of the canonical `aidb.core` classes.
-- Common Python API validation, missing-reference, import-conflict, and integrity failures now have stable error classes/codes. The HTTP adapter includes structured details, maps the contract error taxonomy to HTTP statuses, and returns a generic non-leaking `internal_error` envelope for unexpected handler exceptions.
+- Common Python API validation, missing-reference, import-conflict, and integrity failures now have stable error classes/codes. Resource creation, publication, and relationship writes use savepoints so compound mutations roll back atomically, including inside an outer transaction. JSON-backed resource inputs reject non-finite and non-serializable values. The HTTP adapter includes structured details, maps the contract error taxonomy to HTTP statuses, and returns a generic non-leaking `internal_error` envelope for unexpected handler exceptions.
 - HTTP upload bodies are authenticated/read before acquiring the store's public connection guard; response serialization/writes happen after releasing it; and the production server sets a 10-second socket timeout with daemonized request threads and a bounded listen backlog.
 - README capability claims and project orientation/handoff documents were refreshed.
 
-**Observed verification:** CI run [42092557120](https://github.com/usamaizm/AIDB/actions/runs/42092557120) passed on Python 3.10, 3.11, and 3.12. Each job passed compile and Ruff; pytest reported 138 passed, 3 skipped, 1 xfailed. The remaining xfail is E1 N4b. This run predates the latest error-taxonomy, JSON-input validation, connection-guard, and HTTP error-envelope commits. No CI run has yet been observed for the latest PR head, so those changes remain unverified by CI. The latest branch comparison is 30 commits ahead / 0 behind `main`; GitHub reports the PR mergeable, but independent review and latest-head CI are still pending.
+**Observed verification:** CI run [42092557120](https://github.com/usamaizm/AIDB/actions/runs/42092557120) passed on Python 3.10, 3.11, and 3.12. Each job passed compile and Ruff; pytest reported 138 passed, 3 skipped, 1 xfailed. The remaining xfail is E1 N4b. This run predates the latest error-taxonomy, JSON-input validation, connection-guard, and HTTP error-envelope commits. No CI run has yet been observed for the latest PR head, so those changes remain unverified by CI. The latest branch head recorded here is `dc0d9f450e751d5b098cd4d56819475707949bae`; comparison is 37 commits ahead / 1 behind `main`, and GitHub currently reports the PR not mergeable. Independent review and latest-head CI are still pending.
 
 **Still blocked or in parallel:**
 - N4b per-record tamper detection needs a versioned integrity and canonicalization profile; the current draft contract explicitly says canonical JSON hashing is not finalized.
@@ -57,5 +57,5 @@ The following audit items have been addressed on [draft PR #55](https://github.c
 - Import-ID validation and the phantom CLI session/task/message surface are claimed in a parallel contributor lane; do not duplicate or overwrite that work.
 - HTTP multi-tenant/per-agent authorization and rate limiting remain beyond the current single-token local/self-hosted server model.
 
-PR #55 remains a draft and is not merged. Its last passing CI is evidence for an earlier branch head only; it does not verify the latest commits or make the outstanding decisions complete.
+PR #55 remains a draft and is not merged. Its last passing CI is evidence for an earlier branch head only; it does not verify the latest commits or make the outstanding decisions complete. The `aidb.engine` module has since been removed; update this disposition if a replacement orchestration design is accepted.
 
