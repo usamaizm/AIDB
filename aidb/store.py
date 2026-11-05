@@ -1312,7 +1312,9 @@ class AIDB:
                     "home_snapshots": ("snapshot_id", "home_format", "content", "content_hash"),
                 }.get(table, ())
                 for field in nonempty_fields:
-                    if field in row and not row[field].strip():
+                    if field in row and (
+                        not isinstance(row[field], str) or not row[field].strip()
+                    ):
                         raise ValueError(f"invalid {field} in home import row for table: {table}")
                 integer_fields = {
                     "node_identity": ("id",),
