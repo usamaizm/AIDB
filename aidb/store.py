@@ -1236,16 +1236,54 @@ class AIDB:
         return [self.get_note(r["id"]) for r in self.db.execute(sql,params)]
 
     def publish_resource(self, resource_id):
-        row=self.db.execute("SELECT revision,owner,visibility FROM home_resources WHERE id=?", (resource_id,)).fetchone()
-        if row is None: raise NotFoundError("resource does not exist", details={"resource_id": resource_id})
-        if row["visibility"] == "public":
-            return self.get_resource(resource_id)
-        old_revision=row["revision"]
         with self._atomic("publish_resource"):
-            self.db.execute("UPDATE home_resources SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=?", (resource_id,))
-            self.db.execute("UPDATE notes SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE resource_id=?", (resource_id,))
-            self._append_workflow_event("resource_published", "resource published", metadata={"resource_id":resource_id})
-            self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), resource_id, "publish", row["owner"], old_revision, old_revision+1, self._json({})))
+            row = self.db.execute(
+                "SELECT revision,owner,visibility FROM home_resources WHERE id=?",
+                (resource_id,),
+            ).fetchone()
+            if row is None:
+                raise NotFoundError(
+                    "resource does not exist", details={"resource_id": resource_id}
+                )
+            if row["visibility"] == "public":
+                return self.get_resource(resource_id)
+
+            old_revision = row["revision"]
+            cursor = self.db.execute(
+                "UPDATE home_resources SET visibility='public', revision=revision+1, "
+                "updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') "
+                "WHERE id=? AND revision=? AND visibility='private'",
+                (resource_id, old_revision),
+            )
+            if cursor.rowcount != 1:
+                raise RevisionConflictError(
+                    "resource changed while publishing",
+                    details={"resource_id": resource_id, "expected_revision": old_revision},
+                )
+            self.db.execute(
+                "UPDATE notes SET visibility='public', revision=revision+1, "
+                "updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') "
+                "WHERE resource_id=?",
+                (resource_id,),
+            )
+            self._append_workflow_event(
+                "resource_published",
+                "resource published",
+                metadata={"resource_id": resource_id},
+            )
+            self.db.execute(
+                "INSERT INTO home_changes(change_id,resource_id,operation,actor,"
+                "previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)",
+                (
+                    "chg:" + str(uuid.uuid4()),
+                    resource_id,
+                    "publish",
+                    row["owner"],
+                    old_revision,
+                    old_revision + 1,
+                    self._json({}),
+                ),
+            )
         return self.get_resource(resource_id)
 
     def current_specification(self):
