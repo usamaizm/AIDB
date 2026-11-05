@@ -1390,10 +1390,18 @@ class AIDB:
                 issues.append("invalid resource metadata:" + str(resource_id))
 
         for row in self.db.execute(
-            "SELECT id,resource_id,operation,previous_revision,new_revision "
+            "SELECT id,resource_id,operation,previous_revision,new_revision,payload "
             "FROM home_changes ORDER BY id"
         ).fetchall():
             resource_id = row["resource_id"]
+            try:
+                change_payload = json.loads(row["payload"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                change_payload = None
+            if not isinstance(change_payload, dict):
+                issues.append("invalid change payload:" + str(row["id"]))
+            if not isinstance(row["operation"], str) or not row["operation"].strip():
+                issues.append("invalid change operation:" + str(row["id"]))
             resource = resources.get(resource_id) if resource_id is not None else None
             if resource_id is not None and resource is None:
                 issues.append("missing resource for change:" + str(row["id"]))
