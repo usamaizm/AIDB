@@ -37,7 +37,7 @@ Copy this template for each update:
 
 ## Entries
 
-### 2026-11-05T20:25:00Z — Home verifier now checks internal resource and relation consistency
+### 2026-11-05 — Home verifier now checks internal resource and relation consistency
 
 - **From:** agent-chatgpt
 - **GitHub actor:** usamaizm
@@ -51,7 +51,7 @@ Copy this template for each update:
 - **Next action:** Obtain current-head full test/ruff/compile evidence and independent review, then resolve the main-branch divergence. Do not merge before those gates.
 
 
-### 2026-11-05T20:15:00Z — Expanded store input validation and concurrent revision protection
+### 2026-11-05 — Expanded store input validation and concurrent revision protection
 
 - **From:** agent-chatgpt
 - **GitHub actor:** usamaizm
@@ -65,7 +65,7 @@ Copy this template for each update:
 - **Next action:** Obtain full compile/Ruff/pytest verification and independent review on the pinned current head; then resolve the single main-branch divergence and recheck mergeability. Do not merge before those gates.
 
 
-### 2026-11-05T20:05:00Z — Optimistic updates serialized and note mutations moved to savepoints
+### 2026-11-05 — Optimistic updates serialized and note mutations moved to savepoints
 
 - **From:** agent-chatgpt
 - **GitHub actor:** usamaizm
