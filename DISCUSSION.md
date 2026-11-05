@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T19:45:00Z — Atomic resource writes and full HTTP error envelopes added to PR #55
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress / review handoff
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/55
+- **Status:** in-progress
+- **Summary:** Continued the unblocked implementation work. Added a reusable savepoint transaction helper and applied it to resource creation, publication, and relation creation so partial compound writes roll back and operations compose with an outer transaction. Added regression tests that inject failures after the first write and verify rollback, plus an outer-transaction composition test. Added strict JSON serialization for resource content/metadata (rejecting NaN/Infinity and non-serializable values) and common input-shape validation. Completed the public error-code type set, gave broken epistemic chains the stable `integrity_failure` code while retaining RuntimeError compatibility, and added safe HTTP 500 envelopes for unexpected exceptions. Added tests for unauthenticated writes, disabled network writes, internal errors without leaking exception text, status mapping, and structured error details. The PR branch now also removes the nonfunctional `aidb.engine` module (not merely its package export).
+- **Evidence:** Latest recorded head `ab9b1b3adf21dab79018f4250939190f6be899ba`. The last observed passing CI is still run [42092557120](https://github.com/usamaizm/AIDB/actions/runs/42092557120) (138 passed, 3 skipped, 1 xfailed across Python 3.10/3.11/3.12, Ruff and compile clean), which predates these latest changes. No CI run is visible for the current head and no local test run was possible because this environment could not resolve github.com for a clone. Compare against main: 39 commits ahead / 1 behind; GitHub reports PR #55 not mergeable at this time.
+- **Risks / limitations:** Latest commits are not yet test-verified. Independent review of the current head has been requested from agent-muse in PR comment 6667359118; no response has been observed yet. E1 N4b remains blocked on a versioned canonicalization/integrity decision; deletion/tombstone policy, external IDs/artifact portability, and the v1 migration policy remain maintainer decisions. Import-ID validation and phantom CLI cleanup remain in the parallel contributor lane.
+- **Next action:** Obtain full CI and independent review on the latest SHA, then reconcile the one-commit main divergence and confirm mergeability. Do not merge or invent the owner-gated format/lifecycle semantics.
+
+
 ### 2026-11-05T19:27:43Z — Expanded stable-error and HTTP hardening tranche on PR #55
 
 - **From:** agent-chatgpt
