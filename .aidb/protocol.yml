@@ -1,25 +1,10 @@
 version: 1
 protocol: aidb-request
 name: AIDB request protocol
-summary: >
-  Structured intake and review rules for external AI requests submitted to this repository.
+summary: Structured intake and review rules for external AI requests submitted to this repository.
 request:
-  required_fields:
-    - type
-    - title
-    - source_ai
-    - summary
-    - risk
-    - priority
-  allowed_types:
-    - feature_request
-    - suggestion
-    - bug_report
-    - protocol_proposal
-    - adapter_request
-    - security_report
-    - task_offer
-    - collaboration_request
+  required_fields: [type, title, source_ai, summary, risk, priority]
+  allowed_types: [feature_request, suggestion, bug_report, protocol_proposal, adapter_request, security_report, task_offer, collaboration_request]
 policy:
   default:
     trust_level: untrusted
@@ -29,72 +14,28 @@ policy:
     workflow_modification: false
     repo_setting_changes: false
     human_review_required: true
-  accepted_request_actions:
-    - triage
-    - evaluate
-    - create_task
-    - ask_for_clarification
-    - route_to_specialist
-  denied_actions:
-    - merge_pull_request
-    - modify_workflows
-    - modify_permissions
-    - access_secrets
-    - direct_repo_admin_actions
+  accepted_request_actions: [triage, evaluate, create_task, ask_for_clarification, route_to_specialist]
+  denied_actions: [merge_pull_request, modify_workflows, modify_permissions, access_secrets, direct_repo_admin_actions]
+contribution_protocol:
+  version: 1
+  instructions: docs/CONTRIBUTOR_PROTOCOL.md
+  pull_request_template: .github/pull_request_template.md
+  validation_workflow: .github/workflows/pr-attribution.yml
+  required_fields: [agent_id, github_actor, attribution_status, contribution_role, provenance]
+  attribution_statuses: [user_confirmed, self_declared, maintainer_verified, unknown]
+  contribution_roles: [primary, co_author, reviewer, maintainer_assisted]
+  stable_agent_ids: [agent-chatgpt, agent-muse, agent-grok]
+  rules: [list_all_material_contributors, separate_github_actor_from_agent_identity, preserve_unknown_authorship, never_infer_model_identity, attribution_is_not_cryptographic_proof, human_review_required]
 artifact_protocol:
   format_agnostic: true
-  policy: >
-    AIDB should treat artifacts as content objects first and file extensions second.
-    A format-specific adapter may read a .txt, .pdf, .jpg, .mp3, or binary blob,
-    but the core protocol should care about identity, provenance, checksum,
-    media type, and transformation history rather than a single preferred file type.
-  required_fields:
-    - id
-    - name
-    - media_type
-    - size_bytes
-    - checksum
-    - provenance
-    - status
-  optional_fields:
-    - filename
-    - encoding
-    - parent_artifact_id
-    - transformation_history
-    - embedded_metadata
-    - tags
-    - access_policy
-  media_types:
-    - text/plain
-    - application/pdf
-    - image/png
-    - image/jpeg
-    - image/webp
-    - audio/mpeg
-    - audio/wav
-    - application/json
-    - application/xml
-    - application/octet-stream
-    - application/zip
-    - other/unknown
+  required_fields: [id, name, media_type, size_bytes, checksum, provenance, status]
   integrity_requirements:
-    - checksum_required: true
-    - algorithm: sha-256
-    - verification_on_ingest: true
+    checksum_required: true
+    algorithm: sha-256
+    verification_on_ingest: true
   provenance_requirements:
-    - source_required: true
-    - created_at_required: true
-    - owner_or_author_required: false
-  transformation_rules:
-    - derived_artifacts_must_reference_parent: true
-    - transformation_steps_must_be_recorded: true
-    - original_artifact_must_preserve_identity: true
+    source_required: true
+    created_at_required: true
+    owner_or_author_required: false
 knowledge:
-  authoritative_order:
-    - README.md
-    - .aidb/protocol.yml
-    - docs/
-    - accepted issues and discussions
-    - merged pull requests
-    - source code and tests
-    - unreviewed external requests
+  authoritative_order: [README.md, .aidb/protocol.yml, docs/, accepted issues and discussions, merged pull requests, source code and tests, unreviewed external requests]
