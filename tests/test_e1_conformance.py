@@ -58,9 +58,8 @@ RESULTS_REF = "issue #29, comment 6648458298"
 
 # ---------------------------------------------------------- equivalence
 TABLE_KEYS = {
-    # Runtime specifications are implementation-derived and may be appended
-    # when importing an older home; current capabilities are tested separately.
     "node_identity": lambda r: r.get("node_id"),
+    "node_specifications": lambda r: r.get("specification_id"),
     "home_resources": lambda r: r.get("id"),
     "notes": lambda r: r.get("id"),
     "resource_relations": lambda r: (r.get("source_resource_id"),
@@ -202,8 +201,8 @@ RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 
 
 # ------------------------------------------- node self-specification
-# PR #35 (commit 3bbb5c4) removed the unimplemented messages /
-# message / task vocabulary from the node's advertised specification.
+# PR #35 removed unimplemented message/task claims; PR #49 added the
+# durable agent-network capabilities and resource types.
 # AIDB.current_specification() appends a fresh node_specifications
 # row (random spec id, version + 1) whenever the stored vocabulary
 # differs from the code's, and import_home() returns
@@ -215,11 +214,17 @@ RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 # test_node_specification_row_appended_on_import. If the advertised
 # vocabulary changes again, that pin fails and these constants must
 # be updated -- the ratchet working as designed.
-CURRENT_CAPABILITIES = ["resources", "notes", "artifacts", "knowledge",
-                        "changes", "export", "restore", "public_private",
-                        "ownership"]
-CURRENT_RESOURCE_TYPES = ["resource", "note", "artifact", "knowledge",
-                          "memory"]
+CURRENT_CAPABILITIES = [
+    "resources", "notes", "artifacts", "knowledge", "changes", "export",
+    "restore", "public_private", "ownership", "agent_network", "agent_profiles",
+    "knowledge_offers", "knowledge_requests", "collaboration_requests",
+    "agent_responses", "knowledge_reviews", "public_discovery",
+]
+CURRENT_RESOURCE_TYPES = [
+    "resource", "note", "artifact", "knowledge", "memory", "agent_profile",
+    "knowledge_offer", "knowledge_request", "collaboration_request",
+    "agent_response", "knowledge_review",
+]
 
 
 def _is_appended_spec_row(row):
