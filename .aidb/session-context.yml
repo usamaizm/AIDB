@@ -74,6 +74,8 @@ status:
   implementation_caveats:
     - "Agent-home persistence, changes/checkpoints, export/import, provenance models, and HTTP server have source/tests; inspect exact operation semantics before relying on them."
     - "Universal file-format support, broad language bindings, stable C ABI, autonomous self-evolution, distributed storage, and petabyte/exabyte performance are not established runtime capabilities."
+    - "PR #61 is the proposed distributed-network architecture only; it adds no peer transport, cryptographic node identity, chunk store, or replication runtime."
+    - "PR #49 is local resource-backed agent collaboration/discovery; it is not peer discovery, authenticated node identity, remote chunk transfer, or replication."
     - "Performance/context/storage documents specify goals and proposed designs; benchmark and implement incrementally."
   open_pull_requests_at_last_audit:
     - number: 14
@@ -95,14 +97,17 @@ status:
       topic: "Progressive agent onboarding and handoffs."
       url: "https://github.com/usamaizm/AIDB/pull/45"
     - number: 49
-      topic: "Durable agent discovery and collaboration; fix CLI surface mapping before merge."
+      topic: "Durable local agent collaboration/discovery; CLI backing map patch applied; rebase and current-head CI pending."
       url: "https://github.com/usamaizm/AIDB/pull/49"
     - number: 50
       topic: "E1 companion for PR 49; merge with or after PR 49 only."
       url: "https://github.com/usamaizm/AIDB/pull/50"
     - number: 55
-      topic: "Draft comprehensive audit remediation; first tranche only."
+      topic: "Draft comprehensive audit remediation; expanded errors, HTTP hardening, atomic writes, and verification checks; latest-head CI/review/rebase pending."
       url: "https://github.com/usamaizm/AIDB/pull/55"
+    - number: 61
+      topic: "Proposed distributed-network placement/transport architecture; documentation only; identity/manifest/retention decisions open."
+      url: "https://github.com/usamaizm/AIDB/pull/61"
 canonical_docs:
   project_context: docs/PROJECT_CONTEXT.md
   contributor_rules: AGENTS.md
@@ -116,6 +121,7 @@ canonical_docs:
     language_neutral_contract: docs/language-agnostic-contract.md
     c_api_proposal: docs/c-first-api.md
     multilingual: docs/multilingual-and-language-agnostic.md
+  distributed_networking_proposal: "https://github.com/usamaizm/AIDB/pull/61"
     api_design: docs/api-design-principles.md
     artifact_formats: docs/agent-compatibility-and-file-formats.md
     binary_assembly: docs/binary-and-assembly.md
@@ -132,7 +138,8 @@ priority_order:
   - "Recheck CI for current main and keep Python 3.10/3.11/3.12 green."
   - "Review export/import and snapshot restore for atomicity, idempotency, privacy, and failure recovery."
   - "Continue draft audit remediation in PR 55; do not merge before independent review and full CI."
-  - "Reconcile PRs 14, 15, 16, 24, 25, 45, 49, and 50; do not blind-merge stale branches."
+  - "Reconcile PRs 14, 15, 16, 24, 25, 45, 49, 50, 55, and 61; do not blind-merge stale branches."
+  - "Keep PR #49's semantic collaboration capabilities distinct from PR #61's proposed peer transport and placement architecture."
   - "Resolve the E1 N4b portable-integrity gap with a versioned, backward-compatible integrity policy."
   - "Harden HTTP boundary before public exposure: authorization, TLS deployment, request limits, timeouts, and rate limiting."
   - "Implement bounded/paginated retrieval, streaming, resource budgets, and compact context assembly in tested increments."
