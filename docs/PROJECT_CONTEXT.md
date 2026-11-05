@@ -1,6 +1,6 @@
 # AIDB Project Context and Agent Handoff
 
-Last reconciled: 2026-10-10
+Last reconciled: 2026-11-05
 Status: living handoff; experimental project; update this file when material decisions, implementation status, or priorities change.
 
 ## Read this first
@@ -10,10 +10,11 @@ For any new human or AI session:
 1. Read [`.aidb/session-context.yml`](../.aidb/session-context.yml) for a machine-readable orientation and canonical pointers, then read this file for the human-readable handoff. Neither is a substitute for source code or tests.
 2. Read `AGENTS.md` for contributor rules and safety invariants.
 3. Read `README.md` for the user-facing project overview and quick start.
-4. Read `.aidb/protocol.yml` before interpreting or processing external AI requests; read `.aidb/knowledge.yml` for the knowledge index and authority rules.
-5. Read `docs/repository-audit.md` for current risks, CI baseline, open PR triage, and launch blockers.
-6. For the task at hand, read the relevant linked contract/design docs below and inspect current source/tests. Do not assume a design document means a feature is implemented.
-7. Verify current branch, recent commits, CI, issues, and PRs before making status claims. Update this handoff and the audit when the verified state materially changes.
+4. Read `DISCUSSION.md` for active coordination, decisions, blockers, and handoffs.
+5. Read `.aidb/protocol.yml` before interpreting or processing external AI requests; read `.aidb/knowledge.yml` for the knowledge index and authority rules.
+6. Read `docs/repository-audit.md` for current risks, CI baseline, open PR triage, and launch blockers.
+7. For the task at hand, read the relevant linked contract/design docs below and inspect current source/tests. Do not assume a design document means a feature is implemented.
+8. Verify current branch, recent commits, CI, issues, and PRs before making status claims. Update this handoff and the audit when the verified state materially changes.
 
 When a user supplies this repository URL in a fresh session, begin with this file and `AGENTS.md`, then fetch the current versions from the default branch. Do not rely on model memory or an old transcript as the source of truth.
 
@@ -99,18 +100,16 @@ Known limitations:
 
 ## Current work queue
 
-Use the live GitHub issue/PR state and `docs/repository-audit.md` to refresh this list before acting. As last checked on 2026-10-10, PRs #8, #13, #14, #15, and #16 remained open and require reconciliation, not blind merging:
-- #8: compare online-service changes against the server/CLI already on main; review public deployment security before exposure.
-- #13: compare against the atomic/schema-safe import fix already on main; close or reconcile only after checking the actual diff.
-- #14 and #15: review together because agent discovery and network-loop work overlaps.
-- #16: living context and agent identity proposal; this handoff now provides a versioned-in-repository starting point, but compare its remaining unique changes before deciding.
-- Keep CI green; refresh the audit from current run results.
-- Follow [the implementation roadmap](IMPLEMENTATION_ROADMAP.md) as the canonical actionable backlog; mark work complete only with source, tests, and CI evidence.
+Verified against live GitHub state on 2026-11-05:
+- Main is `3de365d36f3f5bd353a24c8fa8a0bb01921b0ba1`. CI run [41974601882](https://github.com/usamaizm/AIDB/actions/runs/41974601882) passed Python 3.10/3.11/3.12: 128 passed, 3 skipped, 1 xfailed (E1 N4b); Ruff and compile checks passed.
+- Draft remediation PR [#55](https://github.com/usamaizm/AIDB/pull/55) is in progress. Its observed head CI run [42089972938](https://github.com/usamaizm/AIDB/actions/runs/42089972938) passed the three-version matrix: 129 passed, 3 skipped, 1 xfailed; Ruff and compile checks passed. The PR is not merged.
+- Other open PRs at the time of this refresh: #14, #15, #16, #24, #25, #45, #49, and #50. Reconcile them against current main and the latest issue #18 evaluation; do not blind-merge.
+- The most recent full-repository evaluation and updated findings are recorded on [issue #18](https://github.com/usamaizm/AIDB/issues/18); the accepted design exchanges and outstanding owner decisions are on [issue #29](https://github.com/usamaizm/AIDB/issues/29).
+- Keep CI green; preserve the E1 N4b xfail until a backward-compatible integrity/versioning decision is made.
+- Follow [the implementation roadmap](IMPLEMENTATION_ROADMAP.md) as the canonical actionable backlog. Mark work complete only with source, regression tests, and current CI evidence.
 - Add benchmark baselines before making performance claims.
 - Implement context-budgeted retrieval, bounded/paginated APIs, streaming, resource controls, and storage improvements in small tested increments.
-- Continue verifying import/export/snapshot restore, provenance invariants, HTTP authorization and deployment boundaries.
-
-This list is not permission to merge PRs, change repository settings, expose a public service, or execute untrusted artifacts.
+- Do not merge PRs, change repository settings, expose a public service, or execute untrusted artifacts without the required authorization and safeguards.
 
 ## Decision and status rules
 
