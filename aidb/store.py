@@ -1767,24 +1767,44 @@ class AIDB:
     def update_resource(self, resource_id, content=None, metadata=None, owner=None, expected_revision=None):
         if metadata is not None and not isinstance(metadata, dict):
             raise InvalidArgumentError("resource metadata must be an object")
-        row = self.db.execute(
-            "SELECT * FROM home_resources WHERE id=?", (resource_id,)
-        ).fetchone()
-        if row is None:
-            raise NotFoundError("resource does not exist", details={"resource_id": resource_id})
-        if owner is not None and row["owner"] != owner:
-            raise PermissionDeniedError("owner mismatch", details={"resource_id": resource_id})
-        if expected_revision is not None and row["revision"] != expected_revision:
-            raise RevisionConflictError("revision conflict", details={"resource_id": resource_id, "expected_revision": expected_revision, "actual_revision": row["revision"]})
+        if expected_revision is not None and (
+            isinstance(expected_revision, bool)
+            or not isinstance(expected_revision, int)
+            or expected_revision < 1
+        ):
+            raise InvalidArgumentError("expected_revision must be a positive integer")
 
-        old_revision = row["revision"]
-        new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
-        new_content = json.loads(row["content"]) if content is None else content
-        content_json = self._json_value(new_content)
         with self._atomic("update_resource"):
+            row = self.db.execute(
+                "SELECT * FROM home_resources WHERE id=?", (resource_id,)
+            ).fetchone()
+            if row is None:
+                raise NotFoundError(
+                    "resource does not exist", details={"resource_id": resource_id}
+                )
+            if owner is not None and row["owner"] != owner:
+                raise PermissionDeniedError(
+                    "owner mismatch", details={"resource_id": resource_id}
+                )
+            if expected_revision is not None and row["revision"] != expected_revision:
+                raise RevisionConflictError(
+                    "revision conflict",
+                    details={
+                        "resource_id": resource_id,
+                        "expected_revision": expected_revision,
+                        "actual_revision": row["revision"],
+                    },
+                )
+
+            old_revision = row["revision"]
+            new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
+            new_content = json.loads(row["content"]) if content is None else content
+            content_json = self._json_value(new_content)
             self.db.execute(
-                "UPDATE home_resources SET content=?, metadata=?, revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=?",
-                (content_json, self._json(new_metadata), resource_id),
+                "UPDATE home_resources SET content=?, metadata=?, revision=revision+1, "
+                "updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') "
+                "WHERE id=? AND revision=?",
+                (content_json, self._json(new_metadata), resource_id, old_revision),
             )
             note = self.db.execute(
                 "SELECT * FROM notes WHERE resource_id=?", (resource_id,)
@@ -1792,7 +1812,9 @@ class AIDB:
             if note is not None:
                 if isinstance(new_content, dict):
                     if not {"title", "content"}.issubset(new_content):
-                        raise InvalidArgumentError("note resource content must include title and content")
+                        raise InvalidArgumentError(
+                            "note resource content must include title and content"
+                        )
                     note_title = new_content["title"]
                     note_content = new_content["content"]
                     note_kind = new_content.get("kind", note["kind"])
@@ -1809,15 +1831,39 @@ class AIDB:
                         "UPDATE home_resources SET content=? WHERE id=?",
                         (self._json_value(new_content), resource_id),
                     )
+                if not all(isinstance(value, str) for value in (
+                    note_title, note_content, note_kind
+                )) or not note_kind.strip():
+                    raise InvalidArgumentError(
+                        "note title, content, and kind must be strings"
+                    )
                 self.db.execute(
-                    "UPDATE notes SET title=?, content=?, kind=?, metadata=?, revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE resource_id=?",
-                    (note_title, note_content, note_kind, self._json(new_metadata), resource_id),
+                    "UPDATE notes SET title=?, content=?, kind=?, metadata=?, "
+                    "revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') "
+                    "WHERE resource_id=?",
+                    (
+                        note_title,
+                        note_content,
+                        note_kind,
+                        self._json(new_metadata),
+                        resource_id,
+                    ),
                 )
             self.db.execute(
-                "INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)",
-                ("chg:" + str(uuid.uuid4()), resource_id, "update", owner or row["owner"],
-                 old_revision, old_revision + 1,
-                 self._json({"content_changed": content is not None, "metadata_changed": metadata is not None})),
+                "INSERT INTO home_changes(change_id,resource_id,operation,actor,"
+                "previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)",
+                (
+                    "chg:" + str(uuid.uuid4()),
+                    resource_id,
+                    "update",
+                    owner or row["owner"],
+                    old_revision,
+                    old_revision + 1,
+                    self._json({
+                        "content_changed": content is not None,
+                        "metadata_changed": metadata is not None,
+                    }),
+                ),
             )
         return self.get_resource(resource_id)
 
