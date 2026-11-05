@@ -165,7 +165,7 @@ def validate_bind_security(
 
 
 def create_server(
-    db: AIDB,
+    db: HomeStore,
     host: str = "127.0.0.1",
     port: int = 8765,
     auth_token: str | None = None,
