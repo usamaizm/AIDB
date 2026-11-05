@@ -1269,12 +1269,81 @@ class AIDB:
         return {"id":s.id,"version":s.version,"node":{"id":s.node_id},"visibility":s.visibility,"capabilities":s.capabilities,"resources":s.resource_types,"transports":s.transports,"extensions":s.extensions,"constraints":s.constraints,"issued_at":s.issued_at}
 
     def verify_home(self):
-        issues=[]
-        for row in self.db.execute("SELECT id,resource_id,operation,previous_revision,new_revision FROM home_changes ORDER BY id").fetchall():
-            if row["operation"] in {"create","update","publish"} and row["resource_id"]:
-                resource=self.db.execute("SELECT revision FROM home_resources WHERE id=?", (row["resource_id"],)).fetchone()
-                if resource is None: issues.append("missing resource:"+row["resource_id"])
-                if row["new_revision"] is not None and resource is not None and row["new_revision"] > resource["revision"]: issues.append("future revision:"+str(row["id"]))
+        issues = []
+        resources = {
+            row["id"]: row
+            for row in self.db.execute("SELECT * FROM home_resources").fetchall()
+        }
+
+        for row in self.db.execute(
+            "SELECT id,resource_id,operation,previous_revision,new_revision "
+            "FROM home_changes ORDER BY id"
+        ).fetchall():
+            resource_id = row["resource_id"]
+            resource = resources.get(resource_id) if resource_id is not None else None
+            if resource_id is not None and resource is None:
+                issues.append("missing resource for change:" + str(row["id"]))
+                continue
+            if row["operation"] in {"create", "update", "publish"} and resource is not None:
+                if (
+                    row["new_revision"] is not None
+                    and row["new_revision"] > resource["revision"]
+                ):
+                    issues.append("future revision:" + str(row["id"]))
+                if (
+                    row["previous_revision"] is not None
+                    and row["new_revision"] is not None
+                    and row["new_revision"] != row["previous_revision"] + 1
+                ):
+                    issues.append("invalid revision transition:" + str(row["id"]))
+
+        for note in self.db.execute("SELECT * FROM notes ORDER BY id").fetchall():
+            resource = resources.get(note["resource_id"])
+            if resource is None:
+                issues.append("orphan note:" + str(note["id"]))
+                continue
+            if resource["resource_type"] != "note":
+                issues.append("note resource type mismatch:" + str(note["id"]))
+            try:
+                content = json.loads(resource["content"])
+            except (TypeError, json.JSONDecodeError):
+                issues.append("invalid note resource content:" + str(note["id"]))
+                continue
+            if not isinstance(content, dict) or any(
+                content.get(key) != note[key] for key in ("title", "content", "kind")
+            ):
+                issues.append("note content mismatch:" + str(note["id"]))
+            if (
+                resource["visibility"] != note["visibility"]
+                or resource["revision"] != note["revision"]
+                or resource["owner"] != note["owner"]
+            ):
+                issues.append("note resource metadata mismatch:" + str(note["id"]))
+
+        for relation in self.db.execute(
+            "SELECT id,source_resource_id,target_resource_id FROM resource_relations"
+        ).fetchall():
+            if relation["source_resource_id"] not in resources:
+                issues.append("missing relation source:" + str(relation["id"]))
+            if relation["target_resource_id"] not in resources:
+                issues.append("missing relation target:" + str(relation["id"]))
+
+        for blob in self.db.execute(
+            "SELECT artifact_id FROM artifact_blobs ORDER BY artifact_id"
+        ).fetchall():
+            try:
+                if self.get_artifact_bytes(blob["artifact_id"]) is None:
+                    issues.append("orphan artifact blob:" + str(blob["artifact_id"]))
+            except IntegrityFailureError:
+                issues.append("artifact blob integrity failure:" + str(blob["artifact_id"]))
+
+        for snapshot in self.db.execute(
+            "SELECT snapshot_id,content,content_hash FROM home_snapshots ORDER BY id"
+        ).fetchall():
+            digest = hashlib.sha256(snapshot["content"].encode("utf-8")).hexdigest()
+            if digest != snapshot["content_hash"] or snapshot["snapshot_id"] != "snap:" + digest:
+                issues.append("snapshot integrity failure:" + snapshot["snapshot_id"])
+
         return {"ok": not issues, "issues": issues}
 
     def export_home(self, include_private=True):
