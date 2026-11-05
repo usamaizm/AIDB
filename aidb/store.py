@@ -1269,12 +1269,28 @@ class AIDB:
                 "SELECT * FROM notes WHERE resource_id=?", (resource_id,)
             ).fetchone()
             if note is not None:
-                if not isinstance(new_content, dict) or not {"title", "content"}.issubset(new_content):
-                    raise ValueError("note resources must retain title and content fields")
+                if isinstance(new_content, dict):
+                    if not {"title", "content"}.issubset(new_content):
+                        raise ValueError("note resource content must include title and content")
+                    note_title = new_content["title"]
+                    note_content = new_content["content"]
+                    note_kind = new_content.get("kind", note["kind"])
+                else:
+                    # Preserve the legacy shorthand: a scalar update replaces
+                    # the note body while retaining its title and kind.
+                    note_title = note["title"]
+                    note_content = new_content
+                    note_kind = note["kind"]
+                    new_content = {
+                        "title": note_title, "content": note_content, "kind": note_kind
+                    }
+                    self.db.execute(
+                        "UPDATE home_resources SET content=? WHERE id=?",
+                        (json.dumps(new_content), resource_id),
+                    )
                 self.db.execute(
                     "UPDATE notes SET title=?, content=?, kind=?, metadata=?, revision=revision+1, updated_at=CURRENT_TIMESTAMP WHERE resource_id=?",
-                    (new_content["title"], new_content["content"], new_content.get("kind", note["kind"]),
-                     self._json(new_metadata), resource_id),
+                    (note_title, note_content, note_kind, self._json(new_metadata), resource_id),
                 )
             self.db.execute(
                 "INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)",
