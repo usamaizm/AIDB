@@ -8,7 +8,6 @@ import re
 import sqlite3
 import uuid
 import warnings
-from math import sqrt
 from threading import RLock
 from pathlib import Path
 from typing import Any
@@ -318,29 +317,6 @@ class AIDB:
     @staticmethod
     def _json(value: Any) -> str:
         return json.dumps(value if value is not None else {})
-
-    @staticmethod
-    def _tokenize(text: str) -> list[str]:
-        return [part.lower() for part in text.replace("-", " ").replace("/", " ").split() if part]
-
-    @staticmethod
-    def _embedding(text: str) -> dict[str, float]:
-        counts: dict[str, float] = {}
-        for token in AIDB._tokenize(text):
-            counts[token] = counts.get(token, 0.0) + 1.0
-        return counts
-
-    @staticmethod
-    def _cosine_similarity(a: dict[str, float], b: dict[str, float]) -> float:
-        vocab = set(a) | set(b)
-        if not vocab:
-            return 0.0
-        dot = sum(a.get(token, 0.0) * b.get(token, 0.0) for token in vocab)
-        mag_a = sqrt(sum(value * value for value in a.values()))
-        mag_b = sqrt(sum(value * value for value in b.values()))
-        if mag_a == 0 or mag_b == 0:
-            return 0.0
-        return dot / (mag_a * mag_b)
 
     @staticmethod
     def _decode_artifact_blob_row(row):
