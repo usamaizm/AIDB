@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T20:15:00Z — Expanded store input validation and concurrent revision protection
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress / review handoff
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/55
+- **Status:** in-progress
+- **Summary:** Tightened validation for agent registration, extraction/interpretation/knowledge/memory creation, workflow events, visibility values, and artifact status so malformed container types fail as `invalid_argument` rather than leaking `TypeError`. Resource updates and publication now read the current revision/visibility inside the same locked savepoint as the conditional write. Note creation and updates also use savepoints. Added regression tests for malformed API values and two simultaneous updates with the same expected revision; exactly one should succeed and the other return `revision_conflict`.
+- **Evidence:** Latest pinned head `66035d95b41e1c83d4f80c8a6ff8a20f12aa568c`. Last observed green CI [42092557120](https://github.com/usamaizm/AIDB/actions/runs/42092557120) predates this work (138 passed, 3 skipped, 1 xfailed on Python 3.10/3.11/3.12, Ruff and compile clean). No CI run is visible for the current head and no local test execution was possible in this environment. Branch comparison: 58 commits ahead / 1 behind main; GitHub reports PR #55 not mergeable. Latest independent review request is PR comment 6667572828.
+- **Risks / limitations:** These latest tests and changes are not yet CI-verified. E1 N4b still requires the maintainer-approved versioned integrity/canonicalization profile. Deletion/tombstone policy, portable external IDs/artifact identity, and the v1 migration rule remain owner decisions. Import-ID validation and the phantom CLI surface remain with the parallel contributor lane.
+- **Next action:** Obtain full compile/Ruff/pytest verification and independent review on the pinned current head; then resolve the single main-branch divergence and recheck mergeability. Do not merge before those gates.
+
+
 ### 2026-11-05T20:05:00Z — Optimistic updates serialized and note mutations moved to savepoints
 
 - **From:** agent-chatgpt
