@@ -383,3 +383,17 @@ def test_relate_resources_rolls_back_if_change_serialization_fails() -> None:
         "SELECT COUNT(*) FROM home_changes WHERE operation='relate'"
     ).fetchone()[0] == 0
     db.close()
+
+
+
+def test_compound_resource_mutation_respects_outer_transaction() -> None:
+    db = AIDB(":memory:")
+    db.db.execute("BEGIN")
+    resource = db.create_resource("item", {"value": "uncommitted"})
+    assert db.db.in_transaction
+    assert db.get_resource(resource.id).content == {"value": "uncommitted"}
+
+    db.db.rollback()
+    with pytest.raises(NotFoundError):
+        db.get_resource(resource.id)
+    db.close()
