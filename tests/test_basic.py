@@ -611,6 +611,7 @@ def test_verify_home_detects_metadata_only_artifact_corruption() -> None:
 
     verification = db.verify_home()
     assert verification["ok"] is False
-    assert any("invalid artifact metadata:" in issue for issue in verification["issues"])
-    assert any("invalid artifact metadata:" in issue for issue in verification["issues"])
+    assert verification["issues"].count(
+        f"invalid artifact metadata:{artifact.id}"
+    ) == 2
     db.close()
