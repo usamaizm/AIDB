@@ -282,6 +282,7 @@ def test_broken_epistemic_chain_exposes_integrity_error_code() -> None:
     with pytest.raises(EpistemicChainBrokenError) as broken:
         db.trace_memory_to_source(memory_id)
     assert broken.value.code == "integrity_failure"
+    assert isinstance(broken.value, RuntimeError)
     assert broken.value.details == {}
     db.close()
 
