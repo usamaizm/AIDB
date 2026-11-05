@@ -200,11 +200,65 @@ def assert_nothing_imported(db):
 RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 
 
+# ------------------------------------------- node self-specification
+# PR #35 (commit 3bbb5c4) removed the unimplemented messages /
+# message / task vocabulary from the node's advertised specification.
+# AIDB.current_specification() appends a fresh node_specifications
+# row (random spec id, version + 1) whenever the stored vocabulary
+# differs from the code's, and import_home() returns
+# current_specification() -- so importing an E1 fixture (whose stored
+# specification predates PR #35) appends a version-2 row carrying the
+# current vocabulary. That row is the node's own registration, not
+# payload data: round-trip equivalence below is computed with it
+# removed, and its exact shape is pinned separately by
+# test_node_specification_row_appended_on_import. If the advertised
+# vocabulary changes again, that pin fails and these constants must
+# be updated -- the ratchet working as designed.
+CURRENT_CAPABILITIES = ["resources", "notes", "artifacts", "knowledge",
+                        "changes", "export", "restore", "public_private",
+                        "ownership"]
+CURRENT_RESOURCE_TYPES = ["resource", "note", "artifact", "knowledge",
+                          "memory"]
+
+
+def _is_appended_spec_row(row):
+    try:
+        return (json.loads(row["capabilities"]) == CURRENT_CAPABILITIES
+                and json.loads(row["resource_types"]) == CURRENT_RESOURCE_TYPES)
+    except Exception:
+        return False
+
+
+def without_appended_spec(payload):
+    """Copy of a payload with the node's appended self-specification
+    row (see above) removed from node_specifications."""
+    p = wire(payload)
+    rows = p["tables"].get("node_specifications") or []
+    p["tables"]["node_specifications"] = [
+        r for r in rows if not _is_appended_spec_row(r)]
+    return p
+
+
+def test_node_specification_row_appended_on_import(tmp_path):
+    db = make_db(tmp_path, "spec_append")
+    db.import_home(wire(load_fixture("f1.json")))
+    rows = db.export_home()["tables"]["node_specifications"]
+    assert len(rows) == 2
+    appended = [r for r in rows if r["version"] == 2]
+    assert len(appended) == 1
+    assert json.loads(appended[0]["capabilities"]) == CURRENT_CAPABILITIES
+    assert json.loads(appended[0]["resource_types"]) == CURRENT_RESOURCE_TYPES
+    fixture_ids = {r["specification_id"] for r in
+                   load_fixture("f1.json")["tables"]["node_specifications"]}
+    assert appended[0]["specification_id"].startswith("spec:")
+    assert appended[0]["specification_id"] not in fixture_ids
+
+
 # ---------------------------------------------------------- F1
 def test_f1_round_trip(tmp_path):
     fixture = load_fixture("f1.json")
     e1, e2 = roundtrip(tmp_path, "f1", fixture)
-    assert equiv_diff(fixture, e1) == []
+    assert equiv_diff(fixture, without_appended_spec(e1)) == []
     assert equiv_diff(e1, e2) == []
     # The excluded integer PKs really are on the wire (C1, in passing).
     assert isinstance(e1["tables"]["resource_relations"][0]["id"], int)
@@ -215,7 +269,7 @@ def test_f1_round_trip(tmp_path):
 def test_f2_pass_through_fidelity(tmp_path):
     fixture = load_fixture("f2.json")
     e1, _ = roundtrip(tmp_path, "f2", fixture)
-    assert equiv_diff(fixture, e1) == []
+    assert equiv_diff(fixture, without_appended_spec(e1)) == []
     fx = fixture["tables"]["home_resources"][0]
     ex = e1["tables"]["home_resources"][0]
     # RFC 3339 timestamps in the fixture survive byte-identically.
@@ -257,11 +311,11 @@ def test_f3_leg2_revision2_into_fresh(tmp_path):
     assert got.content.get("body") == "final"
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 F3 leg 3: re-importing a revision-2 payload over a revision-1 "
-    "database silently leaves revision-1 content under a revision-2 "
-    f"history (INSERT OR IGNORE, no conflict report) ({RESULTS_REF})"))
 def test_f3_leg3_reimport_converges_or_is_rejected(tmp_path):
+    # E1 F3 leg 3 defect, closed by PR #37: import_home now detects
+    # the conflicting revision-2 rows and raises ValueError, so the
+    # rejection branch below is the observed behaviour (the
+    # convergence branch remains accepted, as in the E1 test).
     db = make_db(tmp_path, "f3_c")
     db.import_home(wire(load_fixture("f3_p1.json")))
     try:
@@ -273,15 +327,21 @@ def test_f3_leg3_reimport_converges_or_is_rejected(tmp_path):
     assert got.content.get("body") == "final"
 
 
-def test_f3_verify_home_flags_stale_revision(tmp_path):
-    # The E1 plan predicted verify_home would NOT flag the leg-3 state;
-    # the results REFUTED that: the export verification block does.
+def test_f3_reimport_conflict_rejected_and_state_unchanged(tmp_path):
+    # Replaces the E1-results pin test_f3_verify_home_flags_stale_revision.
+    # That pin encoded verify_home flagging the leg-3 stale state
+    # ("future revision:2") after a silent re-import. PR #37's import
+    # conflict detection makes the stale state unreachable via import:
+    # the revision-2 payload is rejected outright, the stored
+    # revision-1 state stands, and it still verifies clean.
     db = make_db(tmp_path, "f3_d")
     db.import_home(wire(load_fixture("f3_p1.json")))
-    db.import_home(wire(load_fixture("f3_p2.json")))
-    verification = db.export_home()["verification"]
-    assert verification["ok"] is False
-    assert "future revision:2" in verification["issues"]
+    with pytest.raises(ValueError, match="conflicting existing row"):
+        db.import_home(wire(load_fixture("f3_p2.json")))
+    got = db.get_resource(F3_RESOURCE)
+    assert got.revision == 1
+    assert got.content.get("body") == "draft"
+    assert db.export_home()["verification"]["ok"] is True
 
 
 # ---------------------------------------------------------- F4
@@ -333,7 +393,8 @@ def test_f5_reshaped_variant_equivalent_but_byte_different(tmp_path):
     variant = json.loads(load_fixture_text("f5_v.json"))
     e1_v, _ = roundtrip(tmp_path, "f5v", variant)
     e1_f, _ = roundtrip(tmp_path, "f5f", load_fixture("f1.json"))
-    assert equiv_diff(e1_v, e1_f) == []
+    assert equiv_diff(without_appended_spec(e1_v),
+                      without_appended_spec(e1_f)) == []
     assert json.dumps(e1_v, sort_keys=True) != json.dumps(e1_f, sort_keys=True)
 
 
@@ -341,22 +402,45 @@ def _snapshot_digest():
     return (FIXTURES / "f5_expected_digest.txt").read_text().strip()
 
 
-def test_f5_snapshot_create_reproduces_fixture_hash(tmp_path):
-    source = load_fixture("f5_s.json")
+def test_f5_snapshot_create_hash_is_canonical_for_current_payload(tmp_path):
+    # Replaces the E1-era frozen-digest pin (fixture
+    # f5_expected_digest.txt, digest 03042d7d...). That digest cannot
+    # reproduce on current main because the snapshot payload's
+    # composition changed deliberately: PR #37 added the artifacts /
+    # artifact_blobs tables to exports and excluded home_snapshots
+    # (recursive growth, private-history re-export), and the node's
+    # appended current-vocabulary specification row (PR #35) carries
+    # a random id and issuance timestamp. What is pinned instead:
+    # the digest is exactly the SHA-256 of the canonicalized current
+    # export, the snapshot id is content-addressed from it, and the
+    # created snapshot restores. The frozen pre-#37 digest remains
+    # exercised by test_f5_snapshot_fixture_row_restores, which is
+    # where cross-version compatibility is pinned.
     db = make_db(tmp_path, "f5_snap")
-    db.import_home(wire(source))
+    db.import_home(wire(load_fixture("f5_s.json")))
     made = db.create_snapshot()
-    digest = _snapshot_digest()
+    canonical = json.dumps(db.export_home(), sort_keys=True,
+                           separators=(",", ":"), ensure_ascii=False)
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     assert made["content_hash"] == digest
     assert made["snapshot_id"] == "snap:" + digest
+    tables = db.export_home()["tables"]
+    assert "artifacts" in tables and "artifact_blobs" in tables
+    assert "home_snapshots" not in tables
+    db.restore_snapshot(made["snapshot_id"])
 
 
 def test_f5_snapshot_fixture_row_restores(tmp_path):
+    # Cross-version pin: a snapshot row written by pre-#37 code (the
+    # fixture row, digest in f5_expected_digest.txt) still restores
+    # on current code, and the restored state is equivalent to the
+    # source modulo the node's appended specification row.
     source = load_fixture("f5_s.json")
     db = make_db(tmp_path, "f5_restore")
     db.import_home(wire(load_fixture("f5_snapshot_fixture.json")))
     db.restore_snapshot("snap:" + _snapshot_digest())
-    assert equiv_diff_excluding_snapshots(db.export_home(), source) == []
+    assert equiv_diff_excluding_snapshots(
+        without_appended_spec(db.export_home()), source) == []
 
 
 def test_f5_export_performs_no_canonicalization(tmp_path):
@@ -368,20 +452,29 @@ def test_f5_export_performs_no_canonicalization(tmp_path):
 
 
 # ---------------------------------------------------------- F6
-def test_f6_artifacts_table_rejected_as_unknown(tmp_path):
-    # The only runnable form of F6 today: an artifacts table is not
-    # representable in aidb-home-v1 and import rejects it atomically.
+def test_f6_artifacts_table_importable_without_blob(tmp_path):
+    # Was test_f6_artifacts_table_rejected_as_unknown (E1-era: an
+    # artifacts table was not representable in aidb-home-v1). PR #37
+    # made artifacts a first-class portable table: the probe payload
+    # now imports and registers the artifact row. The payload carries
+    # no artifact_blobs row, so the artifact has metadata and a
+    # recorded checksum but no payload bytes.
     db = make_db(tmp_path, "f6")
-    with pytest.raises(ValueError, match="unknown home import table"):
-        db.import_home(wire(load_fixture("f6_probe.json")))
-    assert_nothing_imported(db)
+    db.import_home(wire(load_fixture("f6_probe.json")))
+    arts = db.list_artifacts()
+    assert [a.name for a in arts] == ["fixture-greeting"]
+    assert arts[0].checksum == \
+        "69fb3d1fd21155c618ba8a5f508c872da8494069ef6dfae74d8c5b8a3b6a4361"
+    assert db.get_artifact_bytes(arts[0].id) is None
+    exp = db.export_home()
+    assert len(exp["tables"]["artifacts"]) == 1
+    assert exp["tables"]["artifact_blobs"] == []
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 F6: a registered artifact appears nowhere in export_home -- "
-    "there is no artifact path in the portable format (blocked on the "
-    f"C3 artifacts-in-profile decision) ({RESULTS_REF})"))
 def test_f6_registered_artifact_appears_in_export(tmp_path):
+    # E1 F6 defect, closed by PR #37: export_home now carries the
+    # artifacts and artifact_blobs tables (blobs base64-encoded), so
+    # a registered artifact appears in the portable format.
     db = make_db(tmp_path, "f6_reg")
     art = db.register_artifact_from_bytes(
         name="fixture-greeting", data=b"hello aidb\n",
@@ -394,19 +487,33 @@ def test_f6_registered_artifact_appears_in_export(tmp_path):
     assert "fixture-greeting" in json.dumps(db.export_home())
 
 
-@pytest.mark.skip(reason=(
-    "E1 F6 full round trip is not expressible yet: blocked on the C3 / "
-    "format-registry section 9.3 decision whether artifacts belong to "
-    "the default portable profile; export_home has no artifact path"))
 def test_f6_full_artifact_round_trip(tmp_path):
-    raise NotImplementedError
+    # Was skipped pending the C3 / format-registry section 9.3
+    # decision. PR #37 landed artifacts-in-profile: full exports
+    # carry artifact rows plus base64 blob rows, and import verifies
+    # size and checksum, so the round trip is now runnable. The
+    # payload is the fixture artifact's content: the SHA-256 of
+    # b"hello aidb\n" is the checksum recorded in f6_artifact.json.
+    fixture = json.loads(load_fixture_text("f6_artifact.json"))
+    data = b"hello aidb\n"
+    assert hashlib.sha256(data).hexdigest() == fixture["checksum"]
+    source = make_db(tmp_path, "f6_full_src")
+    art = source.register_artifact_from_bytes(
+        name=fixture["name"], data=data,
+        media_type=fixture["media_type"], filename=fixture["filename"],
+        provenance=json.loads(fixture["provenance"]),
+        status=fixture["status"], encoding=fixture["encoding"],
+        metadata=json.loads(fixture["metadata"]))
+    target = make_db(tmp_path, "f6_full_dst")
+    target.import_home(wire(source.export_home()))
+    assert target.get_artifact_bytes(art.id) == data
 
 
 # ---------------------------------------------------------- F7
 def test_f7_artifact_absent_control_round_trip(tmp_path):
     fixture = load_fixture("f7.json")
     e1, e2 = roundtrip(tmp_path, "f7", fixture)
-    assert equiv_diff(fixture, e1) == []
+    assert equiv_diff(fixture, without_appended_spec(e1)) == []
     assert equiv_diff(e1, e2) == []
     db = make_db(tmp_path, "f7_note")
     db.import_home(wire(fixture))
@@ -438,11 +545,11 @@ def build_f8_db(tmp_path):
     return db, r, s, t
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 F8 tier (i) on main: filtered export leaks a never-published "
-    "resource's change rows and the relations naming it (only "
-    f"home_resources/notes are filtered) ({RESULTS_REF})"))
 def test_f8_tier_i_filtered_export_leaks_nothing_private(tmp_path):
+    # E1 F8 tier (i) defect, closed by PR #37: filtered exports now
+    # restrict relations to both-endpoints-public, gate home_changes
+    # on a public source (and omit 'relate' operations, whose payload
+    # named the target), exclude artifacts, and carry no snapshots.
     db, _r, _s, t = build_f8_db(tmp_path)
     exp = db.export_home(include_private=False)
     tables = exp["tables"]
@@ -461,23 +568,17 @@ def test_f8_tier_i_filtered_export_leaks_nothing_private(tmp_path):
     assert leaks == []
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 F8 nested snapshot on main: snapshot rows ride along in "
-    "filtered exports and their nested content carries the private "
-    f"resource's change rows and relations unfiltered ({RESULTS_REF})"))
-def test_f8_nested_snapshot_inherits_filtering(tmp_path):
-    db, _r, _s, t = build_f8_db(tmp_path)
-    rows = db.export_home(include_private=False)["tables"]["home_snapshots"]
-    for srow in rows:
-        inner = json.loads(srow["content"]).get("tables", {})
-        assert not any(row["id"] == t.id
-                       for row in inner.get("home_resources", []))
-        assert not any(row.get("resource_id") == t.id
-                       for row in inner.get("home_changes", []))
-        assert not any(
-            t.id in (row["source_resource_id"], row["target_resource_id"])
-            for row in inner.get("resource_relations", []))
-        assert "t-secret-marker-zzz" not in srow["content"]
+def test_f8_filtered_export_carries_no_snapshots(tmp_path):
+    # Replaces the E1 xfail test_f8_nested_snapshot_inherits_filtering.
+    # PR #37 closed the nested-snapshot leak structurally: exports no
+    # longer carry home_snapshots at all (snapshot archives embedded
+    # in exports caused recursive growth and could re-export private
+    # history), so there is no nested content left to filter. If
+    # snapshot rows ever return to filtered exports, this pin goes
+    # red and the nested-content assertions must be reinstated.
+    db, _r, _s, _t = build_f8_db(tmp_path)
+    tables = db.export_home(include_private=False)["tables"]
+    assert "home_snapshots" not in tables
 
 
 @pytest.mark.skip(reason=(
@@ -586,12 +687,16 @@ def test_n4a_tampered_snapshot_rejected_at_import(tmp_path):
 def test_n4a_tampered_snapshot_detected_at_restore(tmp_path):
     db = make_db(tmp_path, "n4a_res")
     db.import_home(wire(load_fixture("n4a.json")))
-    row = db.export_home()["tables"]["home_snapshots"][0]
+    # PR #37 exports no longer carry a home_snapshots table, so the
+    # row is addressed by the fixture's snapshot_id; the detection
+    # behaviour itself is unchanged from E1.
+    snapshot_id = load_fixture(
+        "n4a.json")["tables"]["home_snapshots"][0]["snapshot_id"]
     stored = db.db.execute(
         "SELECT content, content_hash FROM home_snapshots").fetchone()
     assert hashlib.sha256(stored[0].encode("utf-8")).hexdigest() != stored[1]
     with pytest.raises(ValueError, match="snapshot integrity check failed"):
-        db.restore_snapshot(row["snapshot_id"])
+        db.restore_snapshot(snapshot_id)
 
 
 @pytest.mark.xfail(strict=True, reason=(
@@ -614,7 +719,8 @@ def test_n4c_untampered_snapshot_control(tmp_path):
     db = make_db(tmp_path, "n4c")
     db.import_home(wire(load_fixture("f5_snapshot_fixture.json")))
     db.restore_snapshot("snap:" + _snapshot_digest())
-    assert equiv_diff_excluding_snapshots(db.export_home(), source) == []
+    assert equiv_diff_excluding_snapshots(
+        without_appended_spec(db.export_home()), source) == []
 
 
 # ---------------------------------------------------------- N5
@@ -652,11 +758,11 @@ def test_n5b_nan_value_rejected(tmp_path):
         db.import_home(parsed)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 N5b-2: a programmatic NaN in a NOT NULL TEXT field makes "
-    "INSERT OR IGNORE silently drop the whole row under a success "
-    f"return -- silent row-level data loss ({RESULTS_REF})"))
 def test_n5b2_programmatic_nan_row_not_silently_dropped(tmp_path):
+    # E1 N5b-2 defect, closed by PR #37: the NaN still binds as NULL
+    # and the insert is still ignored, but import_home's conflict
+    # check now converts the silent drop into an explicit ValueError
+    # rejection (the branch this test takes on current main).
     payload = load_fixture("n1c.json")
     payload["tables"]["home_resources"][0]["metadata"] = float("nan")
     db = make_db(tmp_path, "n5b2")
@@ -682,24 +788,40 @@ def test_n6_truncated_jsonl_stream(tmp_path):
 @pytest.mark.skip(reason=(
     "E1 N6b as a stream: no JSONL/NDJSON consumer exists in aidb/; "
     "fixture n6b_duplicate.jsonl is retained for the future stream "
-    "adapter. The dict-path analogue that did run is pinned by "
-    "test_n6b_dict_path_duplicate_change_id_absorbed below"))
+    "adapter. The dict-path analogue that did run is pinned by the "
+    "test_n6b_dict_path_* tests below"))
 def test_n6b_duplicate_change_id_stream(tmp_path):
     raise NotImplementedError
 
 
-def test_n6b_dict_path_duplicate_change_id_absorbed(tmp_path):
-    # Observed dict-path behaviour: a duplicate change event is
-    # absorbed by INSERT OR IGNORE (change_id is UNIQUE). This is
-    # also what makes re-import idempotent, so it is pinned as the
-    # current default; the change-stream contract still has to ratify
-    # or reject it explicitly (E1 results, N6b).
+def test_n6b_dict_path_exact_duplicate_absorbed(tmp_path):
+    # Observed dict-path behaviour, narrowed by PR #37 (which is the
+    # explicit ratification/rejection the E1 results called for): a
+    # change row identical to the stored row -- same change_id AND
+    # same database-local id -- is absorbed on import. This is also
+    # what makes wholesale re-import of an export idempotent.
     payload = wire(load_fixture("f1.json"))
     extra = dict(payload["tables"]["home_changes"][0])
-    extra["id"] = 99
     payload["tables"]["home_changes"].append(extra)
     db = make_db(tmp_path, "n6b_dict")
     db.import_home(payload)
     rows = db.export_home()["tables"]["home_changes"]
     c1 = "chg:00000000-0000-4000-8000-0000000000c1"
     assert sum(1 for r in rows if r["change_id"] == c1) == 1
+
+
+def test_n6b_dict_path_conflicting_duplicate_rejected(tmp_path):
+    # The other half of PR #37's semantics: a duplicate whose stored
+    # representation differs -- here the same change_id with an
+    # altered payload -- is rejected as a conflict, atomically. (The
+    # original E1-era absorbed case appended a copy with a different
+    # database-local id; that is a conflict now too, because the
+    # check compares the full row found by primary key.)
+    payload = wire(load_fixture("f1.json"))
+    extra = dict(payload["tables"]["home_changes"][0])
+    extra["payload"] = "{\"tampered\":true}"
+    payload["tables"]["home_changes"].append(extra)
+    db = make_db(tmp_path, "n6b_conflict")
+    with pytest.raises(ValueError, match="conflicting existing row"):
+        db.import_home(payload)
+    assert_nothing_imported(db)
