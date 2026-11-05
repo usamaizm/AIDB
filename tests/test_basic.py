@@ -1,6 +1,7 @@
 """Basic tests for AIDB core behavior."""
 
 import base64
+import hashlib
 import aidb
 import pytest
 from threading import Barrier, Thread
@@ -533,4 +534,26 @@ def test_concurrent_updates_enforce_expected_revision() -> None:
     assert not second.is_alive()
     assert sorted(outcomes) == ["conflict", "updated"]
     assert db.get_resource(resource.id).revision == 2
+    db.close()
+
+
+
+def test_public_store_methods_reject_wrong_container_and_status_types() -> None:
+    db = AIDB(":memory:")
+    with pytest.raises(InvalidArgumentError):
+        db.create_resource("item", {}, visibility=[])
+    with pytest.raises(InvalidArgumentError):
+        db.create_note("title", "body", visibility={})
+    with pytest.raises(InvalidArgumentError):
+        db.register_agent("invalid-permissions", permissions={"read": True})
+    with pytest.raises(InvalidArgumentError):
+        db.add_event("test", metadata=[])
+    with pytest.raises(InvalidArgumentError):
+        db.register_artifact(
+            name="invalid-status",
+            media_type="text/plain",
+            size_bytes=0,
+            checksum=hashlib.sha256(b"").hexdigest(),
+            status=[],
+        )
     db.close()
