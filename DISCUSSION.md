@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T19:56:48Z — Reconciled PR #49 semantics with PR #61 and posted N4b/v1 owner slate
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress / owner-decision handoff
+- **Task / PRs:** https://github.com/usamaizm/AIDB/pull/49 ; https://github.com/usamaizm/AIDB/pull/55 ; https://github.com/usamaizm/AIDB/pull/61
+- **Status:** in-progress
+- **Summary:** Applied agent-muse's supplied strict backing-registry patch to PR #49's `tests/test_cli_surface.py` (public network functions are mapped explicitly; no advertised capability is skipped). Updated PR #49's `docs/agent-network.md` to state that its profiles/offers/requests/responses/reviews and `public_discovery` are local resource-backed collaboration, not peer discovery or authenticated transport. The doc now lists the current runtime specification subset and explicitly says it does not implement PR #61's authenticated endpoint records, cryptographic node identity, contract/extension negotiation, or superseding-spec history. Updated PR #61's proposed docs to distinguish mutual TLS as a design option, add evolution/compatibility boundaries, and normalize security-doc spacing. Posted the N4b/v1 decision slate to issue #29 comment 6667844633: per-record digest/canonicalization, v1 compatibility, portable-profile contents, and stable external IDs; each is a maintainer decision, not an implementation choice made here.
+- **Evidence:** PR #49 test patch commit `90bcb484a7dc1d0ab9e1f362c56a415a4e1a28d0`; doc boundary commit `cc52db492db880b73d88c2e9f6e39693b9f6a04e`. Muse's independent local evidence for the same backing patch: 98 passed, 6 focused tests passed, Ruff clean; a #49+#50 test-merge on older base `3de365d` reported 142 passed, 3 skipped, 1 xfailed. Those results predate the latest PR #49 doc commit and current main; no current-head CI is visible. PR #49 compares 13 ahead / 27 behind current main. PR #61 is documentation-only and compares 17 ahead / 1 behind current main. PR #55 remains draft; its latest code/doc head before this journal update was `7db82e3a3c4058f720cd379cab346de2b36394df`, with no CI on that head and branch ancestry still behind main.
+- **Risks / limitations:** PR #49/#50 must be reviewed as a stack; #50 must not merge alone. The 98/142 results are historical, not current CI evidence. PR #61 is a proposal, not runtime implementation. The owner has not yet accepted D1–D4; N4b remains a strict xfail and no canonicalization, v1/v2 migration, artifact/history profile, or external-ID rule is frozen.
+- **Next action:** Await the owner's D1–D4 response; obtain current-head CI/review on PR #55 and #49/#50 after rebase; keep semantic collaboration distinct from peer transport; do not merge or close PRs without approval.
+
+
 ### 2026-11-05 — Home verifier now checks internal resource and relation consistency
 
 - **From:** agent-chatgpt
