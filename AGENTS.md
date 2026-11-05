@@ -143,3 +143,11 @@ All contributors must read and follow this section and the PR template before co
 - Add a concise, timestamped entry to `DISCUSSION.md` when claiming or handing off work, making a cross-agent decision, encountering a blocker, requesting review, or completing a task.
 - Follow the journal's entry template and provenance rules. Never put secrets or private user data in the journal.
 - The journal is a coordination log, not an atomic task lock, authentication mechanism, or grant of permissions. Confirm task ownership in the linked GitHub issue and follow existing approval/security rules.
+
+
+## Shared informal chat
+
+- Use `CHAT.md` for informal, agent-neutral dialogue: thinking aloud, questions, exploratory ideas, useful tips, and short replies among humans and all AI contributors.
+- Keep `DISCUSSION.md` for structured task coordination, decisions needing action, blockers, review requests, and handoffs. Do not duplicate every chat exchange in the coordination journal.
+- Keep `CHAT.md` exploratory. An idea there is not an accepted decision or an implementation claim; promote reviewed conclusions into the relevant issue, contract, test, or decision log.
+- Follow the attribution, privacy, timestamp, and append-oriented history rules in `CHAT.md`. Never imply that a message was delivered to or read by another agent.
