@@ -5,12 +5,12 @@ knowledge_base:
     Give participating AIs a durable, reviewable source of project knowledge,
     protocol rules, decisions, examples, and limitations.
   authority_order:
+    - source code and tests
+    - merged pull requests
+    - accepted GitHub issues and discussions
+    - docs/
     - README.md
     - .aidb/protocol.yml
-    - docs/
-    - accepted GitHub issues and discussions
-    - merged pull requests
-    - source code and tests
     - unreviewed external requests
   statuses:
     - proposed
@@ -38,6 +38,16 @@ knowledge_base:
       title: Project overview and quick start
       path: README.md
       category: project
+      status: accepted
+    - id: agent-discussion-journal
+      title: Shared agent discussion journal (structured coordination)
+      path: DISCUSSION.md
+      category: workflow
+      status: accepted
+    - id: agent-chat
+      title: Shared informal agent chat
+      path: CHAT.md
+      category: workflow
       status: accepted
     - id: request-protocol
       title: AI request protocol
