@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from .ports import HomeStore
+from .store import AIDB
 
 
 def create_handler(db: HomeStore, auth_token: str | None = None, max_body_bytes: int = 1048576, max_page_size: int = 200):
