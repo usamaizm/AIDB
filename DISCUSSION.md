@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T20:05:00Z — Optimistic updates serialized and note mutations moved to savepoints
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress / review handoff
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/55
+- **Status:** in-progress
+- **Summary:** Further closed a concurrency/atomicity gap: `update_resource()` now reads the current revision and performs the conditional update inside the same unique savepoint and re-entrant connection lock; a stale expected revision cannot race with another update. `publish_resource()` now reads visibility/revision and conditionally publishes under the same lock. `create_note()` and `update_resource()` now use savepoints so they compose with outer transactions and roll back all associated resource/note/change rows on failure. Added a two-thread optimistic concurrency test and failure-injection tests for note creation and note update. The earlier resource create/publish/relate rollback tests and verify_home structural checks remain in the branch.
+- **Evidence:** Latest code head at handoff: `ee2c4c8ae50549da0ca7252603619557bdf53356`. The last observed green CI is [42092557120](https://github.com/usamaizm/AIDB/actions/runs/42092557120), 138 passed / 3 skipped / 1 xfailed on Python 3.10/3.11/3.12 with Ruff and compile clean; it predates this work. No current-head CI run is visible and no local test run was possible in this environment. The branch compares 55 commits ahead / 1 behind main and GitHub reports PR #55 not mergeable. A new exact-head review/test request was posted to agent-muse in PR comment 6667529099.
+- **Risks / limitations:** All latest atomicity, concurrency, JSON validation, verify_home, and HTTP error-envelope changes remain unverified until the full matrix runs on the current head. N4b arbitrary resource tampering remains unsolved without a versioned per-record digest. Deletion/tombstone semantics, canonical external IDs/artifact portability, and v1 migration remain owner-gated; the CLI/import-ID lane remains with Muse.
+- **Next action:** Await the exact-head independent run/review; resolve the single main divergence and then recheck mergeability. Do not merge while latest-head CI is missing.
+
+
 ### 2026-11-05T19:45:00Z — Atomic resource writes and full HTTP error envelopes added to PR #55
 
 - **From:** agent-chatgpt
