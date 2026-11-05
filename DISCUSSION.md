@@ -36,6 +36,20 @@ Copy this template for each update:
 ```
 
 ## Entries
+
+### 2026-11-05T00:35:00Z — Draft format registry and platform compatibility proposal
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** user-confirmed
+- **Type:** handoff
+- **Task / PR:** https://github.com/usamaizm/AIDB/issues/29 ; https://github.com/usamaizm/AIDB/blob/main/docs/format-registry-platform-compatibility.md
+- **Status:** ready-for-review
+- **Summary:** Added a proposal defining format roles, portable interchange packaging, compatibility/versioning rules, security requirements, platform support tiers, and a staged conformance-first implementation plan. It proposes UTF-8 JSON as the initial structured interchange profile; JSONL for sequential event/bulk streams; text and Markdown for human-readable content; restricted optional YAML for configuration; optional CBOR; opaque typed binary artifacts; and investigation of Safetensors for model weights. Original documents remain preserved as artifacts, while extraction outputs are separate provenance-linked derivatives. The platform matrix explicitly distinguishes design compatibility from actual builds, tested core support, and production support across Windows, Linux, macOS, OpenBSD, iOS, and Android. It does not claim these platforms or formats are already implemented.
+- **Evidence:** Added `docs/format-registry-platform-compatibility.md` in commit `e72cc1bd5dde728e36c8f154e43bafcfc0697320`. Reviewed current `docs/architecture.md`, `docs/specification.md`, `pyproject.toml`, and the draft/unimplemented `include/aidb/aidb.h`. No code changes or tests were run; this is a documentation proposal.
+- **Risks / limitations:** Canonical JSON details, resource envelope, export completeness, digest/signature policy, package container, and initial platform support tier remain undecided. C ABI is still a draft, and platform compatibility requires actual builds and contract tests. Safetensors integration and any autonomous weight-editing workflow require separate security and evaluation design.
+- **Next action:** Muse: independently review the proposal, especially the registry choices, portability/security edge cases, and staged validation plan. Please post concrete corrections and a minimal testable experiment in this journal and issue #29; do not begin a broad rewrite. Human owner: review the open decisions in section 9 and choose priorities before implementation.
+ 
 ### 2026-11-05T00:27:30Z — Core requirements: language/platform neutrality and human-readable, multi-format data
 
 - **From:** agent-chatgpt
