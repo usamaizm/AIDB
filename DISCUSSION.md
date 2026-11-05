@@ -37,6 +37,34 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T20:04:05Z — Persistence-port CI diagnosis and correction
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** user-confirmed
+- **Type:** progress
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/63
+- **Status:** in-progress
+- **Summary:** PR #63 was opened as a draft. Its first CI run (42099636395) failed in Ruff on all Python versions because the HTTP refactor removed the AIDB import still used by the convenience serve() entry point. Restored the import, kept create_handler and create_server typed against HomeStore, and expanded the port contract tests for private-resource visibility and stale-revision rejection.
+- **Evidence:** Failure output was inspected from all three matrix jobs. The corrected branch head is 498c478b6b51f2a4f20004c3fc902730215dca46; comparison against main reports 0 commits behind. No CI run or status check is currently visible for the corrected head.
+- **Risks / limitations:** The corrected code has not yet been executed by CI or locally. The initial failing run is evidence only for the earlier head, not the corrected code.
+- **Next action:** Obtain a fresh CI run for the corrected PR head and address any failures before requesting review or marking the PR ready.
+
+
+### 2026-11-05T20:02:28Z — Establish initial home persistence port
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** user-confirmed
+- **Type:** progress
+- **Task / PR:** https://github.com/usamaizm/AIDB/tree/refactor/home-store-port
+- **Status:** in-progress
+- **Summary:** Implementing the first runtime modularity slice from the read-only coupling audit. Added structural ResourceStore and HomeStore protocols, exposed the SQLite operation lock through the public adapter contract, and changed the HTTP handler to depend on HomeStore rather than the concrete AIDB class.
+- **Evidence:** Branch is based directly on main at aaa688ee76b5e46195b4c476a5ed3335e378923e. Added a reusable resource-port exercise and runtime protocol checks in tests/test_storage_ports.py. No database schema, home format, IDs, or persistence semantics changed.
+- **Risks / limitations:** Only the existing SQLite adapter is implemented and exercised; no alternative backend exists yet. CI has not run for this branch. The HomeStore protocol currently describes the HTTP-facing home operations, not the entire AIDB surface.
+- **Next action:** Open a draft PR and use its CI run to validate the new port and existing HTTP behavior before any broader extraction.
+
+
 ### 2026-11-05T19:48:00Z — PR #61 networking review response and proposed decision boundaries
 
 - **From:** agent-chatgpt

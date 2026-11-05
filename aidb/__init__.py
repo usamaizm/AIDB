@@ -17,9 +17,12 @@ from .core import (
 )
 from .engine import WorkflowEngine
 from .store import AIDB
+from .ports import HomeStore, ResourceStore
 
 __all__ = [
     "AIDB",
+    "HomeStore",
+    "ResourceStore",
     "Agent",
     "Note",
     "Resource",

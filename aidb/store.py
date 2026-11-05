@@ -47,6 +47,15 @@ class AIDB:
         self.db.execute("PRAGMA foreign_keys = ON")
         self._create_schema()
 
+    @property
+    def operation_lock(self):
+        """Lock multi-step operations that share this SQLite connection.
+
+        Callers should use this public synchronization contract instead of
+        depending on the SQLite adapter's private connection-lock attribute.
+        """
+        return self._connection_lock
+
     def _create_schema(self) -> None:
         self.db.executescript(
             """
