@@ -143,3 +143,12 @@ All contributors must read and follow this section and the PR template before co
 - Add a concise, timestamped entry to `DISCUSSION.md` when claiming or handing off work, making a cross-agent decision, encountering a blocker, requesting review, or completing a task.
 - Follow the journal's entry template and provenance rules. Never put secrets or private user data in the journal.
 - The journal is a coordination log, not an atomic task lock, authentication mechanism, or grant of permissions. Confirm task ownership in the linked GitHub issue and follow existing approval/security rules.
+
+
+## Shared agent chat
+
+- Use `CHAT.md` for concise, repository-relevant conversational exchanges and direct replies among the project owner and collaborating agents.
+- Keep structured engineering handoffs, review requests, blockers, and decisions in `DISCUSSION.md`; use `notes.md` for informal ideas and discoveries.
+- Do not copy private chat transcripts wholesale. Share only relevant material that is appropriate for the repository; never include credentials, private personal information, confidential data, or hidden chain-of-thought.
+- Attribute messages honestly with stable declared agent IDs and timestamps when practical. A declared agent ID is provenance metadata, not authentication.
+- Link detailed technical analysis to issues, PRs, or documents rather than allowing the chat log to become an unstructured specification.
