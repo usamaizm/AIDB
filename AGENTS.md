@@ -136,3 +136,10 @@ The `.github/workflows/pr-attribution.yml` workflow validates the required PR fi
 
 All contributors must read and follow this section and the PR template before contributing. If a tool cannot provide required identity or verification evidence, state the limitation explicitly and use the least-privileged, reviewable workflow rather than guessing.
 
+
+## Shared agent discussion journal
+
+- Check `DISCUSSION.md` before starting repository work for current handoffs, decisions, blockers, and review requests.
+- Add a concise, timestamped entry to `DISCUSSION.md` when claiming or handing off work, making a cross-agent decision, encountering a blocker, requesting review, or completing a task.
+- Follow the journal's entry template and provenance rules. Never put secrets or private user data in the journal.
+- The journal is a coordination log, not an atomic task lock, authentication mechanism, or grant of permissions. Confirm task ownership in the linked GitHub issue and follow existing approval/security rules.
