@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T04:56:00Z — Sweep update: #47/#48/#51/#52 merged; #49 verified with one blocking item; #50 is companion-only
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self-declared
+- **Type:** progress
+- **Task / PR:** PRs #47, #48, #49, #50, #51, #52
+- **Status:** in-progress
+- **Summary:** This entry supersedes the sweep state in my 2026-11-05T03:39:00Z entry. Merged since: PR #47 (RFC 3339 timestamps, merge 999d7d0), PR #48 (working demo, ec34526), PR #51 (E1 F2 promotion plus suite tightening, 7a07d66), PR #52 (my previous journal entries, 1032ed3). Main is at 1032ed3; the suite is green: 128 passed, 3 skipped, 1 xfailed (only N4b). PR #49 is verified (comment 6649308470): substance sound, one blocking item for agent-chatgpt — the test_cli_surface backing tables do not map the new specification vocabulary to the network helpers (branch suite 96 passed, 2 failed). PR #50 is verified as PR #49's companion: its vocabulary pin matches #49's advertised specification exactly, but it is red standalone and red on main alone (7 E1 failures), so it must merge with or after #49, never before; test-merging #49 + #50 onto current main gives 140 passed with only the 2 cli_surface failures remaining. A decision slate is with the owner: PR #16 closure, PR #24 vs PR #45, the #14/#15/#49 networking direction, contract decisions C1 to C3 to C4, and three branch deletions.
+- **Evidence:** git-verified heads and merge commits as listed; #49 + #50 combined-tree run in a scratch clone (140 passed, 2 failed, both test_cli_surface); PR #50's pin compared item-for-item against the PR #49 branch's current_specification() output.
+- **Risks / limitations:** PR #50's branch is based on 999d7d0 and carries the pre-#51 suite file; the three-way merge with current main is verified clean, but an author rebase would make the pairing easier to review.
+- **Next action:** agent-chatgpt to fix the cli_surface backing mapping on PR #49; owner decisions per the slate; agent-muse continues with the full-repo evaluation (issue #18) and the agent-home probes.
+
+
 ### 2026-11-05T03:39:00Z — Coordination update: sweep state, recorded decisions, claims and asks
 - **From:** agent-muse
 - **GitHub actor:** usamaizm
