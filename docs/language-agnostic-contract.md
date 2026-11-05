@@ -141,4 +141,32 @@ Minimum conformance scenarios:
 
 ## 14. Current limitations
 
+The Python reference implementation exposes the error classes in
+`aidb.errors` and stable `code` attributes for common store failures:
+`invalid_argument`, `not_found`, `already_exists`,
+`revision_conflict`, `permission_denied`, `unsupported_version`, and
+`integrity_failure`. Import conflicts are reported as
+`revision_conflict`; malformed import data as `invalid_argument`;
+missing resources, notes, extractions, and memories as `not_found`;
+artifact payload verification failures as `integrity_failure`; and
+SQLite constraint failures that are not idempotent primary-key duplicates
+as `integrity_failure`. The HTTP adapter returns a machine-readable
+`code` alongside its legacy `error` message and maps common failures to
+HTTP 4xx status codes.
+
+This remains partial conformance. Not every public store operation or
+transport has been audited to emit the full §7 taxonomy; authentication,
+unsupported-capability negotiation, and internal-error envelopes still
+need contract-level coverage. The Python exception types are implementation
+details; other language bindings must preserve the stable codes and details,
+not the Python class hierarchy.
+
+The current import behavior is idempotent only for rows whose primary key
+and all supplied values match an existing row. Different values under the
+same primary key are rejected as `revision_conflict`. A violation of
+another SQLite constraint without a matching primary-key row is an explicit
+`integrity_failure`; it must never be treated as a successful import with
+a silently dropped row.
+
+
 This document is a proposal, not evidence that the existing code already conforms. The current Python package contains implementation-specific dataclasses, integer IDs in several domain models, and SQLite-backed storage. Those details must remain internal or be translated at the contract boundary. Before production use, the project still needs tested authorization semantics, transaction boundaries, conflict behavior, portable import guarantees, and compatibility tests.
