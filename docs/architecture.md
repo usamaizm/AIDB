@@ -158,23 +158,24 @@ Humans and agents should be able to see:
 
 The interface should make change visible without requiring users to reconstruct it from opaque logs.
 
-## 11. Internet cohesion
+## 11. Distributed network
 
-Internet connectivity is an access property, not the identity of the product.
+AIDB is intended to support a distributed knowledge network: independently operated nodes may store, discover, verify, retrieve, and replicate selected portions of a shared knowledge space. A node is not required to hold the entire corpus, and no single topology or central service is mandatory.
 
-A node may be:
+Logical resource identity and knowledge semantics must remain independent of physical placement. Content chunks, manifests, and location records belong to a distributed placement layer; they must not silently redefine the logical data model.
 
-- completely local
-- privately networked
-- publicly reachable
+When communication crosses a machine or trust boundary, authenticated encryption is required. HTTPS is the initial interoperable request/response transport, but transport is an adapter rather than the architecture. Node identity, agent identity, authorization, provenance, content integrity, and trust are separate concepts. See [Distributed Networking Architecture](distributed-networking.md) for the proposed design and implementation sequence.
 
-When networked, discovery, authentication, authorization, protocol negotiation, and interoperability must be explicit.
+A node may be completely local, privately networked, or publicly reachable. Discovery, peer authentication, authorization, protocol negotiation, partial replication, and partition behavior must be explicit.
 
 ## 12. Architecture questions still open
 
 This document intentionally leaves major questions unresolved until they are researched and tested:
 
 - What exactly constitutes a canonical AIDB resource?
+- What is the stable cryptographic identity and key-rotation model for a node?
+- What canonical chunk/manifest format and content-addressing rules are required?
+- What replication policies, location semantics, and partial-replication guarantees are required?
 - Is the change log append-only, mutable, or hybrid?
 - Are state and history physically separate or one storage model?
 - What temporal query semantics are required?
