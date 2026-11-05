@@ -303,3 +303,22 @@ def test_event_and_legacy_memory_missing_references_use_not_found() -> None:
         db.add_event("test", session_id="session:missing")
     assert missing_event_session.value.code == "not_found"
     db.close()
+
+
+
+def test_resource_and_note_apis_reject_non_json_and_malformed_metadata() -> None:
+    db = AIDB(":memory:")
+    with pytest.raises(InvalidArgumentError) as non_finite:
+        db.create_resource("item", {"score": float("nan")})
+    assert non_finite.value.code == "invalid_argument"
+
+    with pytest.raises(InvalidArgumentError) as unsupported:
+        db.create_resource("item", {"value": object()})
+    assert unsupported.value.code == "invalid_argument"
+
+    with pytest.raises(InvalidArgumentError) as bad_metadata:
+        db.create_note("title", "body", metadata=["not", "an", "object"])
+    assert bad_metadata.value.code == "invalid_argument"
+    assert db.list_resources() == []
+    assert db.list_notes() == []
+    db.close()
