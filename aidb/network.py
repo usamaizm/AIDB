@@ -189,24 +189,33 @@ def _discover(
     if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
         raise ValueError("limit must be a positive integer")
     wanted = {value.casefold() for value in _string_list(terms, term_field)}
-    candidates = db.list_resources(
-        resource_type=resource_type, visibility="public", limit=max(limit * 4, limit)
-    )
     matches = []
-    for resource in candidates:
-        content = resource.content if isinstance(resource.content, dict) else {}
-        if content.get("status") not in {"requested", "proposed"}:
-            continue
-        available = {
-            value.casefold()
-            for value in content.get(term_field, [])
-            if isinstance(value, str)
-        }
-        if wanted and not wanted.intersection(available):
-            continue
-        matches.append(resource)
-        if len(matches) == limit:
+    offset = 0
+    batch_size = max(limit * 4, 100)
+    while len(matches) < limit:
+        candidates = db.list_resources(
+            resource_type=resource_type,
+            visibility="public",
+            limit=batch_size,
+            offset=offset,
+        )
+        if not candidates:
             break
+        offset += len(candidates)
+        for resource in candidates:
+            content = resource.content if isinstance(resource.content, dict) else {}
+            if content.get("status") not in {"requested", "proposed"}:
+                continue
+            available = {
+                value.casefold()
+                for value in content.get(term_field, [])
+                if isinstance(value, str)
+            }
+            if wanted and not wanted.intersection(available):
+                continue
+            matches.append(resource)
+            if len(matches) == limit:
+                break
     return matches
 
 
@@ -217,22 +226,31 @@ def discover_agents(
     if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
         raise ValueError("limit must be a positive integer")
     wanted = {value.casefold() for value in _string_list(capabilities, "capabilities")}
-    candidates = db.list_resources(
-        resource_type=AGENT_PROFILE, visibility="public", limit=max(limit * 4, limit)
-    )
     matches = []
-    for resource in candidates:
-        content = resource.content if isinstance(resource.content, dict) else {}
-        available = {
-            value.casefold()
-            for value in content.get("capabilities", [])
-            if isinstance(value, str)
-        }
-        if wanted and not wanted.intersection(available):
-            continue
-        matches.append(resource)
-        if len(matches) == limit:
+    offset = 0
+    batch_size = max(limit * 4, 100)
+    while len(matches) < limit:
+        candidates = db.list_resources(
+            resource_type=AGENT_PROFILE,
+            visibility="public",
+            limit=batch_size,
+            offset=offset,
+        )
+        if not candidates:
             break
+        offset += len(candidates)
+        for resource in candidates:
+            content = resource.content if isinstance(resource.content, dict) else {}
+            available = {
+                value.casefold()
+                for value in content.get("capabilities", [])
+                if isinstance(value, str)
+            }
+            if wanted and not wanted.intersection(available):
+                continue
+            matches.append(resource)
+            if len(matches) == limit:
+                break
     return matches
 
 
@@ -313,13 +331,16 @@ def review_knowledge(
     offer = db.get_resource(_required_text(offer_id, "offer_id"))
     if offer.resource_type != KNOWLEDGE_OFFER:
         raise ValueError("resource is not a knowledge offer")
+    if not isinstance(accepted, bool):
+        raise ValueError("accepted must be a boolean")
+    reviewer = _required_text(reviewer, "reviewer")
     review = db.create_resource(
         KNOWLEDGE_REVIEW,
         {
-            "reviewer": _required_text(reviewer, "reviewer"),
+            "reviewer": reviewer,
             "assessment": _required_text(assessment, "assessment"),
             "confidence": _confidence(confidence),
-            "accepted": bool(accepted),
+            "accepted": accepted,
             "offer_id": offer.id,
         },
         owner=reviewer,
