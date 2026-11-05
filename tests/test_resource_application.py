@@ -88,20 +88,49 @@ class MemoryResourceRepository:
         ]
 
 
-def test_resource_service_runs_against_non_sqlite_repository() -> None:
-    repository = MemoryResourceRepository()
-    service = ResourceService(repository)
-
-    public = service.create("document", {"body": "public"}, visibility="public")
-    private = service.create("document", {"body": "private"})
+def exercise_resource_service_contract(service: ResourceService) -> None:
+    public = service.create(
+        "document", {"body": "public"}, owner="agent:one", visibility="public"
+    )
+    private = service.create("document", {"body": "private"}, owner="agent:two")
 
     assert service.get(public.id).content == {"body": "public"}
-    assert service.list(include_private=False) == [public]
+    assert service.list(
+        resource_type="document", visibility="public", include_private=False
+    ) == [public]
     with pytest.raises(PermissionError, match="private resource"):
         service.get(private.id, include_private=False)
 
+    updated = service.update(
+        public.id,
+        content={"body": "updated"},
+        owner="agent:one",
+        expected_revision=1,
+    )
+    assert updated.revision == 2
+    assert updated.content == {"body": "updated"}
+    with pytest.raises(ValueError, match="revision conflict"):
+        service.update(public.id, content={"body": "stale"}, expected_revision=1)
+    with pytest.raises(PermissionError, match="owner mismatch"):
+        service.update(public.id, content={"body": "unauthorized"}, owner="agent:two")
+
     service.relate(public.id, private.id, "references")
     assert service.relations(public.id)[0]["relation"] == "references"
+    with pytest.raises(ValueError, match="cannot relate to itself"):
+        service.relate(public.id, public.id, "self")
+
+
+def test_resource_service_contract_against_non_sqlite_repository() -> None:
+    exercise_resource_service_contract(ResourceService(MemoryResourceRepository()))
+
+
+def test_resource_service_contract_against_sqlite_repository() -> None:
+    db = AIDB(":memory:")
+    try:
+        assert isinstance(db._resource_repository, ResourceRepository)
+        exercise_resource_service_contract(ResourceService(db._resource_repository))
+    finally:
+        db.close()
 
 
 def test_resource_service_rejects_invalid_visibility_before_persistence() -> None:
