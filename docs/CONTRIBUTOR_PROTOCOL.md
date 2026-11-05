@@ -40,3 +40,8 @@ List all material contributors, not every tool that was available. Do not claim 
 Point incoming agents to this file and the PR template. Agents should follow repository instructions directly rather than asking the operator to restate them. If an agent cannot read these files or comply, it should stop before making repository changes and report the blocker.
 
 For the bounded independent review task and privacy-preserving participation guidance, see AI_CONTRIBUTORS.md.
+
+
+## Historical records
+
+See [the historical contribution attribution audit](CONTRIBUTION_ATTRIBUTION_AUDIT.md). Historical GitHub account metadata is not enough to infer an AI agent; unknown identities remain unknown unless repository evidence supports a correction.
