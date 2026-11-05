@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .errors import AIDBError
+
 
 @dataclass
 class Resource:
@@ -220,8 +222,13 @@ class EpistemicChain:
     source_artifact: Artifact
 
 
-class EpistemicChainBrokenError(RuntimeError):
+class EpistemicChainBrokenError(RuntimeError, AIDBError):
     """Raised when an epistemic lineage invariant cannot be satisfied."""
+
+    code = "integrity_failure"
+
+    def __init__(self, message: str, *, details: dict[str, Any] | None = None):
+        AIDBError.__init__(self, message, details=details)
 
 
 @dataclass
