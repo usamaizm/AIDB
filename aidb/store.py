@@ -328,23 +328,24 @@ class AIDB:
     @contextmanager
     def _atomic(self, operation: str) -> Iterator[None]:
         """Run a compound mutation atomically, including inside an outer transaction."""
-        savepoint = "aidb_" + operation
-        self.db.execute(f"SAVEPOINT {savepoint}")
-        try:
-            yield
-        except sqlite3.IntegrityError as exc:
-            self.db.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
-            self.db.execute(f"RELEASE SAVEPOINT {savepoint}")
-            raise StorageIntegrityError(
-                f"{operation} violated a database constraint",
-                details={"operation": operation},
-            ) from exc
-        except Exception:
-            self.db.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
-            self.db.execute(f"RELEASE SAVEPOINT {savepoint}")
-            raise
-        else:
-            self.db.execute(f"RELEASE SAVEPOINT {savepoint}")
+        savepoint = "aidb_" + operation + "_" + uuid.uuid4().hex
+        with self._connection_lock:
+            self.db.execute(f"SAVEPOINT {savepoint}")
+            try:
+                yield
+            except sqlite3.IntegrityError as exc:
+                self.db.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+                self.db.execute(f"RELEASE SAVEPOINT {savepoint}")
+                raise StorageIntegrityError(
+                    f"{operation} violated a database constraint",
+                    details={"operation": operation},
+                ) from exc
+            except Exception:
+                self.db.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+                self.db.execute(f"RELEASE SAVEPOINT {savepoint}")
+                raise
+            else:
+                self.db.execute(f"RELEASE SAVEPOINT {savepoint}")
 
     @staticmethod
     def _json(value: Any) -> str:
