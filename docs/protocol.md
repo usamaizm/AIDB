@@ -66,3 +66,9 @@ AIDB should preserve provenance and uncertainty, but the current Artifact -> Ext
 HTTP, A2A, MCP, local IPC, queues, and SDKs may expose AIDB. None is the database itself.
 
 The same operation must have the same semantic result regardless of transport.
+
+## Internal networking security
+
+Internal node-to-node and service-to-node networking has a separate proposed security profile in [internal-networking-security.md](internal-networking-security.md). Treat private networks as untrusted: remote peers require encrypted transport, authenticated peer identity, and operation-level authorization. A successful connection must never imply write authority.
+
+The current built-in HTTP adapter is a single-node transport with optional TLS and a shared bearer token. It is not mTLS peer networking, does not provide per-node authorization, and must not be presented as a secure replication protocol. Peer networking and replication remain unimplemented until the identity, authorization, version negotiation, replay/idempotency, and conflict semantics are specified and tested.
