@@ -38,6 +38,11 @@ def test_package_exports() -> None:
     assert AIDB is not None
     assert "WorkflowEngine" not in aidb.__all__
     assert not hasattr(aidb, "WorkflowEngine")
+    assert aidb.UnauthenticatedError.code == "unauthenticated"
+    assert aidb.UnsupportedCapabilityError.code == "unsupported_capability"
+    assert aidb.TemporarilyUnavailableError.code == "temporarily_unavailable"
+    assert aidb.InternalError.code == "internal_error"
+    assert aidb.EpistemicChainBrokenError.code == "integrity_failure"
 
 
 def test_register_artifact_from_bytes() -> None:
