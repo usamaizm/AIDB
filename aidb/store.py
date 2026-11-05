@@ -1458,6 +1458,41 @@ class AIDB:
             if not isinstance(relation_metadata, dict):
                 issues.append("invalid relation metadata:" + str(relation["id"]))
 
+        for artifact in self.db.execute(
+            "SELECT id,size_bytes,checksum,checksum_algorithm,status,provenance,"
+            "metadata,transformation_history FROM artifacts ORDER BY id"
+        ).fetchall():
+            algorithm = artifact["checksum_algorithm"]
+            try:
+                digest_size = hashlib.new(algorithm).digest_size * 2
+            except (TypeError, ValueError):
+                digest_size = 0
+            if (
+                isinstance(artifact["size_bytes"], bool)
+                or not isinstance(artifact["size_bytes"], int)
+                or artifact["size_bytes"] < 0
+                or digest_size == 0
+                or not isinstance(artifact["checksum"], str)
+                or not re.fullmatch(rf"[0-9a-fA-F]{{{digest_size}}}", artifact["checksum"])
+                or artifact["status"] not in {"raw", "derived", "processed"}
+            ):
+                issues.append("invalid artifact metadata:" + str(artifact["id"]))
+            for field in ("provenance", "metadata"):
+                try:
+                    parsed = json.loads(artifact[field] or "{}")
+                except (TypeError, json.JSONDecodeError):
+                    parsed = None
+                if not isinstance(parsed, dict):
+                    issues.append("invalid artifact " + field + ":" + str(artifact["id"]))
+            try:
+                history = json.loads(artifact["transformation_history"] or "[]")
+            except (TypeError, json.JSONDecodeError):
+                history = None
+            if not isinstance(history, list) or any(
+                not isinstance(step, str) for step in history
+            ):
+                issues.append("invalid artifact transformation history:" + str(artifact["id"]))
+
         for blob in self.db.execute(
             "SELECT artifact_id FROM artifact_blobs ORDER BY artifact_id"
         ).fetchall():
