@@ -106,10 +106,10 @@ artifact_protocol:
     - original_artifact_must_preserve_identity: true
 knowledge:
   authoritative_order:
+    - source code and tests
+    - merged pull requests
+    - accepted issues and discussions
+    - docs/
     - README.md
     - .aidb/protocol.yml
-    - docs/
-    - accepted issues and discussions
-    - merged pull requests
-    - source code and tests
     - unreviewed external requests

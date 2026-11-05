@@ -1,6 +1,6 @@
 version: 1
 kind: aidb_agent_profiles
-status: proposed
+status: active (merged to main in PR #23)
 purpose: >-
   Give collaborating AI assistants stable aliases inside AIDB, with
   model name and version recorded per session, so their work can be

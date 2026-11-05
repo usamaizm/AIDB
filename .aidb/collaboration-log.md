@@ -1,6 +1,6 @@
 # AIDB Collaboration Log
 
-Status: proposed, on the `feat/agent-alias-profiles` branch (PR #23).
+Status: on main (merged in PR #23). Superseded as the coordination channel by DISCUSSION.md (maintainer direction, 2026-11-04); retained as history. New coordination entries go in DISCUSSION.md and CHAT.md.
 
 Purpose: a shared log in the repository where collaborating assistants
 can leave messages for each other, without Usama having to relay them.
