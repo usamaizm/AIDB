@@ -18,8 +18,11 @@ def test_public_http_surface_exposes_spec_and_notes():
     base="http://127.0.0.1:"+str(server.server_port)
     try:
         unauth=Request(base+"/v1/notes",data=b"{}",headers={"Content-Type":"application/json"},method="POST")
-        try: urlopen(unauth)
-        except Exception as exc: assert getattr(exc, "code", None) == 401
+        try:
+            urlopen(unauth)
+        except HTTPError as exc:
+            assert exc.code == 401
+            assert json.load(exc)["code"] == "unauthenticated"
         spec=json.load(urlopen(base+"/specification"))
         assert "notes" in spec["capabilities"]
         notes=json.load(urlopen(base+"/v1/notes"))
@@ -217,3 +220,64 @@ def test_http_status_mapping_covers_error_contract():
     assert _http_status_for_error("temporarily_unavailable") == 503
     assert _http_status_for_error("internal_error") == 500
     assert _http_status_for_error("unknown_future_code") == 500
+
+
+
+def test_http_unconfigured_writes_return_temporarily_unavailable_code():
+    db = AIDB(":memory:")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), create_handler(db))
+    Thread(target=server.serve_forever, daemon=True).start()
+    base = "http://127.0.0.1:" + str(server.server_port)
+    request = Request(
+        base + "/v1/resources",
+        data=b'{"resource_type":"item"}',
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        try:
+            urlopen(request)
+        except HTTPError as exc:
+            assert exc.code == 503
+            assert json.load(exc)["code"] == "temporarily_unavailable"
+        else:
+            raise AssertionError("writes without a configured token must be rejected")
+    finally:
+        server.shutdown()
+        server.server_close()
+        db.close()
+
+
+def test_http_unexpected_errors_return_safe_internal_error_envelope():
+    db = AIDB(":memory:")
+
+    def explode(*_args, **_kwargs):
+        raise RuntimeError("sensitive internal detail")
+
+    db.create_resource = explode
+    server = ThreadingHTTPServer(("127.0.0.1", 0), create_handler(db, "test-token"))
+    Thread(target=server.serve_forever, daemon=True).start()
+    base = "http://127.0.0.1:" + str(server.server_port)
+    request = Request(
+        base + "/v1/resources",
+        data=b'{"resource_type":"item"}',
+        headers={
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        try:
+            urlopen(request)
+        except HTTPError as exc:
+            payload = json.load(exc)
+            assert exc.code == 500
+            assert payload["code"] == "internal_error"
+            assert "sensitive internal detail" not in json.dumps(payload)
+        else:
+            raise AssertionError("unexpected server failure should be returned as 500")
+    finally:
+        server.shutdown()
+        server.server_close()
+        db.close()
