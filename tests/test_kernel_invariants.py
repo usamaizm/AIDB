@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
 
 import pytest
 
@@ -74,7 +75,7 @@ def test_parent_artifact_requires_valid_extraction_lineage(tmp_path: Path) -> No
         name="derived.txt",
         media_type="text/plain",
         size_bytes=10,
-        checksum="bad_checksum",
+        checksum=hashlib.sha256(b"0123456789").hexdigest(),
         parent_artifact_id=source.id,
         status="derived",
     )
@@ -131,4 +132,35 @@ def test_knowledge_and_event_are_created_in_same_transaction(tmp_path: Path) -> 
         ("knowledge_created",),
     ).fetchone()["n"] >= 1
 
+    db.close()
+
+
+
+def test_register_artifact_validates_metadata_at_persistence_boundary(tmp_path: Path) -> None:
+    db = AIDB(tmp_path / "artifact_validation.sqlite3")
+    digest = hashlib.sha256(b"0123456789").hexdigest()
+
+    with pytest.raises(ValueError, match="size"):
+        db.register_artifact("negative", "text/plain", -1, digest)
+    with pytest.raises(ValueError, match="checksum"):
+        db.register_artifact("malformed", "text/plain", 10, "not-a-real-hash")
+    with pytest.raises(ValueError, match="unsupported checksum algorithm"):
+        db.register_artifact(
+            "algorithm", "text/plain", 10, digest, checksum_algorithm="sha-999"
+        )
+    with pytest.raises(ValueError, match="status"):
+        db.register_artifact("status", "text/plain", 10, digest, status="whatever")
+    with pytest.raises(ValueError, match="size"):
+        db.register_artifact(
+            "wrong-size", "text/plain", 9, digest, content=b"0123456789"
+        )
+    with pytest.raises(ValueError, match="checksum"):
+        db.register_artifact(
+            "wrong-content", "text/plain", 10, digest, content=b"abcdefghij"
+        )
+
+    artifact = db.register_artifact(
+        "valid", "text/plain", 10, digest, content=b"0123456789"
+    )
+    assert db.get_artifact_bytes(artifact.id) == b"0123456789"
     db.close()
