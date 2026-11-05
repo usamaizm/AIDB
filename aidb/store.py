@@ -478,6 +478,24 @@ class AIDB:
         capabilities: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> Agent:
+        if not isinstance(name, str) or not name.strip():
+            raise InvalidArgumentError("agent name must be a non-empty string")
+        if not all(isinstance(value, str) for value in (description, model, role)):
+            raise InvalidArgumentError("agent description, model, and role must be strings")
+        if not role.strip():
+            raise InvalidArgumentError("agent role must be a non-empty string")
+        if permissions is not None and (
+            not isinstance(permissions, list)
+            or any(not isinstance(value, str) for value in permissions)
+        ):
+            raise InvalidArgumentError("agent permissions must be a list of strings")
+        if capabilities is not None and (
+            not isinstance(capabilities, list)
+            or any(not isinstance(value, str) for value in capabilities)
+        ):
+            raise InvalidArgumentError("agent capabilities must be a list of strings")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise InvalidArgumentError("agent metadata must be an object")
         try:
             cur = self.db.execute(
                 "INSERT INTO agents(name, description, model, role, permissions, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -516,6 +534,12 @@ class AIDB:
                 f"input artifact {input_artifact_id} does not exist",
                 details={"artifact_id": input_artifact_id},
             )
+        if not isinstance(method, str) or not method.strip():
+            raise InvalidArgumentError("extraction method must be a non-empty string")
+        if not isinstance(status, str) or not status.strip():
+            raise InvalidArgumentError("extraction status must be a non-empty string")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise InvalidArgumentError("extraction metadata must be an object")
         self._require_confidence(confidence, "extraction")
         try:
             self.db.execute("BEGIN")
@@ -601,6 +625,12 @@ class AIDB:
                 f"output artifact {output_artifact_id} does not exist",
                 details={"artifact_id": output_artifact_id},
             )
+        if not isinstance(claim, str) or not claim.strip():
+            raise InvalidArgumentError("interpretation claim must be a non-empty string")
+        if not isinstance(interpreter, str) or not interpreter.strip():
+            raise InvalidArgumentError("interpreter must be a non-empty string")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise InvalidArgumentError("interpretation metadata must be an object")
         self._require_confidence(confidence, "interpretation")
         try:
             self.db.execute("BEGIN")
@@ -639,6 +669,10 @@ class AIDB:
                 f"interpretation {interpretation_id} does not exist",
                 details={"interpretation_id": interpretation_id},
             )
+        if not isinstance(status, str) or not status.strip():
+            raise InvalidArgumentError("knowledge status must be a non-empty string")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise InvalidArgumentError("knowledge metadata must be an object")
         self._require_confidence(confidence, "knowledge")
         try:
             self.db.execute("BEGIN")
@@ -688,6 +722,12 @@ class AIDB:
                 f"evidence artifact {evidence_artifact_id} does not exist",
                 details={"artifact_id": evidence_artifact_id},
             )
+        if not isinstance(relation, str) or not relation.strip():
+            raise InvalidArgumentError("knowledge relation must be a non-empty string")
+        if created_by is not None and not isinstance(created_by, str):
+            raise InvalidArgumentError("created_by must be a string or null")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise InvalidArgumentError("knowledge relation metadata must be an object")
         self._require_confidence(confidence, "knowledge relation")
         try:
             self.db.execute("BEGIN")
@@ -733,6 +773,14 @@ class AIDB:
             raise NotFoundError(f"agent {agent_id} does not exist", details={"agent_id": agent_id})
         if self.db.execute("SELECT 1 FROM epistemic_knowledge WHERE id = ?", (knowledge_id,)).fetchone() is None:
             raise NotFoundError(f"knowledge {knowledge_id} does not exist", details={"knowledge_id": knowledge_id})
+        if not isinstance(kind, str) or not kind.strip():
+            raise InvalidArgumentError("memory kind must be a non-empty string")
+        if not isinstance(status, str) or not status.strip():
+            raise InvalidArgumentError("memory status must be a non-empty string")
+        if context is not None and not isinstance(context, dict):
+            raise InvalidArgumentError("memory context must be an object")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise InvalidArgumentError("memory metadata must be an object")
         self._require_confidence(confidence, "memory")
         try:
             self.db.execute("BEGIN")
@@ -876,7 +924,7 @@ class AIDB:
         ):
             raise InvalidArgumentError("checksum must be a hexadecimal digest of the selected algorithm")
         checksum = checksum.lower()
-        if status not in {"raw", "derived", "processed"}:
+        if not isinstance(status, str) or status not in {"raw", "derived", "processed"}:
             raise InvalidArgumentError("artifact status must be raw, derived, or processed")
         if parent_artifact_id is not None and self.db.execute(
             "SELECT 1 FROM artifacts WHERE id = ?", (parent_artifact_id,)
@@ -1036,6 +1084,10 @@ class AIDB:
     ) -> WorkflowEvent:
         if not isinstance(kind, str) or not kind.strip():
             raise InvalidArgumentError("event kind must be a non-empty string")
+        if not isinstance(message, str):
+            raise InvalidArgumentError("event message must be a string")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise InvalidArgumentError("event metadata must be an object")
         for table, value, label, detail_key in (
             ("agents", agent_id, "agent", "agent_id"),
             ("tasks", task_id, "task", "task_id"),
@@ -1096,6 +1148,14 @@ class AIDB:
         )
         if self.db.execute("SELECT 1 FROM agents WHERE id = ?", (agent_id,)).fetchone() is None:
             raise NotFoundError(f"agent {agent_id} does not exist", details={"agent_id": agent_id})
+        if not isinstance(content, str):
+            raise InvalidArgumentError("legacy memory content must be a string")
+        if not isinstance(kind, str) or not kind.strip():
+            raise InvalidArgumentError("legacy memory kind must be a non-empty string")
+        if isinstance(importance, bool) or not isinstance(importance, (int, float)) or not 0 <= importance <= 1:
+            raise InvalidArgumentError("legacy memory importance must be between 0 and 1")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise InvalidArgumentError("legacy memory metadata must be an object")
         cur = self.db.execute(
             "INSERT INTO memories(agent_id, content, kind, importance, metadata) VALUES (?, ?, ?, ?, ?)",
             (agent_id, content, kind, importance, self._json(metadata or {})),
@@ -1135,7 +1195,7 @@ class AIDB:
 
 
     def initialize_home(self, node_id=None, owner=None, visibility="private", metadata=None):
-        if visibility not in {"public", "private"}: raise InvalidArgumentError("visibility must be public or private")
+        if not isinstance(visibility, str) or visibility not in {"public", "private"}: raise InvalidArgumentError("visibility must be public or private")
         if metadata is not None and not isinstance(metadata, dict):
             raise InvalidArgumentError("home metadata must be an object")
         row = self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone()
@@ -1148,7 +1208,8 @@ class AIDB:
     def create_resource(self, resource_type, content=None, owner=None, visibility="private", metadata=None):
         if not isinstance(resource_type, str) or not resource_type.strip():
             raise InvalidArgumentError("resource_type must be a non-empty string")
-        if visibility not in {"public", "private"}: raise InvalidArgumentError("visibility must be public or private")
+        if not isinstance(visibility, str) or visibility not in {"public", "private"}:
+            raise InvalidArgumentError("visibility must be public or private")
         if metadata is not None and not isinstance(metadata, dict):
             raise InvalidArgumentError("resource metadata must be an object")
         content_json = self._json_value(content)
@@ -1187,7 +1248,7 @@ class AIDB:
             raise InvalidArgumentError("note title and content must be strings")
         if not isinstance(kind, str) or not kind.strip():
             raise InvalidArgumentError("note kind must be a non-empty string")
-        if visibility not in {"public", "private"}:
+        if not isinstance(visibility, str) or visibility not in {"public", "private"}:
             raise InvalidArgumentError("visibility must be public or private")
         if metadata is not None and not isinstance(metadata, dict):
             raise InvalidArgumentError("note metadata must be an object")
