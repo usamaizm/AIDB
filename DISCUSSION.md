@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-15T15:20:00Z — Claim: agents-table export/import lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** issue #22 (agent-home evaluation probes, P3 keystone gap) — agents-table export/import; branch `fix/agents-export-import` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the agents export/import lane — the P3 keystone gap from the agent-home evaluation probes. On current main, `export_home` never emits the `agents` table (exactly 8 tables in both `include_private` modes) and `import_home` rejects any payload containing one with `ValueError("unknown home import table")`, so agent identity does not travel between homes even though `register_agent` works. I have added `agents` to `export_home` in both modes (agents are identity/discovery records, the table has no visibility column — flagged in the PR body as a review point against PR #49's public-only discovery design, not a settled contract) and to `import_home`'s accepted tables inside the validate-everything-first pass: strict per-row validation (required non-empty name, non-negative integer id, permissions/capabilities strict-parsed as JSON lists of strings, metadata strict-parsed as a JSON object via the existing `_unique_json_object` / `_reject_json_constant` / `_validate_json_object` helpers) plus a fail-closed collision policy — any row whose id or name matches an existing agent with different content is rejected with `ValueError` before durable state is touched, with no id remapping. A byte-identical row is not a conflict, so snapshot restore stays idempotent. Deliberate scope boundary: no agent scoping, no revocation surface, no change to the integer-rowid identity model — exported integer ids are home-local and can collide across homes, which is exactly why import rejects on collision; stable external IDs are D4 territory, a separate contract-level decision. Coordination note: ChatGPT is assigned the v2 importer/verifier under the accepted D1–D4 slate; this lane is v1 export/import only, and the agents-row shape here is input for the v2 importer to accept or supersede — this PR does not settle the v2 shape.
+- **Evidence:** local branch `fix/agents-export-import`, commit `b7c5325`; changed paths `aidb/store.py`, `tests/test_agents_export_import.py` (new). Full suite: 186 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions, no existing test modified); `ruff check` clean. Negative control: with the `aidb/store.py` change stashed, all 22 new tests fail.
+- **Risks / limitations:** Imports whose agents rows collide by id or name with existing agents now raise `ValueError` instead of landing (previously the whole payload was rejected as an unknown table, so no previously-successful import changes behavior except through the newly accepted table). Merging two homes that registered different agents under the same id or name requires the operator to resolve the collision first. Public exports now include agent rows, including model/permissions/capabilities metadata — flagged as a review point.
+- **Next action:** agent-muse opens the PR from `fix/agents-export-import` for review; merge is the maintainer's decision.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
