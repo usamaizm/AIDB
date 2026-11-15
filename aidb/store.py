@@ -36,6 +36,40 @@ from .core import (
 )
 
 
+# Canonical checksum algorithms for artifacts, mapped to the hex-digest
+# length each produces. _checksum_bytes can compute every algorithm listed
+# here; register_artifact rejects any algorithm outside this table.
+_CHECKSUM_DIGEST_LENGTHS = {
+    "sha-256": 64,
+    "sha1": 40,
+    "sha-512": 128,
+    "md5": 32,
+}
+
+# Accepted alternative spellings, mapped to their canonical algorithm name.
+_CHECKSUM_ALGORITHM_ALIASES = {
+    "sha256": "sha-256",
+    "sha-1": "sha1",
+    "sha512": "sha-512",
+}
+
+# Artifact statuses used by this codebase: the artifacts table default and
+# register_artifact's default ("raw") and derive_artifact's default
+# ("derived").
+_ARTIFACT_STATUSES = {"raw", "derived"}
+
+_HEX_DIGITS = frozenset("0123456789abcdef")
+
+
+def _canonical_checksum_algorithm(algorithm: Any) -> str | None:
+    """Return the canonical checksum algorithm name, or None if unsupported."""
+    if not isinstance(algorithm, str):
+        return None
+    normalized = algorithm.lower()
+    canonical = _CHECKSUM_ALGORITHM_ALIASES.get(normalized, normalized)
+    return canonical if canonical in _CHECKSUM_DIGEST_LENGTHS else None
+
+
 class AIDB:
     """SQLite-backed state layer for AI agents, sessions, tasks, memory, tools, workflow events, and artifacts."""
 
@@ -343,10 +377,76 @@ class AIDB:
 
     @staticmethod
     def _checksum_bytes(data: bytes, algorithm: str = "sha-256") -> str:
-        normalized = (algorithm or "sha-256").lower()
-        if normalized not in {"sha-256", "sha1", "md5"}:
+        canonical = _canonical_checksum_algorithm(algorithm or "sha-256")
+        if canonical is None:
             raise ValueError(f"unsupported checksum algorithm: {algorithm}")
-        return hashlib.new(normalized, data).hexdigest()
+        return hashlib.new(canonical, data).hexdigest()
+
+    @staticmethod
+    def _validate_json_object(value: Any, label: str) -> None:
+        if value is None:
+            return
+        if not isinstance(value, dict):
+            raise ValueError(f"{label} must be a JSON object")
+        if any(not isinstance(key, str) for key in value):
+            raise ValueError(f"{label} keys must be strings")
+        try:
+            json.dumps(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{label} must be JSON-serializable") from exc
+
+    @staticmethod
+    def _validate_artifact_registration(
+        name: str,
+        media_type: str,
+        size_bytes: int,
+        checksum: str,
+        provenance: dict[str, Any] | None,
+        status: str,
+        transformation_history: list[str] | None,
+        metadata: dict[str, Any] | None,
+        checksum_algorithm: str,
+        content: bytes | None,
+    ) -> None:
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("artifact name must be a non-empty string")
+        if not isinstance(media_type, str) or not media_type.strip():
+            raise ValueError("artifact media_type must be a non-empty string")
+        if isinstance(size_bytes, bool) or not isinstance(size_bytes, int):
+            raise ValueError("artifact size_bytes must be an integer")
+        if size_bytes < 0:
+            raise ValueError("artifact size_bytes must be non-negative")
+        if content is not None and size_bytes != len(content):
+            raise ValueError("artifact size_bytes does not match provided content length")
+        canonical_algorithm = _canonical_checksum_algorithm(checksum_algorithm)
+        if canonical_algorithm is None:
+            raise ValueError(f"unsupported checksum algorithm: {checksum_algorithm}")
+        if not isinstance(checksum, str) or not checksum:
+            raise ValueError("artifact checksum must be a non-empty string")
+        if content is not None:
+            # The store takes custody of these bytes, so the checksum must be
+            # a well-formed digest for the algorithm and match the content.
+            # Metadata-only registrations (content=None) may record opaque
+            # externally computed checksums, so they are not shape-checked.
+            digest_length = _CHECKSUM_DIGEST_LENGTHS[canonical_algorithm]
+            if len(checksum) != digest_length or any(
+                char not in _HEX_DIGITS for char in checksum.lower()
+            ):
+                raise ValueError(
+                    f"artifact checksum must be a {digest_length}-character hex digest "
+                    f"for algorithm {checksum_algorithm}"
+                )
+            if checksum.lower() != AIDB._checksum_bytes(content, checksum_algorithm):
+                raise ValueError("checksum does not match provided content")
+        if status not in _ARTIFACT_STATUSES:
+            raise ValueError(f"unsupported artifact status: {status}")
+        AIDB._validate_json_object(provenance, "artifact provenance")
+        AIDB._validate_json_object(metadata, "artifact metadata")
+        if transformation_history is not None and (
+            not isinstance(transformation_history, (list, tuple))
+            or any(not isinstance(step, str) for step in transformation_history)
+        ):
+            raise ValueError("artifact transformation_history must be a list of strings")
 
     @staticmethod
     def _require_confidence(confidence: float, label: str) -> float:
@@ -737,6 +837,18 @@ class AIDB:
         checksum_algorithm: str = "sha-256",
         content: bytes | None = None,
     ) -> Artifact:
+        self._validate_artifact_registration(
+            name,
+            media_type,
+            size_bytes,
+            checksum,
+            provenance,
+            status,
+            transformation_history,
+            metadata,
+            checksum_algorithm,
+            content,
+        )
         self._assert_no_duplicate_checksum(checksum_algorithm, checksum)
         try:
             self.db.execute("BEGIN")
