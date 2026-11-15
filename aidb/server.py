@@ -77,6 +77,11 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
                 return self._send(404, {"error": "not_found"})
             except (PermissionError, ValueError) as exc:
                 return self._send(400, {"error": str(exc)})
+            except Exception:
+                # Never let an unexpected store failure kill the handler
+                # thread and drop the connection: answer a stable 500
+                # without leaking exception internals to the client.
+                return self._send(500, {"error": "internal_error"})
 
         def do_POST(self):
             with db._connection_lock:
@@ -129,6 +134,11 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
                 return self._send(413, {"error": str(exc)})
             except (KeyError, ValueError, json.JSONDecodeError) as exc:
                 return self._send(400, {"error": str(exc)})
+            except Exception:
+                # Never let an unexpected store failure kill the handler
+                # thread and drop the connection: answer a stable 500
+                # without leaking exception internals to the client.
+                return self._send(500, {"error": "internal_error"})
 
         def log_message(self, *_args):
             return
