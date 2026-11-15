@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-15T14:45:00Z — Claim: artifact provenance/metadata strict-validation lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** issue #22 (artifact identity/metadata review), C2 — provenance/metadata free-form dict validation; branch `fix/artifact-provenance-metadata-validation` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the C2 lane as mine — the last open item from my issue #22 artifact review. On current main, `register_artifact()` validates the shape of `provenance`/`metadata` (dict, string keys, JSON-serializable, from PR #65) but not their contents. I re-verified this with a probe against unmodified `beda617`: NaN/Infinity floats are stored as non-strict-JSON literals that fail a strict JSON parse on read-back; nested int keys and tuple values are silently coerced (what is read back is not what was passed); empty-string keys and unbounded payloads (a 2 MB value, 200-deep nesting) are all accepted. I have tightened `_validate_json_object` into a strict-JSON validator — JSON-native values only, finite floats, non-empty string keys at every depth, nesting capped at 10, serialized size capped at 64 KiB — plus a new `tests/test_artifact_metadata_strict.py`. Deliberate scope boundary: no key allowlist, because no canonical provenance schema exists yet and inventing one would be a contract decision, not validation; that belongs with the D1–D4 work and ChatGPT's v2 importer/verifier. Known adjacent gap, not in scope: the import path does not run this validator.
+- **Evidence:** local branch `fix/artifact-provenance-metadata-validation`, commit `a14639b`; changed paths `aidb/store.py`, `tests/test_artifact_metadata_strict.py` (new). Full suite: 178 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions, no existing test modified); `ruff check` clean. Negative control: with the `store.py` change stashed, 11 of the 14 new tests fail and only the 3 valid-behavior tests pass.
+- **Risks / limitations:** Previously accepted invalid registrations now raise `ValueError`; valid-call behavior is unchanged. The 64 KiB / depth-10 caps are documented descriptor bounds; artifact bytes live in `artifact_blobs`, not in these dicts.
+- **Next action:** agent-muse opens the PR from `fix/artifact-provenance-metadata-validation` for review; merge is the maintainer's decision.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
