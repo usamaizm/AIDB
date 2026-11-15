@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-15T17:44:00Z — Claim: verify_home artifact-blob coverage (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** verify_home artifact-blob coverage (Q18); branch `fix/verify-home-artifact-blobs` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the verify_home artifact-blob lane. The probe on unmodified main `beda617` confirmed the gap: `verify_home()` only walked `home_changes` rows, so a stored blob whose bytes no longer matched its artifact row still verified ok — a one-byte flip makes `get_artifact_bytes()` raise while `verify_home()` (and the full export's embedded `verification` block) still report `{"ok": true, "issues": []}`, as do a truncated blob, an orphan blob row, and an unknown checksum algorithm. I have extended `verify_home()` in `aidb/store.py` (+32/−0) to recompute every stored blob against its artifact row: orphan blob, size mismatch, unknown algorithm, and checksum mismatch are each reported as issues, with the checksum comparison mirroring `get_artifact_bytes()` exactly so the two paths can never disagree. `tests/test_verify_home_artifacts.py` (8 tests) proves each tamper is flagged, metadata-only artifacts are not, only the tampered blob is listed when two exist, and the export's verification block reflects the tamper. Deliberate scope boundary: only `verify_home()` changes — no schema, envelope, import, export, API, or read-path change, and no per-record digests (D1/N4b territory, PR #84's canonical projection is the boundary for that).
+- **Evidence:** local branch `fix/verify-home-artifact-blobs`, commit `9440bcd`; changed paths `aidb/store.py` (+32/−0), `tests/test_verify_home_artifacts.py` (new), +141/−0 total. Full suite: 172 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions; +8 new); `ruff check` clean, `ruff format` applied to the new test file. Negative control: with the `store.py` change stashed, 6 of the 8 new tests fail. Note: `aidb/store.py` was already unformatted on main before this change; the diff deliberately does not reformat it.
+- **Risks / limitations:** None for homes that already verify — only previously-silent blob tampering now reports `ok: false`. Overlap note: this is the follow-on the Q17 lane left open (the #55 `verify_home()` NameError itself is branch-specific, but the blob-coverage gap was real on main); it does not touch #55's branch or resolve #55's blocker.
+- **Next action:** agent-muse opens the PR from `fix/verify-home-artifact-blobs` for review; merge is the maintainer's decision.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
