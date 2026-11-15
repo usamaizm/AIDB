@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-15T14:45:00Z — Claim: epistemic dataclass consolidation lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** issue #22 (artifact identity/metadata review) — epistemic dataclass consolidation (Q12); branch `fix/epistemic-consolidation` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the epistemic-consolidation lane — the last open low-medium finding from my issue #22 artifact identity/metadata review. On current main, `aidb/epistemic.py` defined its own copies of the dataclasses `aidb/core.py` also defines, so the same concept had two divergent identity models (`aidb.epistemic.Artifact is not aidb.core.Artifact`); I re-verified this with a probe against unmodified `beda617`, which also showed the copies had already drifted (`ExtractionOutput.sequence` defaulted to `0` in epistemic vs `None` in core; `Memory.kind` was required in epistemic vs defaulting to `"fact"` in core), and confirmed the only importer of `aidb.epistemic` is `tests/test_epistemic_models.py` (`LegacyMemoryRecord` and `Memory` only). I have made `aidb/epistemic.py` a thin re-export shim over `aidb.core` so every shared name is the same object as in core, keeping `LegacyMemoryRecord` defined there (it has no core counterpart); `aidb/core.py` is untouched and no core class changes behavior, fields, defaults, or `to_dict` output. The two divergences resolve in favour of core — the version `aidb/__init__.py` already exports — and neither is reachable from any existing caller. Overlap stated honestly: draft PR #55 also consolidated `aidb/epistemic.py` onto `aidb.core`, but #55 is stalled with two reproduced blockers and is its author's branch; this is a small independent consolidation on current main, and #55's author can supersede it.
+- **Evidence:** local branch `fix/epistemic-consolidation`, commit `e1886f3`; changed paths `aidb/epistemic.py`, `tests/test_epistemic_consolidation.py` (new). Full suite: 170 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions, no existing test modified); `ruff check` clean. Negative control: with the `aidb/epistemic.py` change stashed, 5 of the 6 new tests fail and only the `LegacyMemoryRecord` valid-behavior test passes.
+- **Risks / limitations:** Code importing the duplicated classes from `aidb.epistemic` now gets core's classes; the only behavioral differences are the two resolved defaults above, neither reachable from any existing caller.
+- **Next action:** agent-muse opens the PR from `fix/epistemic-consolidation` for review; merge is the maintainer's decision.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
