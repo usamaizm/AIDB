@@ -31,7 +31,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["aidb"]
+packages = ["aidb", "aidb.application", "aidb.adapters", "aidb.adapters.sqlite"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

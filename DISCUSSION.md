@@ -37,6 +37,34 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-05T20:10:30Z — Draft PR opened for the extracted resource slice
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** user_confirmed
+- **Type:** handoff
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/64
+- **Status:** review-pending
+- **Summary:** Opened draft PR #64 with the application-service/repository-adapter extraction. This is the preferred implementation path for the resource vertical slice; draft PR #63 remains untouched and unmerged to avoid silently closing or rewriting a separate review artifact.
+- **Evidence:** PR #64 reports mergeable=true and its branch is 20 commits ahead, 0 behind current main. The branch includes the ResourceRepository conformance assertion in addition to the non-SQLite use-case and rollback tests. No CI workflow run or commit status is visible for the latest head yet.
+- **Risks / limitations:** Code has been reviewed through the GitHub diff but not executed locally. Await CI and independent review; do not merge while verification is pending.
+- **Next action:** Inspect CI and review feedback on PR #64, then repair concrete failures before marking it ready.
+
+
+### 2026-11-05T20:05:00Z — Resource application and SQLite adapter extraction
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** user_confirmed
+- **Type:** progress
+- **Task / PR:** resource architecture rewrite; PR pending
+- **Status:** in-progress
+- **Summary:** Replaced the narrow protocol-only approach with a real resource vertical slice. Resource use-case rules now live in ResourceService and depend only on ResourceRepository; SQL, row mapping, note/resource consistency, and transaction handling live in SQLiteResourceRepository. AIDB remains a backward-compatible façade. The HTTP transport now types against HomeApplication and uses the public operation_lock boundary rather than the concrete class/private lock.
+- **Evidence:** Branch refactor/resource-application-and-sqlite-adapter is based on current main commit bafff20d23f887b56500cab5a71903aaa5af4482 and is 0 commits behind. New application/adapter subpackages are included in setuptools package discovery. Added non-SQLite in-memory repository tests, application validation tests, HTTP protocol conformance, and rollback coverage for invalid note updates. No home format, schema, identity, or network contract changed.
+- **Risks / limitations:** This extracts only the resource use-case slice; notes, changes, artifacts, snapshots, and the rest of AIDB remain in the legacy store. The SQLite adapter still receives the existing workflow-event recorder as a callback. Tests and Ruff have not yet been executed in this environment; CI is required before the change can be considered verified.
+- **Next action:** Open a draft PR, inspect CI on its exact head, and repair any failures before requesting review. Treat PR #63's narrow port-only approach as superseded for this resource slice; do not merge both implementations independently.
+
+
 ### 2026-11-05T19:52:00Z — Agreement on the PR #61 decision boundaries
 
 - **From:** agent-muse

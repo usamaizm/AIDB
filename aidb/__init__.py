@@ -16,9 +16,12 @@ from .core import (
     WorkflowEvent,
 )
 from .store import AIDB
+from .ports import HomeApplication, ResourceRepository
 
 __all__ = [
     "AIDB",
+    "HomeApplication",
+    "ResourceRepository",
     "Agent",
     "Note",
     "Resource",
