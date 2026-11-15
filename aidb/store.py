@@ -1186,6 +1186,64 @@ class AIDB:
                 resource=self.db.execute("SELECT revision FROM home_resources WHERE id=?", (row["resource_id"],)).fetchone()
                 if resource is None: issues.append("missing resource:"+row["resource_id"])
                 if row["new_revision"] is not None and resource is not None and row["new_revision"] > resource["revision"]: issues.append("future revision:"+str(row["id"]))
+        # Stored JSON-text columns must parse as strict JSON in the shape the
+        # read paths expect; corrupt rows otherwise break reads while this
+        # check stayed silent. home_changes.payload, home_snapshots.content,
+        # and artifact_blobs are covered by sibling lanes, and agents rows
+        # are not read back or exported on main, so all four are out of scope.
+        json_columns = [
+            ("home_resources", "id", [("content", "any"), ("metadata", "object")]),
+            ("notes", "id", [("metadata", "object")]),
+            ("resource_relations", "id", [("metadata", "object")]),
+            (
+                "artifacts",
+                "id",
+                [
+                    ("provenance", "object"),
+                    ("metadata", "object"),
+                    ("transformation_history", "string-list"),
+                ],
+            ),
+            ("node_identity", "id", [("metadata", "object")]),
+            (
+                "node_specifications",
+                "version",
+                [
+                    ("capabilities", "string-list"),
+                    ("resource_types", "string-list"),
+                    ("transports", "string-list"),
+                    ("extensions", "string-list"),
+                    ("constraints", "object"),
+                ],
+            ),
+        ]
+        for table, id_column, columns in json_columns:
+            for row in self.db.execute(
+                f"SELECT {id_column}, {', '.join(name for name, _ in columns)} FROM {table}"
+            ).fetchall():
+                for column, shape in columns:
+                    try:
+                        value = json.loads(
+                            row[column],
+                            object_pairs_hook=self._unique_json_object,
+                            parse_constant=self._reject_json_constant,
+                        )
+                    except (json.JSONDecodeError, ValueError, TypeError):
+                        issues.append(
+                            f"invalid JSON in {table}.{column} for {id_column}={row[id_column]}"
+                        )
+                        continue
+                    if shape == "object" and not isinstance(value, dict):
+                        issues.append(
+                            f"invalid JSON shape in {table}.{column} for {id_column}={row[id_column]}: expected object"
+                        )
+                    elif shape == "string-list" and (
+                        not isinstance(value, list)
+                        or any(not isinstance(item, str) for item in value)
+                    ):
+                        issues.append(
+                            f"invalid JSON shape in {table}.{column} for {id_column}={row[id_column]}: expected list of strings"
+                        )
         return {"ok": not issues, "issues": issues}
 
     def export_home(self, include_private=True):
