@@ -1180,12 +1180,138 @@ class AIDB:
         return {"id":s.id,"version":s.version,"node":{"id":s.node_id},"visibility":s.visibility,"capabilities":s.capabilities,"resources":s.resource_types,"transports":s.transports,"extensions":s.extensions,"constraints":s.constraints,"issued_at":s.issued_at}
 
     def verify_home(self):
-        issues=[]
-        for row in self.db.execute("SELECT id,resource_id,operation,previous_revision,new_revision FROM home_changes ORDER BY id").fetchall():
-            if row["operation"] in {"create","update","publish"} and row["resource_id"]:
-                resource=self.db.execute("SELECT revision FROM home_resources WHERE id=?", (row["resource_id"],)).fetchone()
-                if resource is None: issues.append("missing resource:"+row["resource_id"])
-                if row["new_revision"] is not None and resource is not None and row["new_revision"] > resource["revision"]: issues.append("future revision:"+str(row["id"]))
+        issues = []
+        changes = self.db.execute(
+            "SELECT id,resource_id,operation,previous_revision,new_revision,payload FROM home_changes ORDER BY id"
+        ).fetchall()
+        expected_revision = {}
+        expected_visibility = {}
+        broken_revision = set()
+        for row in changes:
+            change_id = row["id"]
+            operation = row["operation"]
+            resource_id = row["resource_id"]
+            payload = None
+            payload_ok = True
+            try:
+                payload = json.loads(
+                    row["payload"],
+                    object_pairs_hook=self._unique_json_object,
+                    parse_constant=self._reject_json_constant,
+                )
+            except (TypeError, ValueError):
+                issues.append("invalid change payload:" + str(change_id))
+                payload_ok = False
+            if payload_ok and not isinstance(payload, dict):
+                issues.append("invalid change payload:" + str(change_id))
+                payload_ok = False
+            if operation in {"create", "update", "publish"}:
+                if not resource_id:
+                    issues.append("missing resource id:" + str(change_id))
+                    continue
+                resource = self.db.execute(
+                    "SELECT resource_type,visibility,revision FROM home_resources WHERE id=?",
+                    (resource_id,),
+                ).fetchone()
+                if resource is None:
+                    issues.append("missing resource:" + resource_id)
+                    continue
+                if row["new_revision"] is not None and row["new_revision"] > resource["revision"]:
+                    issues.append("future revision:" + str(change_id))
+                    broken_revision.add(resource_id)
+                if operation == "create":
+                    if resource_id not in broken_revision and (
+                        resource_id in expected_revision
+                        or row["previous_revision"] is not None
+                        or row["new_revision"] != 1
+                    ):
+                        issues.append("revision chain broken:" + str(change_id))
+                        broken_revision.add(resource_id)
+                    expected_revision[resource_id] = 1
+                    if payload_ok:
+                        if payload.get("resource_type") != resource["resource_type"]:
+                            issues.append("create payload mismatch:" + str(change_id))
+                        visibility = payload.get("visibility")
+                        if visibility not in {"public", "private"}:
+                            issues.append("create payload mismatch:" + str(change_id))
+                        else:
+                            expected_visibility[resource_id] = visibility
+                else:
+                    previous = row["previous_revision"]
+                    new = row["new_revision"]
+                    if resource_id not in broken_revision:
+                        if resource_id not in expected_revision:
+                            issues.append("unanchored revision:" + str(change_id))
+                            broken_revision.add(resource_id)
+                        elif (
+                            previous is None
+                            or new is None
+                            or previous != expected_revision[resource_id]
+                            or new != previous + 1
+                        ):
+                            issues.append("revision chain broken:" + str(change_id))
+                            broken_revision.add(resource_id)
+                        else:
+                            expected_revision[resource_id] = new
+                    if payload_ok and operation == "update":
+                        if not isinstance(payload.get("content_changed"), bool) or not isinstance(
+                            payload.get("metadata_changed"), bool
+                        ):
+                            issues.append("update payload mismatch:" + str(change_id))
+                    if operation == "publish":
+                        expected_visibility[resource_id] = "public"
+            elif operation == "relate":
+                if not resource_id:
+                    issues.append("missing resource id:" + str(change_id))
+                    continue
+                if (
+                    self.db.execute(
+                        "SELECT 1 FROM home_resources WHERE id=?", (resource_id,)
+                    ).fetchone()
+                    is None
+                ):
+                    issues.append("missing resource:" + resource_id)
+                    continue
+                if payload_ok:
+                    target = payload.get("target_resource_id")
+                    relation = payload.get("relation")
+                    if (
+                        not isinstance(target, str)
+                        or not target.strip()
+                        or not isinstance(relation, str)
+                        or not relation.strip()
+                    ):
+                        issues.append("relate payload mismatch:" + str(change_id))
+                    elif (
+                        self.db.execute(
+                            "SELECT 1 FROM home_resources WHERE id=?", (target,)
+                        ).fetchone()
+                        is None
+                    ):
+                        issues.append("relate target missing:" + str(change_id))
+                    elif (
+                        self.db.execute(
+                            "SELECT 1 FROM resource_relations WHERE source_resource_id=? AND target_resource_id=? AND relation=?",
+                            (resource_id, target, relation),
+                        ).fetchone()
+                        is None
+                    ):
+                        issues.append("relate payload mismatch:" + str(change_id))
+            else:
+                issues.append("unknown change operation:" + str(change_id))
+        for resource_id, revision in expected_revision.items():
+            resource = self.db.execute(
+                "SELECT visibility,revision FROM home_resources WHERE id=?", (resource_id,)
+            ).fetchone()
+            if resource is None:
+                continue
+            if resource_id not in broken_revision and resource["revision"] > revision:
+                issues.append("revision mismatch:" + resource_id)
+            if (
+                resource_id in expected_visibility
+                and resource["visibility"] != expected_visibility[resource_id]
+            ):
+                issues.append("visibility mismatch:" + resource_id)
         return {"ok": not issues, "issues": issues}
 
     def export_home(self, include_private=True):
