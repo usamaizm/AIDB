@@ -12,6 +12,7 @@ from threading import RLock
 from pathlib import Path
 from typing import Any
 
+from .portability import portable_tables
 from .core import (
     Agent,
     Artifact,
@@ -1191,10 +1192,10 @@ class AIDB:
     def export_home(self, include_private=True):
         # Snapshot archives are deliberately excluded: embedding snapshots in
         # snapshots causes recursive growth and can re-export private history.
-        tables = [
-            "node_identity", "node_specifications", "home_resources", "notes",
-            "resource_relations", "home_changes", "artifacts", "artifact_blobs",
-        ]
+        # The table list itself lives in aidb.portability (TABLE_PORTABILITY):
+        # export_home emits exactly the tables recorded "portable" there, so
+        # the profile boundary is a recorded decision, not a local literal.
+        tables = portable_tables()
         payload = {"format": "aidb-home-v1", "tables": {}}
         if include_private:
             for table in tables:
