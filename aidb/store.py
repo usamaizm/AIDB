@@ -1275,6 +1275,24 @@ class AIDB:
     def _reject_json_constant(value):
         raise ValueError("non-standard JSON numeric constant: " + value)
 
+    @staticmethod
+    def _parse_strict_json_text(text, label):
+        """Parse a JSON-text column with the envelope's strictness.
+
+        Duplicate keys and NaN/Infinity literals are rejected, the same
+        strictness import_home_json enforces at the envelope level.
+        """
+        if not isinstance(text, str):
+            raise ValueError(f"{label} must be a JSON string")
+        try:
+            return json.loads(
+                text,
+                object_pairs_hook=AIDB._unique_json_object,
+                parse_constant=AIDB._reject_json_constant,
+            )
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"invalid JSON in {label}") from exc
+
     def import_home_json(self, content: str | bytes):
         """Import a JSON wire payload while rejecting duplicate keys and NaN/Infinity."""
         if not isinstance(content, (str, bytes)):
@@ -1367,6 +1385,25 @@ class AIDB:
                 columns = list(row)
                 if any(column not in allowed_columns for column in columns):
                     raise ValueError(f"invalid column in home import row for table: {table}")
+                # Columns that are NOT NULL with no database default must be
+                # present (and non-null); without this, a missing column only
+                # surfaces later as a misleading "conflicting existing row"
+                # or a raw IntegrityError from the insert. Columns with a
+                # default (content, metadata, revision, timestamps) may be
+                # omitted and take the default, exactly as the store's own
+                # writes do when they leave them unset.
+                required_columns = {
+                    "node_identity": ("node_id",),
+                    "node_specifications": ("specification_id", "node_id"),
+                    "home_resources": ("id", "resource_type"),
+                    "notes": ("id", "resource_id", "title", "content"),
+                    "resource_relations": (
+                        "source_resource_id", "target_resource_id", "relation",
+                    ),
+                }.get(table, ())
+                for column in required_columns:
+                    if column not in row or row[column] is None:
+                        raise ValueError(f"missing {column} in home import row for table: {table}")
                 if any(
                     not isinstance(value, (str, int, float, bytes, bool, type(None)))
                     for value in row.values()
@@ -1448,6 +1485,88 @@ class AIDB:
                         raise ValueError("snapshot integrity check failed during import")
                 if table == "artifact_blobs":
                     row = self._decode_artifact_blob_row(row)
+                if table == "home_resources":
+                    # content is json.dumps() of any JSON value at write
+                    # time, so it must parse as strict JSON; metadata is
+                    # always a JSON object (the store writes _json({})).
+                    if "content" in row:
+                        self._parse_strict_json_text(row["content"], "home_resources content")
+                    if "metadata" in row:
+                        self._validate_json_object(
+                            self._parse_strict_json_text(
+                                row["metadata"], "home_resources metadata"
+                            ),
+                            "home_resources metadata",
+                        )
+                    if "revision" in row and (row["revision"] is None or row["revision"] < 1):
+                        raise ValueError(
+                            "invalid revision in home import row for table: home_resources"
+                        )
+                if table == "notes":
+                    # title/content are plain text, not JSON; only the
+                    # metadata column is a JSON object. A note's id is its
+                    # resource's id: create_note writes both from the same
+                    # value, so a mismatch is not a shape the store writes.
+                    if "metadata" in row:
+                        self._validate_json_object(
+                            self._parse_strict_json_text(row["metadata"], "notes metadata"),
+                            "notes metadata",
+                        )
+                    if "revision" in row and (row["revision"] is None or row["revision"] < 1):
+                        raise ValueError("invalid revision in home import row for table: notes")
+                    if "id" in row and "resource_id" in row and row["id"] != row["resource_id"]:
+                        raise ValueError(
+                            "note id must equal its resource_id in home import row for table: notes"
+                        )
+                if table == "resource_relations":
+                    if "metadata" in row:
+                        self._validate_json_object(
+                            self._parse_strict_json_text(
+                                row["metadata"], "resource_relations metadata"
+                            ),
+                            "resource_relations metadata",
+                        )
+                    if (
+                        "source_resource_id" in row
+                        and "target_resource_id" in row
+                        and row["source_resource_id"] == row["target_resource_id"]
+                    ):
+                        raise ValueError(
+                            "a resource cannot relate to itself in home import row for table: resource_relations"
+                        )
+                if table == "node_identity":
+                    if "metadata" in row:
+                        self._validate_json_object(
+                            self._parse_strict_json_text(row["metadata"], "node_identity metadata"),
+                            "node_identity metadata",
+                        )
+                    if "id" in row and row["id"] is not None and row["id"] != 1:
+                        raise ValueError(
+                            "invalid node_identity id in home import row for table: node_identity"
+                        )
+                if table == "node_specifications":
+                    # capabilities/resource_types/transports/extensions are
+                    # JSON lists (extensions defaults to '[]' and is never
+                    # written otherwise); constraints is a JSON object.
+                    for field in (
+                        "capabilities",
+                        "resource_types",
+                        "transports",
+                        "extensions",
+                    ):
+                        if field in row:
+                            parsed = self._parse_strict_json_text(
+                                row[field], f"node_specifications {field}"
+                            )
+                            if not isinstance(parsed, list):
+                                raise ValueError(f"node_specifications {field} must be a JSON list")
+                    if "constraints" in row:
+                        self._validate_json_object(
+                            self._parse_strict_json_text(
+                                row["constraints"], "node_specifications constraints"
+                            ),
+                            "node_specifications constraints",
+                        )
                 validated_rows[table].append(row)
 
         # Change rows have no schema-level FK, so validate their targets
@@ -1464,6 +1583,20 @@ class AIDB:
             resource_id = row.get("resource_id")
             if resource_id is not None and resource_id not in valid_resource_ids:
                 raise ValueError("home change references a missing resource")
+
+        # Notes and relations carry schema-level foreign keys, but until
+        # now a dangling target only surfaced at insert time as a raw
+        # sqlite IntegrityError. Validate them here, in the pass, with
+        # the same payload-or-home scope as the home_changes check above.
+        for row in validated_rows["notes"]:
+            resource_id = row.get("resource_id")
+            if resource_id is not None and resource_id not in valid_resource_ids:
+                raise ValueError("note references a missing resource")
+        for row in validated_rows["resource_relations"]:
+            for field in ("source_resource_id", "target_resource_id"):
+                resource_id = row.get(field)
+                if resource_id is not None and resource_id not in valid_resource_ids:
+                    raise ValueError("resource relation references a missing resource")
 
         # A savepoint makes restore atomic and also works when the caller already
         # has an outer transaction. Existing rows are preserved for idempotency.
