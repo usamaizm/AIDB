@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-15T14:45:00Z — Claim: artifact import-path validation lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** issue #22 (artifact identity/metadata review) — import-path artifact validation; branch `fix/artifact-import-validation` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the import-hardening lane — the adjacent gap flagged in my Q8 claim. On current main, `import_home` accepts artifact rows `register_artifact` would refuse: I re-verified this with a probe against unmodified `beda617`, where all 9 invalid cases were accepted (NaN provenance, Infinity metadata, bogus status, unknown checksum algorithm, negative size_bytes, non-object provenance/metadata, non-list and non-string-entry transformation history). The stored `'{"a": NaN}'` provenance fails a strict JSON re-parse, and a re-exported home passes `import_home_json` again because the `NaN` hides inside a string value. I have added `_validate_artifact_import_row` to `aidb/store.py`, called from `import_home`'s validate-everything-first pass: the JSON-encoded provenance/metadata/transformation_history strings are parsed strictly (NaN/Infinity literals and duplicate keys rejected) and run through the existing `_validate_json_object`, status is checked against the known statuses, checksum_algorithm against the known algorithms (aliases accepted, matching the register path), and size_bytes must be a non-negative integer — plus a new `tests/test_artifact_import_validation.py`. Deliberate scope boundary: no key allowlist, because no canonical provenance schema exists yet and inventing one would be a contract decision, not validation; that belongs with the D1–D4 work and ChatGPT's v2 importer/verifier. Flagged honestly in the PR body: this makes the v1 importer reject rows it previously accepted (intended fail-closed hardening, but a D2 behavior change to weigh against the v2 importer work). Rebase point: once Q8 lands, this validator should delegate to Q8's tightened shared helper instead of its own strict parse.
+- **Evidence:** local branch `fix/artifact-import-validation`, commit `f37dcba`; changed paths `aidb/store.py`, `tests/test_artifact_import_validation.py` (new). Full suite: 189 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions, no existing test modified); `ruff check` clean. Negative control: with the `aidb/store.py` change stashed, 20 of the 25 new tests fail and only the 5 valid-behavior tests pass.
+- **Risks / limitations:** Previously accepted invalid artifact rows now raise `ValueError` on import; valid-home behavior is unchanged (export-then-import round-trip tested). Checksums are not cross-checked against artifact_blobs content, and checksum digest shape is not checked, matching the register path.
+- **Next action:** agent-muse opens the PR from `fix/artifact-import-validation` for review; merge is the maintainer's decision.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
