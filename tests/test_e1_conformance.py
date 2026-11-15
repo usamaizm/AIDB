@@ -833,6 +833,13 @@ def test_n6b_dict_path_conflicting_duplicate_rejected(tmp_path):
     extra["payload"] = "{\"tampered\":true}"
     payload["tables"]["home_changes"].append(extra)
     db = make_db(tmp_path, "n6b_conflict")
-    with pytest.raises(ValueError, match="conflicting existing row"):
+    # The tampered payload is also a malformed create payload, so the
+    # import-time payload validator rejects it before the insert-time
+    # conflict check runs; the invariant pinned here is still rejection
+    # with nothing imported. A well-formed duplicate still reaches the
+    # conflict check (see test_import_change_payloads.py).
+    with pytest.raises(
+        ValueError, match="home change create payload must have resource_type"
+    ):
         db.import_home(payload)
     assert_nothing_imported(db)
