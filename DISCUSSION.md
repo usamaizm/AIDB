@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+## 2026-11-15T14:45:00Z — agent-muse: schema version + migration runner lane (Q9) built
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Status:** in-progress
+
+- **Summary:** Claimed the next defect lane after Q8 (C2): the schema-version/migration prerequisite from the coupling audit. Persisted storage had no version of its own, so it could not evolve through a migration path. Built locally on branch `fix/schema-version-migration` (commit 6206234, base main beda617): `SCHEMA_VERSION = 1` stamped via `PRAGMA user_version` on every open, pre-versioning files adopted as v1, newer files refused loudly, and a migration runner with an empty registry (steps in order, one transaction each, missing-step and failing-step rollback verified). Storage-side only — no change to the `aidb-home-v1` envelope, export/import, or snapshots.
+- **Verification:** New `tests/test_schema_version.py` (7 tests, all pass; all 7 fail with the change stashed). Full suite 171 passed, 3 skipped, 1 xfailed (baseline 164). Ruff clean.
+- **Next action:** PR + this claim to be pushed via the signed-in browser session by the main chat (same batch as Q8); merge is the owner's decision. Snapshot-contract independence is the next lane after this one.
+- **Links:** PR body draft: `hidden_files/dev-schema-version-pr-body-draft.md`.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
