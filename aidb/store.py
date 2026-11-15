@@ -449,6 +449,104 @@ class AIDB:
             raise ValueError("artifact transformation_history must be a list of strings")
 
     @staticmethod
+    def _parse_strict_json_text(value: str, label: str) -> Any:
+        """Strictly parse a JSON-encoded text field from an imported row.
+
+        Rejects the non-standard numeric constants NaN/Infinity (which the
+        register path's json.dumps-based check lets through) and duplicate
+        object keys, matching the strictness import_home_json enforces at
+        the envelope level. Rebase note: once the provenance/metadata
+        strict-validation lane (Q8) lands and tightens _validate_json_object,
+        callers should delegate the parsed value to that shared helper
+        instead of relying on this local strict parse.
+        """
+        try:
+            return json.loads(
+                value,
+                object_pairs_hook=AIDB._unique_json_object,
+                parse_constant=AIDB._reject_json_constant,
+            )
+        except ValueError as exc:
+            raise ValueError(f"{label} must be strict JSON") from exc
+
+    @staticmethod
+    def _validate_artifact_import_row(row: dict) -> None:
+        """Validate one imported artifacts row with the register path's rules.
+
+        import_home's generic shape checks only establish that the fields
+        are strings/ints; they never look inside the JSON-encoded provenance,
+        metadata, and transformation_history strings, and never check status,
+        checksum_algorithm, or size_bytes sign. A home file could therefore
+        smuggle in artifact records register_artifact would refuse, which
+        then fail a strict JSON parse on read-back or carry invalid status.
+        This applies the same rules here, before any durable state is
+        touched. Only fields present in the row are checked — omitted
+        columns fall back to the table defaults, as before.
+
+        Deliberate boundaries: no key allowlist for provenance/metadata
+        (no canonical provenance schema exists yet — a contract decision,
+        not validation); checksums are not cross-checked against
+        artifact_blobs content (blobs may be absent); checksum shape is not
+        checked, matching register_artifact, which only shape-checks a
+        checksum when content bytes are provided.
+        """
+        if "status" in row and row["status"] not in _ARTIFACT_STATUSES:
+            raise ValueError(
+                "unsupported artifact status in home import row for table: artifacts: "
+                + str(row["status"])
+            )
+        if "checksum_algorithm" in row and _canonical_checksum_algorithm(
+            row["checksum_algorithm"]
+        ) is None:
+            raise ValueError(
+                "unsupported checksum algorithm in home import row for table: artifacts: "
+                + str(row["checksum_algorithm"])
+            )
+        if "size_bytes" in row:
+            size_bytes = row["size_bytes"]
+            if size_bytes is None or size_bytes < 0:
+                raise ValueError(
+                    "artifact size_bytes must be a non-negative integer in home import "
+                    "row for table: artifacts"
+                )
+        for field, label in (
+            ("provenance", "artifact provenance"),
+            ("metadata", "artifact metadata"),
+        ):
+            if field in row:
+                encoded = row[field]
+                if not isinstance(encoded, str):
+                    raise ValueError(
+                        f"invalid {field} in home import row for table: artifacts"
+                    )
+                parsed = AIDB._parse_strict_json_text(
+                    encoded, f"{label} in home import row for table: artifacts"
+                )
+                if not isinstance(parsed, dict):
+                    raise ValueError(
+                        f"{label} must be a JSON object in home import row for "
+                        "table: artifacts"
+                    )
+                AIDB._validate_json_object(parsed, label)
+        if "transformation_history" in row:
+            encoded = row["transformation_history"]
+            if not isinstance(encoded, str):
+                raise ValueError(
+                    "invalid transformation_history in home import row for table: artifacts"
+                )
+            parsed = AIDB._parse_strict_json_text(
+                encoded,
+                "artifact transformation_history in home import row for table: artifacts",
+            )
+            if not isinstance(parsed, list) or any(
+                not isinstance(step, str) for step in parsed
+            ):
+                raise ValueError(
+                    "artifact transformation_history must be a list of strings in home "
+                    "import row for table: artifacts"
+                )
+
+    @staticmethod
     def _require_confidence(confidence: float, label: str) -> float:
         if not 0.0 <= confidence <= 1.0:
             raise ValueError(f"{label} confidence must be between 0.0 and 1.0")
@@ -1448,6 +1546,8 @@ class AIDB:
                         raise ValueError("snapshot integrity check failed during import")
                 if table == "artifact_blobs":
                     row = self._decode_artifact_blob_row(row)
+                if table == "artifacts":
+                    self._validate_artifact_import_row(row)
                 validated_rows[table].append(row)
 
         # Change rows have no schema-level FK, so validate their targets
