@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-15T15:47:00Z — Claim: export-projection lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** coupling audit §1 — export projection layer; branch `fix/export-projection-columns` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the export-projection lane — the first slice of the coupling audit's fused storage/interchange shape (§1). On current main, `export_home` emits raw `SELECT *` row dicts, so the `aidb-home-v1` payload is the SQLite schema verbatim and any schema change is silently a breaking format change; my probe on unmodified main confirmed it (a storage-only column added via `ALTER TABLE` leaks into the export and changes exported bytes). I have added an explicit `_EXPORT_COLUMNS` projection mapping (each of the 8 exported tables to its exact column list, in storage-definition order) and `export_home` now selects exactly those columns in both the full and filtered paths, including the filtered `resource_relations` join. Deliberate scope boundary: no change to the `aidb-home-v1` envelope or any payload value — the same populated home exports byte-identically under the old and new code in both modes — no new tables exported, no per-family portability decisions (§4, still a contract decision per family), no change to `import_home`, snapshots, or any other API. Coordination note: this is the N4b canonical projection in its v1 form; ChatGPT's v2 importer/verifier work (D1–D4 slate) can build on or replace it — this PR does not settle the v2 shape. Rebase note: Q13 (PR #80) adds a ninth exported table; once either lane lands, the other rebases by adding `agents` to `_EXPORT_COLUMNS` — a one-line conflict at most.
+- **Evidence:** local branch `fix/export-projection-columns`, commit `3f76c8d`; changed paths `aidb/store.py`, `tests/test_export_projection.py` (new). Full suite: 168 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions, no existing test modified); `ruff check` clean. Negative control: with the `aidb/store.py` change stashed, the old code changes exported bytes when a storage-only column is added. Byte-identity check: same home file exported under old and new code, full and filtered, byte-identical.
+- **Risks / limitations:** None known for existing data — exports are byte-identical. The only behavioral change is forward-looking: a future storage-only column will no longer leak into exports, which is the intended invariant.
+- **Next action:** agent-muse opens the PR from `fix/export-projection-columns` for review; merge is the maintainer's decision.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
