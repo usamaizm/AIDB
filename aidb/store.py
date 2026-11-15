@@ -1194,6 +1194,7 @@ class AIDB:
         tables = [
             "node_identity", "node_specifications", "home_resources", "notes",
             "resource_relations", "home_changes", "artifacts", "artifact_blobs",
+            "agents",
         ]
         payload = {"format": "aidb-home-v1", "tables": {}}
         if include_private:
@@ -1251,6 +1252,17 @@ class AIDB:
             # contract. Exclude them from public-only exports until one exists.
             payload["tables"]["artifacts"] = []
             payload["tables"]["artifact_blobs"] = []
+            # Agents are identity/discovery records and the agents table has
+            # no visibility column, so they travel in public exports too.
+            # This follows PR #49's public-only discovery design, but it is
+            # a review point, not a settled contract: agent rows carry
+            # model/permissions/capabilities metadata, and whether that
+            # belongs in a public export is still an open question.
+            payload["tables"]["agents"] = [
+                dict(row) for row in self.db.execute(
+                    "SELECT * FROM agents"
+                ).fetchall()
+            ]
         if include_private:
             payload["verification"] = self.verify_home()
         else:
@@ -1274,6 +1286,50 @@ class AIDB:
     @staticmethod
     def _reject_json_constant(value):
         raise ValueError("non-standard JSON numeric constant: " + value)
+
+    @staticmethod
+    def _parse_strict_json(text: str, label: str) -> Any:
+        """Parse a JSON-encoded string, rejecting duplicate keys and NaN/Infinity."""
+        try:
+            return json.loads(
+                text,
+                object_pairs_hook=AIDB._unique_json_object,
+                parse_constant=AIDB._reject_json_constant,
+            )
+        except (json.JSONDecodeError, ValueError) as exc:
+            raise ValueError(f"invalid JSON in {label}") from exc
+
+    @staticmethod
+    def _validate_agent_import_row(row: dict) -> None:
+        """Strictly validate one agents import row.
+
+        The generic per-row checks already enforce that string fields are
+        strings, that name/role are non-empty, and that id is an integer.
+        This covers what only the agents table needs: name is required
+        (the column is NOT NULL), id must be non-negative, and the
+        JSON-encoded permissions/capabilities/metadata must parse strictly
+        into a list of strings, a list of strings, and a JSON object.
+        """
+        if "name" not in row or not isinstance(row["name"], str) or not row["name"].strip():
+            raise ValueError("invalid name in home import row for table: agents")
+        agent_id = row.get("id")
+        if agent_id is not None and agent_id < 0:
+            raise ValueError("invalid id in home import row for table: agents")
+        for field in ("permissions", "capabilities"):
+            value = row.get(field)
+            if value is None:
+                continue
+            parsed = AIDB._parse_strict_json(value, f"agent {field}")
+            if not isinstance(parsed, list) or any(
+                not isinstance(item, str) for item in parsed
+            ):
+                raise ValueError(
+                    f"invalid {field} in home import row for table: agents"
+                )
+        metadata = row.get("metadata")
+        if metadata is not None:
+            parsed = AIDB._parse_strict_json(metadata, "agent metadata")
+            AIDB._validate_json_object(parsed, "agent metadata")
 
     def import_home_json(self, content: str | bytes):
         """Import a JSON wire payload while rejecting duplicate keys and NaN/Infinity."""
@@ -1349,6 +1405,10 @@ class AIDB:
                 "parent_artifact_id", "transformation_history", "metadata", "created_at",
             },
             "artifact_blobs": {"artifact_id", "content", "created_at", "content_encoding"},
+            "agents": {
+                "id", "name", "description", "model", "role", "permissions",
+                "capabilities", "metadata",
+            },
         }
         unknown_tables = set(tables) - set(columns_by_table)
         if unknown_tables:
@@ -1387,6 +1447,7 @@ class AIDB:
                     "home_changes": ("change_id", "operation", "actor", "payload"),
                     "artifacts": ("name", "media_type", "checksum", "provenance", "transformation_history", "metadata"),
                     "home_snapshots": ("snapshot_id", "home_format", "content", "content_hash"),
+                    "agents": ("description", "model", "role", "permissions", "capabilities", "metadata"),
                 }.get(table, ())
                 for field in string_fields:
                     if field in row and row[field] is not None and not isinstance(row[field], str):
@@ -1400,6 +1461,7 @@ class AIDB:
                     "home_changes": ("change_id", "operation"),
                     "artifacts": ("name", "media_type", "checksum"),
                     "home_snapshots": ("snapshot_id", "home_format", "content", "content_hash"),
+                    "agents": ("name", "role"),
                 }.get(table, ())
                 for field in nonempty_fields:
                     if field in row and (
@@ -1416,6 +1478,7 @@ class AIDB:
                     "home_snapshots": ("id",),
                     "artifacts": ("id", "size_bytes"),
                     "artifact_blobs": ("artifact_id",),
+                    "agents": ("id",),
                 }.get(table, ())
                 for field in integer_fields:
                     if field in row and row[field] is not None and (
@@ -1446,6 +1509,8 @@ class AIDB:
                         or row.get("snapshot_id") != "snap:" + digest
                     ):
                         raise ValueError("snapshot integrity check failed during import")
+                if table == "agents":
+                    self._validate_agent_import_row(row)
                 if table == "artifact_blobs":
                     row = self._decode_artifact_blob_row(row)
                 validated_rows[table].append(row)
@@ -1464,6 +1529,53 @@ class AIDB:
             resource_id = row.get("resource_id")
             if resource_id is not None and resource_id not in valid_resource_ids:
                 raise ValueError("home change references a missing resource")
+
+        # Agent identity is home-local: exported integer ids can collide
+        # across homes, and silently remapping an id would rewrite
+        # identity — a contract decision, not a fix. Fail closed, before
+        # touching durable state: any incoming agents row whose id or
+        # name matches an existing agent (or another row in this payload)
+        # with different content is rejected. A byte-identical row is
+        # not a conflict — it is the idempotent re-import the snapshot
+        # restore path relies on — so it passes through as a no-op.
+        agent_rows = validated_rows["agents"]
+        if agent_rows:
+            existing_by_id = {
+                row["id"]: dict(row)
+                for row in self.db.execute("SELECT * FROM agents").fetchall()
+            }
+            existing_by_name = {
+                row["name"]: row for row in existing_by_id.values()
+            }
+            seen_by_id: dict[int, dict] = {}
+            seen_by_name: dict[str, dict] = {}
+            for row in agent_rows:
+                full_row = {
+                    "id": None,
+                    "name": row["name"],
+                    "description": None,
+                    "model": None,
+                    "role": "agent",
+                    "permissions": "[]",
+                    "capabilities": "[]",
+                    "metadata": "{}",
+                    **row,
+                }
+                agent_id = full_row["id"]
+                name = full_row["name"]
+                for other in (
+                    existing_by_id.get(agent_id) if agent_id is not None else None,
+                    existing_by_name.get(name),
+                    seen_by_id.get(agent_id) if agent_id is not None else None,
+                    seen_by_name.get(name),
+                ):
+                    if other is not None and other != full_row:
+                        raise ValueError(
+                            "imported agent collides with an existing agent"
+                        )
+                if agent_id is not None:
+                    seen_by_id[agent_id] = full_row
+                seen_by_name[name] = full_row
 
         # A savepoint makes restore atomic and also works when the caller already
         # has an outer transaction. Existing rows are preserved for idempotency.
