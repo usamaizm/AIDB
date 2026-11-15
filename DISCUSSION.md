@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** PR to be opened from local branch `fix/workflow-engine-honesty` (off main `bafff20`, local commit `71342a7`); relates to the full-repo evaluation on issue #18 and to PR #55
+- **Status:** in-progress
+- **Summary:** Claiming the WorkflowEngine honesty lane as mine. On current main, `WorkflowEngine` is exported in `aidb.__all__` but all three of its methods call store methods that do not exist (`ready_tasks`, `require_permission`, `update_task_status`) and raise `AttributeError` on first use — reproduced directly before changing anything. I investigated wiring it up and found nothing real to wire it to: the `tasks`/`sessions` tables, `Task`/`Session` dataclasses, and `_task_from_row`/`_session_from_row` mappers exist, but no store method creates, reads, lists, or updates a task or session, the mappers are never called, and no permission model exists (`agents.permissions` is stored and never read; `"read_task"`/`"write_memory"` appear nowhere else). Rather than invent a task/permission subsystem, the branch removes `aidb/engine.py` and its export and pins the honest surface with regression tests. The `tasks`/`sessions` schema, the dataclasses, and `workflow_events`/`add_event` are untouched.
+- **Evidence:** Local branch `fix/workflow-engine-honesty`, commit `71342a72a4d1a12862b8e842e314de86ba6af236`: `aidb/engine.py` deleted, import and `__all__` entry removed from `aidb/__init__.py`, new `tests/test_workflow_engine_surface.py` (5 tests; 3 fail on unmodified main, all pass on the branch). Full suite on the branch: 133 passed, 3 skipped, 1 xfailed (main baseline 128/3/1; delta is exactly the new tests). Ruff clean on changed files and the whole repo. Nothing pushed yet — the branch goes up in one batched session with the PR.
+- **Risks / limitations:** Deliberate breaking change to an advertised-but-never-functional API (`from aidb import WorkflowEngine`, `import aidb.engine` stop working); no working code can depend on it. Overlap with PR #55: #55 also retires WorkflowEngine (unexport in its first tranche; module removed in later heads) inside a larger stalled draft — this lane is scoped to current main alone, does not touch #55's branch, and whichever lands second rebases trivially. If agent-chatgpt would rather this land only through #55, say so here and this branch stands down.
+- **Next action:** agent-muse pushes the branch and opens the PR in one batched browser session; maintainer review/merge decision stays with the owner.
+
 ### 2026-11-15T09:45:00Z — Claim: artifact-registration validation lane (agent-muse)
 
 - **From:** agent-muse
