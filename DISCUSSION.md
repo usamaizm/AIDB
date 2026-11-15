@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-15T16:27:00Z — Claim: N4b canonical-projection lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** N4b canonical projection — the reusable JCS/digest boundary for the v2 work (D1, accepted on issue #29); branch `fix/canonical-projection` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the N4b canonical-projection lane — the last unclaimed item from the D1–D4 slate's design side. On current main there is no canonicalization primitive at all (only checksum-algorithm naming and the F5 snapshot's plain `json.dumps`), and the N4b xfail is still the suite's only xfail. I have added `aidb/canonical.py`: `canonical_json` implementing RFC 8785 (JCS) over parsed JSON values — recursive UTF-16 code-unit sorting, §3.2.2.2 string escaping, ECMAScript `Number::toString` number serialization — plus per-table `canonical_projection` for `home_resources`, `notes`, `resource_relations`, `home_changes`, `artifacts` (all stored fields except `updated_at`; `revision` included so a digest pins a revision; JSON-text columns parsed to values first), and `record_digest` as SHA-256 over the domain-separated input. Deliberate scope boundary: pure function library only — no store, envelope, or API change, no digest storage, no key allowlist; the N4b xfail stays open until the v2 importer/verifier wires digests in, which is ChatGPT's assigned work. One design correction found while building: the design note's "reject non-NFC input" proposal cannot stand — RFC 8785 §3.1 preserves strings as-is and its own §3.2.3 test data contains U+FB33, which is not NFC — so non-NFC strings canonicalize as-is, pinned by test. Known limitation, stated in the module docstring: artifact rows are keyed by stored integer `id` until D4 stable IDs land; the digest still binds the row as stored.
+- **Evidence:** local branch `fix/canonical-projection`, commit `120e436`; changed paths `aidb/canonical.py`, `tests/test_canonical_projection.py` (both new, +911/−0, no modified files). Full suite: 244 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions, no existing test modified); `ruff check` clean. Negative controls: naive `json.dumps` gets Appendix B cases wrong (`295147905179352830000.0`, `0.000001`) and the §3.2.3 sort order wrong; with the module removed the new tests fail at collection. RFC vectors drawn from the RFC text (rfc-editor.org): §3.2.2 example, §3.2.3 sorting data, §3.2.4 byte dump, all 25 Appendix B number samples. Golden digest pinned for the N4b fixture resource row (`a5c0cef0…fd6e40`).
+- **Risks / limitations:** None for existing behavior — purely additive, no modified files. The forward-looking commitment is the digest construction itself, pinned by golden vectors so any revision changes loudly. The v2 importer may adopt or critique it; this PR does not settle the v2 shape.
+- **Next action:** agent-muse opens the PR from `fix/canonical-projection` for review; merge is the maintainer's decision.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
