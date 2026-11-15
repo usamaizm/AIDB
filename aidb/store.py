@@ -382,18 +382,51 @@ class AIDB:
             raise ValueError(f"unsupported checksum algorithm: {algorithm}")
         return hashlib.new(canonical, data).hexdigest()
 
+    # Provenance/metadata are descriptors, not payloads (artifact bytes live
+    # in artifact_blobs). Keep them small, shallow, and strictly JSON so a
+    # consumer parsing with a strict JSON reader never sees NaN/Infinity
+    # literals or silently coerced keys. No key allowlist: no canonical
+    # provenance schema exists yet, and inventing one here would be a
+    # contract decision, not validation.
+    _MAX_JSON_OBJECT_DEPTH = 10
+    _MAX_JSON_OBJECT_BYTES = 65_536
+
+    @staticmethod
+    def _validate_json_value(value: Any, label: str, depth: int) -> None:
+        if isinstance(value, bool) or value is None or isinstance(value, (str, int)):
+            return
+        if isinstance(value, float):
+            if not math.isfinite(value):
+                raise ValueError(f"{label} must not contain non-finite numbers")
+            return
+        if isinstance(value, dict):
+            if depth >= AIDB._MAX_JSON_OBJECT_DEPTH:
+                raise ValueError(f"{label} exceeds maximum nesting depth")
+            for key, item in value.items():
+                if not isinstance(key, str) or not key:
+                    raise ValueError(f"{label} keys must be non-empty strings")
+                AIDB._validate_json_value(item, label, depth + 1)
+            return
+        if isinstance(value, list):
+            if depth >= AIDB._MAX_JSON_OBJECT_DEPTH:
+                raise ValueError(f"{label} exceeds maximum nesting depth")
+            for item in value:
+                AIDB._validate_json_value(item, label, depth + 1)
+            return
+        # Anything else (tuple, set, bytes, arbitrary objects) would be
+        # silently coerced or rejected by json.dumps; reject it here so what
+        # the caller passed is exactly what gets stored.
+        raise ValueError(f"{label} must contain only JSON values")
+
     @staticmethod
     def _validate_json_object(value: Any, label: str) -> None:
         if value is None:
             return
         if not isinstance(value, dict):
             raise ValueError(f"{label} must be a JSON object")
-        if any(not isinstance(key, str) for key in value):
-            raise ValueError(f"{label} keys must be strings")
-        try:
-            json.dumps(value)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"{label} must be JSON-serializable") from exc
+        AIDB._validate_json_value(value, label, depth=1)
+        if len(json.dumps(value)) > AIDB._MAX_JSON_OBJECT_BYTES:
+            raise ValueError(f"{label} exceeds maximum size")
 
     @staticmethod
     def _validate_artifact_registration(
