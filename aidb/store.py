@@ -1186,6 +1186,27 @@ class AIDB:
                 resource=self.db.execute("SELECT revision FROM home_resources WHERE id=?", (row["resource_id"],)).fetchone()
                 if resource is None: issues.append("missing resource:"+row["resource_id"])
                 if row["new_revision"] is not None and resource is not None and row["new_revision"] > resource["revision"]: issues.append("future revision:"+str(row["id"]))
+        # Stored snapshots are only hash-checked at restore time; verify them
+        # here too so a tampered snapshot cannot hide behind an ok verdict.
+        # Accepted stamps: "aidb-snapshot-v1" is the snapshot contract stamp
+        # (Q10, PR #71, unmerged at the time of writing) and "aidb-home-v1"
+        # is the legacy stamp create_snapshot() still writes on main (D2).
+        accepted_snapshot_formats = {"aidb-snapshot-v1", "aidb-home-v1"}
+        for row in self.db.execute("SELECT snapshot_id,home_format,content,content_hash FROM home_snapshots ORDER BY id").fetchall():
+            snapshot_id = row["snapshot_id"]
+            digest = hashlib.sha256(row["content"].encode("utf-8")).hexdigest()
+            if digest != row["content_hash"]:
+                issues.append("snapshot checksum mismatch:"+snapshot_id)
+            else:
+                # Content whose hash still matches but which is not JSON
+                # cannot be restored; flag it only when the hash already
+                # clears, so one tamper is not reported twice.
+                try:
+                    json.loads(row["content"])
+                except json.JSONDecodeError:
+                    issues.append("snapshot invalid content:"+snapshot_id)
+            if row["home_format"] not in accepted_snapshot_formats:
+                issues.append("snapshot unknown format:"+snapshot_id)
         return {"ok": not issues, "issues": issues}
 
     def export_home(self, include_private=True):
