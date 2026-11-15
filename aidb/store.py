@@ -1275,6 +1275,129 @@ class AIDB:
     def _reject_json_constant(value):
         raise ValueError("non-standard JSON numeric constant: " + value)
 
+    @staticmethod
+    def _parse_strict_json_text(value: str, label: str) -> Any:
+        """Strictly parse a JSON-encoded text field from an imported row.
+
+        Rejects the non-standard numeric constants NaN/Infinity (which the
+        register path's json.dumps-based check lets through) and duplicate
+        object keys, matching the strictness import_home_json enforces at
+        the envelope level.
+        """
+        try:
+            return json.loads(
+                value,
+                object_pairs_hook=AIDB._unique_json_object,
+                parse_constant=AIDB._reject_json_constant,
+            )
+        except ValueError as exc:
+            raise ValueError(f"{label} must be strict JSON") from exc
+
+    def _validate_change_payload_row(self, row, valid_resource_ids, resource_types, relation_keys):
+        """Validate one imported home_changes row against the per-operation
+        shape the store itself writes.
+
+        The store writes exactly four operations, each with a fixed payload
+        and revision pattern: create {"resource_type", "visibility"} at
+        revision 1 with no previous revision; update
+        {"content_changed", "metadata_changed"} (both booleans) stepping
+        exactly one revision; publish {} stepping exactly one revision;
+        relate {"target_resource_id", "relation"} with no revisions and a
+        matching resource_relations row. Anything else is a tampered or
+        hand-built history, rejected here before any row is stored.
+
+        ``resource_types`` maps resource ids to their resource_type from
+        both the incoming payload and this home; ``relation_keys`` holds
+        (source, target, relation) triples from both. A create payload's
+        visibility is checked only for membership, not against the stored
+        row: a resource created private and later published legitimately
+        has a public row with a private create payload.
+        """
+        operation = row.get("operation")
+        if operation not in {"create", "update", "publish", "relate"}:
+            raise ValueError("unknown home change operation: " + str(operation))
+        resource_id = row.get("resource_id")
+        if not isinstance(resource_id, str) or not resource_id.strip():
+            raise ValueError("home change resource_id must be a non-empty string")
+        payload_text = row.get("payload")
+        if not isinstance(payload_text, str):
+            raise ValueError("home change payload must be a string")
+        payload = self._parse_strict_json_text(payload_text, "home change payload")
+        if not isinstance(payload, dict):
+            raise ValueError("home change payload must be a JSON object")
+        previous_revision = row.get("previous_revision")
+        new_revision = row.get("new_revision")
+        if operation == "create":
+            if set(payload) != {"resource_type", "visibility"}:
+                raise ValueError(
+                    "home change create payload must have resource_type and visibility"
+                )
+            if (
+                not isinstance(payload["resource_type"], str)
+                or not payload["resource_type"].strip()
+            ):
+                raise ValueError(
+                    "home change create payload resource_type must be a non-empty string"
+                )
+            if payload["visibility"] not in {"public", "private"}:
+                raise ValueError("home change create payload visibility must be public or private")
+            expected_type = resource_types.get(resource_id)
+            if expected_type is not None and payload["resource_type"] != expected_type:
+                raise ValueError(
+                    "home change create payload resource_type does not match the resource"
+                )
+            if previous_revision is not None or new_revision != 1:
+                raise ValueError(
+                    "home change create revision must be new_revision 1 with no previous_revision"
+                )
+        elif operation == "update":
+            if set(payload) != {"content_changed", "metadata_changed"}:
+                raise ValueError(
+                    "home change update payload must have content_changed and metadata_changed"
+                )
+            if not isinstance(payload["content_changed"], bool) or not isinstance(
+                payload["metadata_changed"], bool
+            ):
+                raise ValueError("home change update payload flags must be booleans")
+            if (
+                previous_revision is None
+                or new_revision is None
+                or new_revision != previous_revision + 1
+            ):
+                raise ValueError("home change update revision must step by exactly one")
+        elif operation == "publish":
+            if payload != {}:
+                raise ValueError("home change publish payload must be empty")
+            if (
+                previous_revision is None
+                or new_revision is None
+                or new_revision != previous_revision + 1
+            ):
+                raise ValueError("home change publish revision must step by exactly one")
+        elif operation == "relate":
+            if set(payload) != {"target_resource_id", "relation"}:
+                raise ValueError(
+                    "home change relate payload must have target_resource_id and relation"
+                )
+            target_resource_id = payload["target_resource_id"]
+            relation = payload["relation"]
+            if not isinstance(target_resource_id, str) or not target_resource_id.strip():
+                raise ValueError(
+                    "home change relate payload target_resource_id must be a non-empty string"
+                )
+            if not isinstance(relation, str) or not relation.strip():
+                raise ValueError("home change relate payload relation must be a non-empty string")
+            if target_resource_id == resource_id:
+                raise ValueError(
+                    "home change relate payload target must differ from the source resource"
+                )
+            if target_resource_id not in valid_resource_ids:
+                raise ValueError("home change relate payload references a missing resource")
+            if (resource_id, target_resource_id, relation) not in relation_keys:
+                raise ValueError("home change relate payload has no matching relation row")
+            if previous_revision is not None or new_revision is not None:
+                raise ValueError("home change relate revision must be null")
+
     def import_home_json(self, content: str | bytes):
         """Import a JSON wire payload while rejecting duplicate keys and NaN/Infinity."""
         if not isinstance(content, (str, bytes)):
@@ -1464,6 +1587,43 @@ class AIDB:
             resource_id = row.get("resource_id")
             if resource_id is not None and resource_id not in valid_resource_ids:
                 raise ValueError("home change references a missing resource")
+
+        # Change payloads are JSON text the store itself writes in a fixed
+        # per-operation shape. Parse them strictly and check that shape
+        # against the incoming and already-stored rows before any row is
+        # stored, so a tampered history cannot enter through import.
+        resource_types = {
+            row["id"]: row.get("resource_type")
+            for row in validated_rows["home_resources"]
+            if isinstance(row.get("id"), str)
+        }
+        for existing in self.db.execute(
+            "SELECT id, resource_type FROM home_resources"
+        ).fetchall():
+            resource_types.setdefault(existing["id"], existing["resource_type"])
+        relation_keys = {
+            (
+                row.get("source_resource_id"),
+                row.get("target_resource_id"),
+                row.get("relation"),
+            )
+            for row in validated_rows["resource_relations"]
+        }
+        for existing in self.db.execute(
+            "SELECT source_resource_id, target_resource_id, relation "
+            "FROM resource_relations"
+        ).fetchall():
+            relation_keys.add(
+                (
+                    existing["source_resource_id"],
+                    existing["target_resource_id"],
+                    existing["relation"],
+                )
+            )
+        for row in validated_rows["home_changes"]:
+            self._validate_change_payload_row(
+                row, valid_resource_ids, resource_types, relation_keys
+            )
 
         # A savepoint makes restore atomic and also works when the caller already
         # has an outer transaction. Existing rows are preserved for idempotency.
