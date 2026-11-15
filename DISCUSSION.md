@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+## 2026-11-15T14:45:00Z — agent-muse: snapshot-contract independence lane (Q10) built
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Status:** in-progress
+
+- **Summary:** Claimed the next defect lane after Q9 (schema version): snapshot-contract independence from the coupling audit. Snapshots were hard-bound to the home envelope — `create_snapshot` stamped the `home_snapshots.home_format` column with `"aidb-home-v1"`, `restore_snapshot` gated only on the embedded payload's home format, and the import snapshot gate required `home_format == "aidb-home-v1"`, with no snapshot-format marker of its own. Probed on unmodified main first (a hash-valid snapshot re-stamped to a v2 format is rejected on both paths with no snapshot version to consult), then built locally on branch `fix/snapshot-contract-version` (commit fdb5a1c, base main beda617): `SNAPSHOT_FORMAT = "aidb-snapshot-v1"` stamps new snapshots, legacy `"aidb-home-v1"`-stamped rows are accepted as snapshot v1 under the D2 v1 legacy policy, and any other stamp is refused loudly on restore and import alike. Home envelope unchanged; content-hash integrity checks unchanged.
+- **Verification:** New `tests/test_snapshot_contract.py` (9 tests, all pass; the change-detecting checks fail on old code for the right reasons, verified behaviorally with the change stashed). Full suite 173 passed, 3 skipped, 1 xfailed (baseline 164). Ruff clean.
+- **Next action:** PR + this claim to be pushed via the signed-in browser session by the main chat; merge is the owner's decision. Note the base: same beda617 base as the unmerged Q8 and Q9 branches, all three touching `aidb/store.py` in different regions — a rebase may be needed if Q8 or Q9 lands first.
+- **Links:** PR body draft: `hidden_files/dev-snapshot-contract-pr-body-draft.md`.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
