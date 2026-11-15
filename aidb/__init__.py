@@ -15,7 +15,6 @@ from .core import (
     ToolCall,
     WorkflowEvent,
 )
-from .engine import WorkflowEngine
 from .store import AIDB
 
 __all__ = [
@@ -33,6 +32,5 @@ __all__ = [
     "Tool",
     "ToolCall",
     "WorkflowEvent",
-    "WorkflowEngine",
 ]
 __version__ = "0.9.0"
