@@ -1186,6 +1186,38 @@ class AIDB:
                 resource=self.db.execute("SELECT revision FROM home_resources WHERE id=?", (row["resource_id"],)).fetchone()
                 if resource is None: issues.append("missing resource:"+row["resource_id"])
                 if row["new_revision"] is not None and resource is not None and row["new_revision"] > resource["revision"]: issues.append("future revision:"+str(row["id"]))
+        # Artifact payloads are the one stored content verify_home never
+        # looked at: get_artifact_bytes() verifies a blob on read, but a
+        # tampered blob left verify_home (and the verification block a full
+        # export embeds) reporting ok. Recompute each stored blob against
+        # its artifact row. A size mismatch already proves tampering, so
+        # the checksum check is skipped for that blob to avoid reporting
+        # the same tamper twice. The checksum comparison mirrors
+        # get_artifact_bytes() exactly (case-sensitive), so the two paths
+        # can never disagree about a blob. Metadata-only artifacts have
+        # no blob row and are not flagged. An unknown algorithm is an
+        # issue, not an exception: verification must report, never raise.
+        for blob in self.db.execute(
+            "SELECT b.artifact_id, b.content, a.size_bytes, a.checksum,"
+            " a.checksum_algorithm FROM artifact_blobs b"
+            " LEFT JOIN artifacts a ON a.id = b.artifact_id"
+            " ORDER BY b.artifact_id"
+        ).fetchall():
+            artifact_id = blob["artifact_id"]
+            if blob["size_bytes"] is None:
+                issues.append("orphan artifact blob:" + str(artifact_id))
+                continue
+            content = bytes(blob["content"])
+            if len(content) != blob["size_bytes"]:
+                issues.append("artifact payload size mismatch:" + str(artifact_id))
+                continue
+            try:
+                actual_checksum = self._checksum_bytes(content, blob["checksum_algorithm"])
+            except ValueError:
+                issues.append("artifact checksum algorithm unsupported:" + str(artifact_id))
+                continue
+            if actual_checksum != blob["checksum"]:
+                issues.append("artifact payload checksum mismatch:" + str(artifact_id))
         return {"ok": not issues, "issues": issues}
 
     def export_home(self, include_private=True):
