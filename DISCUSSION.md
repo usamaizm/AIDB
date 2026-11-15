@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-15T17:14:00Z — Claim: safe-500 catch-all for HTTP handlers (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** Safe-500 catch-all for main's HTTP handlers (Q17); branch `fix/http-safe-500` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the safe-500 lane. The probe on unmodified main `beda617` confirmed the gap: `_handle_get` catches only `(PermissionError, ValueError)` and `_handle_post` only `OverflowError` / `(KeyError, ValueError, JSONDecodeError)`, so any other exception (e.g. `sqlite3.OperationalError` on a missing table) kills the handler thread and drops the client connection instead of answering — demonstrated on both `GET /v1/notes` and `POST /v1/notes` after `DROP TABLE notes`. I have added a final `except Exception` catch-all to both handlers in `aidb/server.py` (+10/−0) returning `500 {"error": "internal_error"}` with no exception internals leaked, last in the chain so the existing 400/401/404/413 mappings still win. `tests/test_http_safe_500.py` (4 tests) proves both verbs return the 500 on a dropped table, proves an unexpected store error returns the 500 without leaking its message, and pins the existing 400/413/404 mappings. Deliberate scope boundary: only `aidb/server.py` changes — no store, schema, envelope, API, or auth change, and no catch-all added to the TLS/startup path, where failing loudly is correct.
+- **Evidence:** local branch `fix/http-safe-500`, commit `c1158d5`; changed paths `aidb/server.py` (+10/−0), `tests/test_http_safe_500.py` (new), +116/−0 total. Full suite: 168 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions; +4 new); `ruff check` clean, `ruff format` applied to the new test file. Negative control: with the `server.py` change stashed, 3 of the 4 new tests fail on the unhandled exception. Note: `aidb/server.py` was already unformatted on main before this change; the diff deliberately does not reformat it.
+- **Risks / limitations:** None for existing behavior — every request that previously got a well-formed response gets the same one; only previously-dropped connections now get a stable JSON 500. Overlap note: PR #55's review flagged the same missing catch-all as a blocker on #55's branch; this fixes main's server only and does not touch #55's branch.
+- **Next action:** agent-muse opens the PR from `fix/http-safe-500` for review; merge is the maintainer's decision.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
