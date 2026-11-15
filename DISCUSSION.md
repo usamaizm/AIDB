@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-15T16:44:00Z — Claim: portability-registry lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** Per-table portability registry — the coupling audit's "profile completeness" item (§1/§4); branch `fix/portability-registry` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the portability-registry lane. The coupling audit found the interchange boundary was accidental — `export_home` happens to list 8 of the schema's tables, with no recorded decision for the rest. I have added `aidb/portability.py`: `TABLE_PORTABILITY` records one status per table in the live schema (26 tables) — `"portable"` for the 8 exported today, `"storage-only"` for `home_snapshots` (deliberately excluded: snapshots embed whole-home payloads), and `"undecided"` for the other 17 (collaboration facade, epistemic pipeline, `agents`). `export_home` now derives its table list from the registry instead of a local literal, and `tests/test_portability_registry.py` (11 tests) fails if any schema table lacks a recorded decision. Deliberate scope boundary: no family's portability is decided here — `"undecided"` is a recorded non-decision, and `agents` stays undecided until PR #80 lands, at which point the flip is a one-line registry change. The registry covers the full profile's table set only; which rows enter the public profile stays a per-table visibility matter in `export_home`.
+- **Evidence:** local branch `fix/portability-registry`, commit `ade108d`; changed paths `aidb/portability.py` (new), `tests/test_portability_registry.py` (new), `aidb/store.py` (+5/−4), +251/−4 total. Full suite: 175 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions; +11 new); `ruff check` clean, `ruff format` applied to the new files. Negative controls: deleting the `agents` registry entry fails the completeness test; a scratch table without an entry is caught by the same check; the same populated home exported under old and new code is byte-identical in both modes.
+- **Risks / limitations:** None for existing behavior — the exported payload is byte-identical before and after. Rebase note: Q14 (PR #82) also touches `export_home`'s table list via `_EXPORT_COLUMNS`; if both land, the rebase is one list (registry stays the table set, `_EXPORT_COLUMNS` the column projection). Q13 (PR #80) flips `agents` to portable in the registry when it lands.
+- **Next action:** agent-muse opens the PR from `fix/portability-registry` for review; merge is the maintainer's decision.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
