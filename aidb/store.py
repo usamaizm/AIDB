@@ -10,7 +10,7 @@ import uuid
 import warnings
 from threading import RLock
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .core import (
     Agent,
@@ -60,6 +60,24 @@ _ARTIFACT_STATUSES = {"raw", "derived"}
 
 _HEX_DIGITS = frozenset("0123456789abcdef")
 
+# Persisted-storage schema version, recorded in the SQLite file itself via
+# PRAGMA user_version. Persisted storage previously had no version of its
+# own (see the format-coupling audit, issue #29: the schema is created with
+# CREATE TABLE IF NOT EXISTS and nothing records which schema a file holds),
+# so it could not evolve through a migration path. Version 1 is the schema
+# as it stands on main. Databases created before versioning carry
+# user_version 0 and are adopted as version 1 on open (the v1 legacy
+# policy). A stored version newer than SCHEMA_VERSION is refused loudly
+# rather than silently misread.
+SCHEMA_VERSION = 1
+
+# Registered schema migrations, keyed by the version each step migrates TO.
+# A step receives the live connection and must leave the database at its
+# target version; steps run in ascending order, one transaction each. The
+# registry is empty until the first real schema change ships: the runner is
+# the prerequisite the audit calls for, not a v2 schema.
+SCHEMA_MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {}
+
 
 def _canonical_checksum_algorithm(algorithm: Any) -> str | None:
     """Return the canonical checksum algorithm name, or None if unsupported."""
@@ -80,6 +98,7 @@ class AIDB:
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys = ON")
         self._create_schema()
+        self._ensure_schema_version()
 
     def _create_schema(self) -> None:
         self.db.executescript(
@@ -347,6 +366,66 @@ class AIDB:
             """
         )
         self.db.commit()
+
+    @property
+    def schema_version(self) -> int:
+        """Persisted-storage schema version of this database (PRAGMA user_version)."""
+        row = self.db.execute("PRAGMA user_version").fetchone()
+        return int(row[0])
+
+    def _ensure_schema_version(self) -> None:
+        """Stamp or check the persisted schema version on open.
+
+        A pre-versioning database (user_version 0) is adopted as schema
+        version 1. A database newer than this code is refused rather than
+        silently misread. An older versioned database runs the registered
+        migrations; with none registered for a step, opening fails loudly
+        before anything is mutated.
+        """
+        stored = self.schema_version
+        if stored == 0:
+            self._set_schema_version(SCHEMA_VERSION)
+            return
+        if stored > SCHEMA_VERSION:
+            raise ValueError(
+                f"database schema version {stored} is newer than supported "
+                f"version {SCHEMA_VERSION}; refusing to open"
+            )
+        if stored < SCHEMA_VERSION:
+            self._run_migrations(stored)
+
+    def _set_schema_version(self, version: int) -> None:
+        self.db.execute(f"PRAGMA user_version = {int(version)}")
+        self.db.commit()
+
+    def _run_migrations(self, stored: int) -> None:
+        """Apply registered migrations from `stored` up to SCHEMA_VERSION.
+
+        Missing steps are detected before any step runs, so a gap fails
+        without mutating the database. Each step runs in one transaction
+        and stamps its target version on success, so a failing step leaves
+        the database at the last good version instead of half-migrated.
+        Steps must not commit on their own or manage transactions; the
+        runner commits once per step.
+        """
+        missing = [v for v in range(stored + 1, SCHEMA_VERSION + 1) if v not in SCHEMA_MIGRATIONS]
+        if missing:
+            raise ValueError(
+                f"no registered migration to schema version {missing[0]} "
+                f"(database is at version {stored}, supported version is {SCHEMA_VERSION})"
+            )
+        for target in range(stored + 1, SCHEMA_VERSION + 1):
+            try:
+                # Explicit BEGIN: without it, Python's sqlite3 runs DDL
+                # outside any transaction and a failing step could not roll
+                # its schema changes back.
+                self.db.execute("BEGIN")
+                SCHEMA_MIGRATIONS[target](self.db)
+                self.db.execute(f"PRAGMA user_version = {target}")
+                self.db.commit()
+            except Exception:
+                self.db.rollback()
+                raise
 
     @staticmethod
     def _json(value: Any) -> str:
