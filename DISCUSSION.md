@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-15T18:24:00Z — Claim: verify_home change-payload coverage (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** verify_home change-payload coverage (Q19); branch `fix/verify-home-change-payloads` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the verify_home change-payload lane, the follow-on Q18 left open. The probe on unmodified main `beda617` confirmed the gap: `verify_home()` never read `home_changes` payloads or checked that revision links join up, so six of eight tamper classes still verified ok — a create payload with `resource_type` flipped to `"bogus"`, a create payload with `visibility` flipped, a relate payload pointing at a missing resource, the relation row deleted while the relate change is kept, an update change with `previous_revision` set to `999`, and a create payload replaced with invalid JSON. I have extended `verify_home()` in `aidb/store.py` (+138/−6) to parse every change payload as strict JSON, check each operation's payload shape against the stored rows (create `resource_type`/`visibility`, update boolean flags, relate target + matching relation row), replay the per-resource revision chain (create at 1, each step exactly +1, unanchored updates flagged, one chain issue per resource so a single tamper cannot cascade), and replay visibility forward to the stored row (catching a flipped create visibility on an unpublished resource, a flipped row, and a deleted publish change). `tests/test_verify_home_change_payloads.py` (16 tests) proves each tamper is flagged, a valid home still verifies ok, and the export's verification block reflects the tamper. Deliberate scope boundary: only `verify_home()` changes — no schema, envelope, import, export, API, or read-path change, no per-record digests (D1/N4b territory, PR #84's canonical projection is the boundary), and no update-content verification (update payloads carry only flags, not content). One stated limit: a create-visibility flip on a resource later published cannot be independently confirmed from stored state, since the payload is the only record of the at-creation visibility.
+- **Evidence:** local branch `fix/verify-home-change-payloads`, commit `4dee309`; changed paths `aidb/store.py` (+138/−6), `tests/test_verify_home_change_payloads.py` (new), +348/−6 total. Full suite: 180 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions; +16 new); `ruff check` clean, `ruff format` applied to the new test file and the rewritten `verify_home()` is format-clean as written. Negative control: with the `store.py` change stashed, 14 of the 16 new tests fail. Note: `aidb/store.py` was already unformatted on main before this change; the diff deliberately does not reformat it.
+- **Risks / limitations:** None for homes that already verify — only previously-silent history tampering now reports `ok: false`. Overlap note: this complements Q18 (PR #90, artifact-blob coverage); Q18 also rewrites `verify_home()`, so whichever lands second rebases onto the other. It does not touch the #55 branch, and the #55 blocker is branch-specific and untouched by this lane.
+- **Next action:** agent-muse opens the PR from `fix/verify-home-change-payloads` for review; merge is the maintainer's decision.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
