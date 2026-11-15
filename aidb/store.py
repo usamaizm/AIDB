@@ -70,6 +70,74 @@ def _canonical_checksum_algorithm(algorithm: Any) -> str | None:
     return canonical if canonical in _CHECKSUM_DIGEST_LENGTHS else None
 
 
+def _validate_strict_json_value(value: Any, label: str) -> None:
+    """Reject values that are not strict JSON (no NaN/Infinity, no silent coercion).
+
+    Only dict/list/str/int/finite-float/bool/None are accepted; dict keys must
+    be non-empty strings. Tuples, sets, bytes, and other objects are rejected
+    rather than silently coerced by json.dumps, and non-finite floats are
+    rejected rather than stored as non-strict-JSON literals. This is the same
+    strictness Q8 (PR #70) applies to artifact provenance/metadata and Q23
+    (PR #100) applies to the resource/note creation boundary, scoped here to
+    the update boundary; the helpers can converge onto one when either lands.
+    No depth or size cap: resource content is user data, unlike provenance
+    metadata.
+    """
+    if value is None or isinstance(value, (str, bool)):
+        return
+    if isinstance(value, int):
+        return
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"{label} must contain only finite numbers")
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str) or not key:
+                raise ValueError(f"{label} keys must be non-empty strings")
+            _validate_strict_json_value(item, label)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _validate_strict_json_value(item, label)
+        return
+    raise ValueError(f"{label} must be a JSON value")
+
+
+def _validate_metadata(metadata: Any, label: str = "metadata") -> None:
+    """Metadata must be absent or a JSON object of strict JSON values."""
+    if metadata is None:
+        return
+    if not isinstance(metadata, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    _validate_strict_json_value(metadata, label)
+
+
+def _validate_note_content(content: Any) -> None:
+    """Validate the content of an update_resource() call on a note resource.
+
+    Dict content must include a non-empty-string title and a string content,
+    with kind (when present) a non-empty string, mirroring create_note's
+    rules; a missing kind keeps the existing kind. The legacy scalar
+    shorthand replaces only the note body, so a non-dict update must be a
+    string.
+    """
+    if isinstance(content, dict):
+        if not {"title", "content"}.issubset(content):
+            raise ValueError("note resource content must include title and content")
+        if not isinstance(content["title"], str) or not content["title"].strip():
+            raise ValueError("note title must be a non-empty string")
+        if not isinstance(content["content"], str):
+            raise ValueError("note content must be a string")
+        if "kind" in content and (
+            not isinstance(content["kind"], str) or not content["kind"].strip()
+        ):
+            raise ValueError("note kind must be a non-empty string")
+        return
+    if not isinstance(content, str):
+        raise ValueError("note content must be a string")
+
+
 class AIDB:
     """SQLite-backed state layer for AI agents, sessions, tasks, memory, tools, workflow events, and artifacts."""
 
@@ -1533,6 +1601,18 @@ class AIDB:
             raise PermissionError("owner mismatch")
         if expected_revision is not None and row["revision"] != expected_revision:
             raise ValueError("revision conflict")
+
+        # Validate before any write: None means "keep existing" and is not
+        # validated. Note rules need the notes row, so they run here too,
+        # before BEGIN.
+        if content is not None:
+            _validate_strict_json_value(content, "content")
+            note_row = self.db.execute(
+                "SELECT 1 FROM notes WHERE resource_id=?", (resource_id,)
+            ).fetchone()
+            if note_row is not None:
+                _validate_note_content(content)
+        _validate_metadata(metadata)
 
         old_revision = row["revision"]
         new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
