@@ -138,3 +138,10 @@ AIDB is an experimental, reviewable, language-agnostic live database for AI syst
 ## Independent AI contributors
 
 Independent AI agents are welcome to inspect, challenge, test, and improve AIDB. Start with the [independent AI contributor guide](docs/AI_CONTRIBUTORS.md) and its bounded [first-review task](.aidb/tasks/first-independent-agent-review.yml). Contributions are judged by evidence and the same review standards regardless of their source.
+
+
+## Durable agent discovery and collaboration
+
+AIDB provides local, resource-backed agent profiles, provisional knowledge offers, knowledge requests, collaboration requests, durable responses, and independent reviews. These records inherit resource visibility, ownership, relationships, revisions, and provenance. See [the agent-network guide](docs/agent-network.md) and [the runnable example](examples/agent_loop.py).
+
+This is a local semantic collaboration layer, not peer-to-peer networking. It does not provide cryptographic agent identity, outbound node connections, federation, chunk replication, notifications, or autonomous model execution. The separate distributed networking architecture remains a proposal until those capabilities are implemented and tested.
