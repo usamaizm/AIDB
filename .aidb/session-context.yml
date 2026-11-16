@@ -127,9 +127,9 @@ priority_order:
 
 
 live_repository_snapshot:
-  as_of: "2026-11-16T12:56:54Z"
-  main_commit: "d10a706659aa15feeeeb4e50c9e6b735c2b19e08"
-  open_pull_requests: 28
+  as_of: "2026-11-16"
+  main_commit: "e3664a66b1165a1a1e6812f2df59e28296ff4ea1"
+  open_pull_requests: 6
   cli_surface:
     source: aidb/__main__.py
     commands: [agent, search, serve]
@@ -195,6 +195,14 @@ live_repository_snapshot:
     - pr: 120
       topic: "restore DISCUSSION.md journal from repository history"
       merge_commit: "d10a706659aa15feeeeb4e50c9e6b735c2b19e08"
+    - pr: 136
+      topic: "consolidate nine Q8-Q16 contribution claim entries"
+      merge_commit: "635dca74845803a6820849ff026ace3d2a4e34a7"
+    - pr: 138
+      topic: "HTTPS certificate-chain and hostname verification plus bearer write authorization"
+      merge_commit: "e3664a66b1165a1a1e6812f2df59e28296ff4ea1"
+      ci_run_id: 43883836808
+      ci_result: success
   verified_boundaries:
     - "Import validates all portable rows before writes; failure remains atomic."
     - "verify_home checks strict JSON, snapshots, artifact blobs, and change/revision history."
@@ -203,12 +211,12 @@ live_repository_snapshot:
     - "Local agent collaboration exists; distributed peer networking does not."
     - "RFC 8785 digest primitives exist; home-format integration is not complete."
   open_work_clusters:
-    - "PR #120 restored DISCUSSION.md; PR #118 is closed as superseded."
-    - "PR #122 adds a new verify_home stored-row JSON claim; compare it with #105 and merged #112 before accepting a duplicate claim."
-    - "PR #64 resource application/SQLite adapter refactor needs rebase and preservation of current validations."
-    - "PR #55 is broad and overlaps several merged fixes; split/reconcile unique changes before merge."
-    - "PR #61 distributed/evolution docs are proposed architecture only; companion rebased docs PR pending."
-    - "PRs #14 and #15 overlap the merged local agent-network work and proposed distributed architecture."
-    - "PRs #74-#105 contain paired agent-muse claim entries; preserve attribution and verify against merged code."
-  superseded_implementation_prs: [49, 50, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 114, 118]
+    - "PR #141 node specification: contract 0.1.0, supersedes history, transport-scoped capabilities; earlier CI 43883727803 passed, but latest branch is dirty after #138 and has no current-head run; persist contract version per revision before merge."
+    - "PR #143 HTTP request safety: current-main branch on e3664a66; CI 43884344106 passed Python 3.10/3.11/3.12; independent review pending."
+    - "PR #139 progressive onboarding: additive docs; CI 43882238516 passed on its prior base; branch is 7 commits behind main and needs a current-base check; independent review pending."
+    - "PR #140 refreshes audit/session snapshot to main e3664a66; CI 43884072018 passed on its prior head; current refreshed head requires recheck."
+    - "PR #64 adapter refactor: dirty merge and stale base; bypasses strict resource validation and reintroduces POST body lock contention; do not merge as-is."
+    - "PR #25 phone-first contribution protocol: docs proposal; workflow inventory and branch-protection review outstanding."
+    - "PR #55 broad remediation bundle was closed as stale/dirty and overlapping merged work; extract only unique changes into focused PRs if still needed."
+  superseded_implementation_prs: [14, 15, 24, 45, 49, 50, 74, 75, 76, 77, 79, 81, 82, 83, 84, 85, 86, 87, 88, 90, 92, 94, 96, 98, 100, 102, 104, 114, 118, 129, 131, 133, 134, 137, 142, 144]
   handoff: "Refresh live GitHub state before every new task; read docs/repository-audit.md and docs/PROJECT_CONTEXT.md."
