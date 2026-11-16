@@ -72,6 +72,23 @@ def publish_agent_profile(
     stable_id = _required_text(agent_id, "agent_id")
     if not _AGENT_ID.fullmatch(stable_id):
         raise ValueError("agent_id must use the stable agent-<slug> format")
+    offset = 0
+    while True:
+        existing_profiles = db.list_resources(
+            resource_type=AGENT_PROFILE,
+            include_private=True,
+            limit=100,
+            offset=offset,
+        )
+        for existing in existing_profiles:
+            existing_content = (
+                existing.content if isinstance(existing.content, dict) else {}
+            )
+            if existing_content.get("agent_id") == stable_id:
+                raise ValueError("agent_id already has a published profile")
+        if len(existing_profiles) < 100:
+            break
+        offset += len(existing_profiles)
     capabilities = _string_list(agent.capabilities, "capabilities")
     content = {
         "agent_id": stable_id,
