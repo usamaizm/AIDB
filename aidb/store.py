@@ -1068,6 +1068,217 @@ class AIDB:
             cur.lastrowid,
         )
 
+    def _require_session_row(self, session_id):
+        row = self.db.execute(
+            "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"session {session_id} does not exist")
+        return row
+
+    def _session_participant_ids(self, session_id):
+        rows = self.db.execute(
+            "SELECT agent_id FROM session_participants WHERE session_id = ? ORDER BY id ASC",
+            (session_id,),
+        ).fetchall()
+        return [row["agent_id"] for row in rows]
+
+    def _session_dict(self, row):
+        session = dict(row)
+        session["metadata"] = json.loads(session["metadata"] or "{}")
+        session["participants"] = self._session_participant_ids(row["session_id"])
+        return session
+
+    def _message_dict(self, row):
+        message = dict(row)
+        message["metadata"] = json.loads(message["metadata"] or "{}")
+        return message
+
+    def create_session(self, created_by, title="", description="", metadata=None):
+        """Open a session owned by an existing agent.
+
+        The creator becomes the session's first participant. The session
+        row and the creator's participant row are written atomically, so
+        a session never exists without its creator participating. The
+        returned dict carries the decoded metadata and the participant
+        agent ids in join order.
+        """
+        if not isinstance(title, str):
+            raise ValueError("session title must be a string")
+        if not isinstance(description, str):
+            raise ValueError("session description must be a string")
+        self._validate_json_object(metadata, "session metadata")
+        if created_by is None:
+            raise ValueError("session creator must be an existing agent id")
+        session_id = "ses:" + str(uuid.uuid4())
+        with self._atomic("create_session"):
+            agent = self.db.execute("SELECT id FROM agents WHERE id = ?", (created_by,)).fetchone()
+            if agent is None:
+                raise ValueError(f"agent {created_by} does not exist")
+            self.db.execute(
+                "INSERT INTO sessions(session_id, title, description, metadata, created_by, status)"
+                " VALUES (?, ?, ?, ?, ?, 'active')",
+                (session_id, title, description, self._json(metadata or {}), created_by),
+            )
+            self.db.execute(
+                "INSERT INTO session_participants(session_id, agent_id) VALUES (?, ?)",
+                (session_id, created_by),
+            )
+        return self.get_session(session_id)
+
+    def get_session(self, session_id):
+        return self._session_dict(self._require_session_row(session_id))
+
+    def list_sessions(self, status=None, participant_id=None):
+        query = "SELECT * FROM sessions"
+        conditions = []
+        params = []
+        if status is not None:
+            conditions.append("status = ?")
+            params.append(status)
+        if participant_id is not None:
+            conditions.append(
+                "EXISTS (SELECT 1 FROM session_participants p"
+                " WHERE p.session_id = sessions.session_id AND p.agent_id = ?)"
+            )
+            params.append(participant_id)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY rowid ASC"
+        rows = self.db.execute(query, params).fetchall()
+        return [self._session_dict(row) for row in rows]
+
+    def join_session(self, session_id, agent_id):
+        with self._atomic("join_session"):
+            row = self._require_session_row(session_id)
+            if row["status"] != "active":
+                raise ValueError(f"session {session_id} is closed")
+            agent = self.db.execute("SELECT id FROM agents WHERE id = ?", (agent_id,)).fetchone()
+            if agent is None:
+                raise ValueError(f"agent {agent_id} does not exist")
+            existing = self.db.execute(
+                "SELECT 1 FROM session_participants WHERE session_id = ? AND agent_id = ?",
+                (session_id, agent_id),
+            ).fetchone()
+            if existing is not None:
+                raise ValueError(
+                    f"agent {agent_id} is already a participant of session {session_id}"
+                )
+            self.db.execute(
+                "INSERT INTO session_participants(session_id, agent_id) VALUES (?, ?)",
+                (session_id, agent_id),
+            )
+        return self.get_session(session_id)
+
+    def leave_session(self, session_id, agent_id):
+        with self._atomic("leave_session"):
+            self._require_session_row(session_id)
+            cur = self.db.execute(
+                "DELETE FROM session_participants WHERE session_id = ? AND agent_id = ?",
+                (session_id, agent_id),
+            )
+            if cur.rowcount == 0:
+                raise ValueError(f"agent {agent_id} is not a participant of session {session_id}")
+        return self.get_session(session_id)
+
+    def close_session(self, session_id):
+        """Close a session. Closed is terminal: no reopen, and a closed
+        session refuses new participants and new messages."""
+        with self._atomic("close_session"):
+            row = self._require_session_row(session_id)
+            if row["status"] == "closed":
+                raise ValueError(f"session {session_id} is already closed")
+            self.db.execute(
+                "UPDATE sessions SET status = 'closed' WHERE session_id = ?",
+                (session_id,),
+            )
+        return self.get_session(session_id)
+
+    def post_message(self, session_id, agent_id, role, content, metadata=None):
+        """Append a message to an active session.
+
+        Only current participants may post: the message is the
+        session-scoped write, so authorship is always attributable to a
+        participating agent.
+        """
+        if not isinstance(role, str) or not role.strip():
+            raise ValueError("message role must be a non-empty string")
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("message content must be a non-empty string")
+        self._validate_json_object(metadata, "message metadata")
+        with self._atomic("post_message"):
+            row = self._require_session_row(session_id)
+            if row["status"] != "active":
+                raise ValueError(f"session {session_id} is closed")
+            participant = self.db.execute(
+                "SELECT 1 FROM session_participants WHERE session_id = ? AND agent_id = ?",
+                (session_id, agent_id),
+            ).fetchone()
+            if participant is None:
+                raise ValueError(f"agent {agent_id} is not a participant of session {session_id}")
+            cur = self.db.execute(
+                "INSERT INTO messages(session_id, agent_id, role, content, metadata)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (session_id, agent_id, role, content, self._json(metadata or {})),
+            )
+            message_id = cur.lastrowid
+        row = self.db.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
+        return self._message_dict(row)
+
+    def list_messages(self, session_id, limit=None):
+        self._require_session_row(session_id)
+        if limit is not None and limit < 1:
+            raise ValueError("limit must be positive")
+        query = "SELECT * FROM messages WHERE session_id = ? ORDER BY id ASC"
+        params = [session_id]
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+        rows = self.db.execute(query, params).fetchall()
+        return [self._message_dict(row) for row in rows]
+
+    def session_change_cursor(self, session_id):
+        """The session's change-feed cursor: the current home_changes
+        high-water mark. Pass it as ``after_id`` to session_changes to
+        read only what arrives afterwards."""
+        self._require_session_row(session_id)
+        row = self.db.execute("SELECT COALESCE(MAX(id), 0) AS cursor FROM home_changes").fetchone()
+        return int(row["cursor"])
+
+    def session_changes(self, session_id, after_id=0, limit=None):
+        """Changes attributed to the session's current participants.
+
+        Attribution follows the store's actor strings: a home_changes row
+        belongs to the session when its actor equals the name of an agent
+        who currently participates. A participant therefore appears in
+        the feed once their agent name is used as the actor/owner on
+        resource writes, and rows by non-participants never appear. Rows
+        are returned in the same dict shape as list_changes.
+        """
+        self._require_session_row(session_id)
+        if limit is not None and limit < 1:
+            raise ValueError("limit must be positive")
+        names = [
+            row["name"]
+            for row in self.db.execute(
+                "SELECT a.name AS name FROM session_participants p"
+                " JOIN agents a ON a.id = p.agent_id WHERE p.session_id = ?",
+                (session_id,),
+            ).fetchall()
+        ]
+        if not names:
+            return []
+        placeholders = ", ".join("?" for _ in names)
+        query = (
+            f"SELECT * FROM home_changes WHERE id > ? AND actor IN ({placeholders}) ORDER BY id ASC"
+        )
+        params = [after_id, *names]
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+        rows = self.db.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
     def create_extraction(
         self,
         input_artifact_id: int,
