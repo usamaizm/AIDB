@@ -213,20 +213,25 @@ def create_server(
     tls_keyfile: str | None = None,
 ) -> ThreadingHTTPServer:
     validate_bind_security(host, auth_token, tls_certfile, tls_keyfile)
-    transport_protocol = "https/1.1" if tls_certfile and tls_keyfile else "http/1.1"
-    server = ThreadingHTTPServer(
-        (host, port),
-        create_handler(db, auth_token, transport_protocol=transport_protocol),
-    )
+    context = None
     if tls_certfile and tls_keyfile:
-        try:
-            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            context.minimum_version = ssl.TLSVersion.TLSv1_2
-            context.load_cert_chain(tls_certfile, tls_keyfile)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(tls_certfile, tls_keyfile)
+
+    transport_protocol = "https/1.1" if context is not None else "http/1.1"
+    server = ThreadingHTTPServer((host, port), BaseHTTPRequestHandler)
+    try:
+        if context is not None:
             server.socket = context.wrap_socket(server.socket, server_side=True)
-        except Exception:
-            server.server_close()
-            raise
+        # Publish the transport only after TLS setup succeeds, so a failed
+        # certificate load never leaves a false HTTPS advertisement in history.
+        server.RequestHandlerClass = create_handler(
+            db, auth_token, transport_protocol=transport_protocol
+        )
+    except Exception:
+        server.server_close()
+        raise
     return server
 
 
