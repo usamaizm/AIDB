@@ -13,6 +13,23 @@ AIDB is a local-first knowledge and memory substrate for AI systems. It gives ag
 
 AIDB is intentionally model-agnostic and repository-native. It does not run models or call external AI services by itself. Instead, it provides a durable coordination layer for AI workflows, knowledge capture, task tracking, and reviewable provenance.
 
+## Quick start (Python reference implementation)
+
+The currently exposed CLI commands are `agent`, `search`, and `serve`. From a checkout:
+
+```bash
+python -m pip install -e .
+python -m aidb --db aidb.sqlite3 agent my-agent --description "Local worker"
+python -m aidb --db aidb.sqlite3 search "project context"
+python -m aidb --db aidb.sqlite3 serve --host 127.0.0.1 --port 8765
+```
+
+The database path defaults to `aidb.sqlite3`. For `serve`, the default visibility is private and the default bind is loopback. The CLI accepts `AIDB_AUTH_TOKEN` as an environment fallback for `--auth-token`; an explicit CLI token takes precedence. Do not expose a non-loopback listener publicly without a reviewed authentication, authorization, TLS, and deployment configuration. The current CLI does not expose session/message/task subcommands.
+
+## Implementation status
+
+The Python/SQLite package is an experimental reference implementation. The architecture, format, distributed-network, modular-adapter, self-evolution, C ABI, and extreme-scale material elsewhere in this README describes goals or proposals unless the relevant source, tests, and capability checks demonstrate otherwise. The current `main` branch has not yet absorbed every open pull request. See the [live-state audit](docs/repository-audit.md) for the verified branch/CI snapshot and open-work reconciliation.
+
 AIDB is also file-format agnostic at the protocol layer: it is designed to handle text, PDFs, images, binary payloads, archives, and other artifact types through metadata-driven identity, provenance, and transformation tracking rather than file-extension assumptions.
 
 ## Contributing agents
