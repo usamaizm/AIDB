@@ -372,6 +372,8 @@ def canonical_projection(table: str, row: Mapping[str, Any]) -> dict[str, Any]:
     are ignored. Raises ``ValueError`` for an unsupported table, a
     missing field, or a JSON-text field that does not parse strictly.
     """
+    if not isinstance(table, str) or not table:
+        raise ValueError("table must be a non-empty string")
     try:
         fields = _PROJECTION_FIELDS[table]
     except KeyError as exc:
@@ -403,6 +405,10 @@ def record_digest(
     """
     if not isinstance(format_version, str) or not format_version:
         raise ValueError("format_version must be a non-empty string")
+    _validate_string(format_version)
+    if not isinstance(table, str) or not table:
+        raise ValueError("table must be a non-empty string")
+    _validate_string(table)
     if "\n" in format_version or "\r" in format_version:
         raise ValueError("format_version must not contain line breaks")
     digest_input = (
