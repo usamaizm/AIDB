@@ -1,9 +1,11 @@
 import json
+import socket
+from http.client import HTTPConnection
 from urllib.request import Request, urlopen
 from http.server import ThreadingHTTPServer
-from threading import Thread
+from threading import Event, Thread
 
-from aidb.server import create_handler
+from aidb.server import create_handler, create_server
 from aidb import AIDB
 
 
@@ -93,6 +95,112 @@ def test_http_rejects_oversized_request_body():
             status = getattr(exc, "code", None)
         assert status == 413
     finally:
+        server.shutdown()
+        server.server_close()
+        db.close()
+
+
+def test_create_server_sets_connection_timeout_and_bounded_worker_defaults():
+    db = AIDB(":memory:")
+    server = create_server(db, port=0)
+    client = socket.create_connection(server.server_address)
+    accepted = None
+    try:
+        accepted, _ = server.get_request()
+        assert accepted.gettimeout() == 10.0
+        assert server.daemon_threads is True
+        assert server.request_queue_size == 32
+    finally:
+        if accepted is not None:
+            accepted.close()
+        client.close()
+        server.server_close()
+        db.close()
+
+
+def test_slow_post_body_does_not_hold_shared_database_lock():
+    db = AIDB(":memory:")
+    server = create_server(db, port=0, auth_token="test-token")
+    body_read_started = Event()
+    allow_body_read_to_finish = Event()
+    result = {}
+
+    def slow_body(_handler):
+        body_read_started.set()
+        assert allow_body_read_to_finish.wait(timeout=3)
+        return {"title": "slow", "content": "upload"}
+
+    server.RequestHandlerClass._json_body = slow_body
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    client = HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+
+    def post():
+        try:
+            client.request(
+                "POST",
+                "/v1/notes",
+                body=b"{}",
+                headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+            )
+            response = client.getresponse()
+            result["status"] = response.status
+            result["body"] = response.read()
+        except Exception as exc:
+            result["error"] = exc
+
+    request_thread = Thread(target=post)
+    request_thread.start()
+    try:
+        assert body_read_started.wait(timeout=2)
+        # This would fail if do_POST held the shared lock while waiting for
+        # the request body. The lock is needed only around the actual write.
+        assert db._connection_lock.acquire(timeout=1)
+        db._connection_lock.release()
+        allow_body_read_to_finish.set()
+        request_thread.join(timeout=3)
+        assert not request_thread.is_alive()
+        assert result.get("status") == 201
+    finally:
+        allow_body_read_to_finish.set()
+        request_thread.join(timeout=3)
+        client.close()
+        server.shutdown()
+        server.server_close()
+        db.close()
+
+
+def test_http_maps_request_body_timeout_to_408(monkeypatch):
+    monkeypatch.setattr("aidb.server._REQUEST_TIMEOUT_SECONDS", 0.1)
+    db = AIDB(":memory:")
+    server = create_server(db, port=0, auth_token="test-token")
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    client = socket.create_connection(server.server_address, timeout=2)
+    client.settimeout(2)
+    request = (
+        b"POST /v1/notes HTTP/1.1\\r\\n"
+        b"Host: 127.0.0.1\\r\\n"
+        b"Authorization: Bearer test-token\\r\\n"
+        b"Content-Type: application/json\\r\\n"
+        b"Content-Length: 100\\r\\n"
+        b"Connection: close\\r\\n\\r\\n"
+        b"{}"
+    )
+    try:
+        client.sendall(request)
+        response = bytearray()
+        while True:
+            chunk = client.recv(4096)
+            if not chunk:
+                break
+            response.extend(chunk)
+        headers, separator, body = bytes(response).partition(b"\\r\\n\\r\\n")
+        assert separator
+        assert b" 408 " in headers.splitlines()[0]
+        assert json.loads(body) == {"error": "request_timeout"}
+    finally:
+        client.close()
         server.shutdown()
         server.server_close()
         db.close()
