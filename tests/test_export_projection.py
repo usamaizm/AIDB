@@ -97,3 +97,12 @@ def test_projected_export_round_trips_unchanged() -> None:
     restored = AIDB(path=":memory:")
     restored.import_home(json.loads(json.dumps(exported)))
     assert restored.export_home(include_private=True)["tables"] == exported["tables"]
+
+
+def test_updated_at_remains_in_the_v1_export_projection():
+    db = make_populated_db()
+    payload = db.export_home(include_private=True)
+    assert "updated_at" in _EXPORT_COLUMNS["home_resources"]
+    assert "updated_at" in _EXPORT_COLUMNS["notes"]
+    assert all("updated_at" in row for row in payload["tables"]["home_resources"])
+    assert all("updated_at" in row for row in payload["tables"]["notes"])
