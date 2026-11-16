@@ -10,7 +10,7 @@ import uuid
 import warnings
 from threading import RLock
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .core import (
     Agent,
@@ -99,9 +99,31 @@ _EXPORT_COLUMNS = {
         "created_at",
     ),
     "artifact_blobs": ("artifact_id", "content", "created_at"),
+    "agents": (
+        "id", "name", "description", "model", "role", "permissions",
+        "capabilities", "metadata",
+    ),
 }
 
 _HEX_DIGITS = frozenset("0123456789abcdef")
+
+# Persisted-storage schema version, recorded in the SQLite file itself via
+# PRAGMA user_version. Persisted storage previously had no version of its
+# own (see the format-coupling audit, issue #29: the schema is created with
+# CREATE TABLE IF NOT EXISTS and nothing records which schema a file holds),
+# so it could not evolve through a migration path. Version 1 is the schema
+# as it stands on main. Databases created before versioning carry
+# user_version 0 and are adopted as version 1 on open (the v1 legacy
+# policy). A stored version newer than SCHEMA_VERSION is refused loudly
+# rather than silently misread.
+SCHEMA_VERSION = 1
+
+# Registered schema migrations, keyed by the version each step migrates TO.
+# A step receives the live connection and must leave the database at its
+# target version; steps run in ascending order, one transaction each. The
+# registry is empty until the first real schema change ships: the runner is
+# the prerequisite the audit calls for, not a v2 schema.
+SCHEMA_MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {}
 
 
 def _canonical_checksum_algorithm(algorithm: Any) -> str | None:
@@ -111,6 +133,72 @@ def _canonical_checksum_algorithm(algorithm: Any) -> str | None:
     normalized = algorithm.lower()
     canonical = _CHECKSUM_ALGORITHM_ALIASES.get(normalized, normalized)
     return canonical if canonical in _CHECKSUM_DIGEST_LENGTHS else None
+
+
+# Snapshot contract version, independent of the "aidb-home-v1" home
+# envelope format. New snapshots are stamped with SNAPSHOT_FORMAT in the
+# home_snapshots.home_format column; the embedded payload keeps the home
+# envelope's own "aidb-home-v1" format, which import_home gates on
+# separately, so either version can evolve without silently
+# reinterpreting the other. Rows stamped "aidb-home-v1" predate the
+# snapshot contract (the stamp was copied from the home envelope) and
+# are accepted as snapshot v1 under the accepted D2 v1 legacy policy.
+# Any other stamp is a snapshot format this code does not know and is
+# refused loudly, on restore and on import alike.
+SNAPSHOT_FORMAT = "aidb-snapshot-v1"
+_LEGACY_SNAPSHOT_FORMAT = "aidb-home-v1"
+_ACCEPTED_SNAPSHOT_FORMATS = frozenset({SNAPSHOT_FORMAT, _LEGACY_SNAPSHOT_FORMAT})
+
+
+
+def _validate_strict_json_value(value: Any, label: str) -> None:
+    """Reject values that are not strict JSON (no NaN/Infinity, no silent coercion)."""
+    if value is None or isinstance(value, (str, bool)):
+        return
+    if isinstance(value, int):
+        return
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"{label} must contain only finite numbers")
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str) or not key:
+                raise ValueError(f"{label} keys must be non-empty strings")
+            _validate_strict_json_value(item, label)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _validate_strict_json_value(item, label)
+        return
+    raise ValueError(f"{label} must be a JSON value")
+
+
+def _validate_metadata(metadata: Any, label: str = "metadata") -> None:
+    """Metadata must be absent or a JSON object of strict JSON values."""
+    if metadata is None:
+        return
+    if not isinstance(metadata, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    _validate_strict_json_value(metadata, label)
+
+
+def _validate_note_content(content: Any) -> None:
+    """Validate note-resource content while preserving the legacy scalar shorthand."""
+    if isinstance(content, dict):
+        if not {"title", "content"}.issubset(content):
+            raise ValueError("note resource content must include title and content")
+        if not isinstance(content["title"], str) or not content["title"].strip():
+            raise ValueError("note title must be a non-empty string")
+        if not isinstance(content["content"], str):
+            raise ValueError("note content must be a string")
+        if "kind" in content and (
+            not isinstance(content["kind"], str) or not content["kind"].strip()
+        ):
+            raise ValueError("note kind must be a non-empty string")
+        return
+    if not isinstance(content, str):
+        raise ValueError("note content must be a string")
 
 
 class AIDB:
@@ -123,6 +211,7 @@ class AIDB:
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys = ON")
         self._create_schema()
+        self._ensure_schema_version()
 
     def _create_schema(self) -> None:
         self.db.executescript(
@@ -391,6 +480,66 @@ class AIDB:
         )
         self.db.commit()
 
+    @property
+    def schema_version(self) -> int:
+        """Persisted-storage schema version of this database (PRAGMA user_version)."""
+        row = self.db.execute("PRAGMA user_version").fetchone()
+        return int(row[0])
+
+    def _ensure_schema_version(self) -> None:
+        """Stamp or check the persisted schema version on open.
+
+        A pre-versioning database (user_version 0) is adopted as schema
+        version 1. A database newer than this code is refused rather than
+        silently misread. An older versioned database runs the registered
+        migrations; with none registered for a step, opening fails loudly
+        before anything is mutated.
+        """
+        stored = self.schema_version
+        if stored == 0:
+            self._set_schema_version(SCHEMA_VERSION)
+            return
+        if stored > SCHEMA_VERSION:
+            raise ValueError(
+                f"database schema version {stored} is newer than supported "
+                f"version {SCHEMA_VERSION}; refusing to open"
+            )
+        if stored < SCHEMA_VERSION:
+            self._run_migrations(stored)
+
+    def _set_schema_version(self, version: int) -> None:
+        self.db.execute(f"PRAGMA user_version = {int(version)}")
+        self.db.commit()
+
+    def _run_migrations(self, stored: int) -> None:
+        """Apply registered migrations from `stored` up to SCHEMA_VERSION.
+
+        Missing steps are detected before any step runs, so a gap fails
+        without mutating the database. Each step runs in one transaction
+        and stamps its target version on success, so a failing step leaves
+        the database at the last good version instead of half-migrated.
+        Steps must not commit on their own or manage transactions; the
+        runner commits once per step.
+        """
+        missing = [v for v in range(stored + 1, SCHEMA_VERSION + 1) if v not in SCHEMA_MIGRATIONS]
+        if missing:
+            raise ValueError(
+                f"no registered migration to schema version {missing[0]} "
+                f"(database is at version {stored}, supported version is {SCHEMA_VERSION})"
+            )
+        for target in range(stored + 1, SCHEMA_VERSION + 1):
+            try:
+                # Explicit BEGIN: without it, Python's sqlite3 runs DDL
+                # outside any transaction and a failing step could not roll
+                # its schema changes back.
+                self.db.execute("BEGIN")
+                SCHEMA_MIGRATIONS[target](self.db)
+                self.db.execute(f"PRAGMA user_version = {target}")
+                self.db.commit()
+            except Exception:
+                self.db.rollback()
+                raise
+
     @staticmethod
     def _json(value: Any) -> str:
         return json.dumps(value if value is not None else {})
@@ -425,18 +574,51 @@ class AIDB:
             raise ValueError(f"unsupported checksum algorithm: {algorithm}")
         return hashlib.new(canonical, data).hexdigest()
 
+    # Provenance/metadata are descriptors, not payloads (artifact bytes live
+    # in artifact_blobs). Keep them small, shallow, and strictly JSON so a
+    # consumer parsing with a strict JSON reader never sees NaN/Infinity
+    # literals or silently coerced keys. No key allowlist: no canonical
+    # provenance schema exists yet, and inventing one here would be a
+    # contract decision, not validation.
+    _MAX_JSON_OBJECT_DEPTH = 10
+    _MAX_JSON_OBJECT_BYTES = 65_536
+
+    @staticmethod
+    def _validate_json_value(value: Any, label: str, depth: int) -> None:
+        if isinstance(value, bool) or value is None or isinstance(value, (str, int)):
+            return
+        if isinstance(value, float):
+            if not math.isfinite(value):
+                raise ValueError(f"{label} must not contain non-finite numbers")
+            return
+        if isinstance(value, dict):
+            if depth >= AIDB._MAX_JSON_OBJECT_DEPTH:
+                raise ValueError(f"{label} exceeds maximum nesting depth")
+            for key, item in value.items():
+                if not isinstance(key, str) or not key:
+                    raise ValueError(f"{label} keys must be non-empty strings")
+                AIDB._validate_json_value(item, label, depth + 1)
+            return
+        if isinstance(value, list):
+            if depth >= AIDB._MAX_JSON_OBJECT_DEPTH:
+                raise ValueError(f"{label} exceeds maximum nesting depth")
+            for item in value:
+                AIDB._validate_json_value(item, label, depth + 1)
+            return
+        # Anything else (tuple, set, bytes, arbitrary objects) would be
+        # silently coerced or rejected by json.dumps; reject it here so what
+        # the caller passed is exactly what gets stored.
+        raise ValueError(f"{label} must contain only JSON values")
+
     @staticmethod
     def _validate_json_object(value: Any, label: str) -> None:
         if value is None:
             return
         if not isinstance(value, dict):
             raise ValueError(f"{label} must be a JSON object")
-        if any(not isinstance(key, str) for key in value):
-            raise ValueError(f"{label} keys must be strings")
-        try:
-            json.dumps(value)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"{label} must be JSON-serializable") from exc
+        AIDB._validate_json_value(value, label, depth=1)
+        if len(json.dumps(value)) > AIDB._MAX_JSON_OBJECT_BYTES:
+            raise ValueError(f"{label} exceeds maximum size")
 
     @staticmethod
     def _validate_artifact_registration(
@@ -490,6 +672,104 @@ class AIDB:
             or any(not isinstance(step, str) for step in transformation_history)
         ):
             raise ValueError("artifact transformation_history must be a list of strings")
+
+    @staticmethod
+    def _parse_strict_json_text(value: str, label: str) -> Any:
+        """Strictly parse a JSON-encoded text field from an imported row.
+
+        Rejects the non-standard numeric constants NaN/Infinity (which the
+        register path's json.dumps-based check lets through) and duplicate
+        object keys, matching the strictness import_home_json enforces at
+        the envelope level. Rebase note: once the provenance/metadata
+        strict-validation lane (Q8) lands and tightens _validate_json_object,
+        callers should delegate the parsed value to that shared helper
+        instead of relying on this local strict parse.
+        """
+        try:
+            return json.loads(
+                value,
+                object_pairs_hook=AIDB._unique_json_object,
+                parse_constant=AIDB._reject_json_constant,
+            )
+        except ValueError as exc:
+            raise ValueError(f"{label} must be strict JSON") from exc
+
+    @staticmethod
+    def _validate_artifact_import_row(row: dict) -> None:
+        """Validate one imported artifacts row with the register path's rules.
+
+        import_home's generic shape checks only establish that the fields
+        are strings/ints; they never look inside the JSON-encoded provenance,
+        metadata, and transformation_history strings, and never check status,
+        checksum_algorithm, or size_bytes sign. A home file could therefore
+        smuggle in artifact records register_artifact would refuse, which
+        then fail a strict JSON parse on read-back or carry invalid status.
+        This applies the same rules here, before any durable state is
+        touched. Only fields present in the row are checked — omitted
+        columns fall back to the table defaults, as before.
+
+        Deliberate boundaries: no key allowlist for provenance/metadata
+        (no canonical provenance schema exists yet — a contract decision,
+        not validation); checksums are not cross-checked against
+        artifact_blobs content (blobs may be absent); checksum shape is not
+        checked, matching register_artifact, which only shape-checks a
+        checksum when content bytes are provided.
+        """
+        if "status" in row and row["status"] not in _ARTIFACT_STATUSES:
+            raise ValueError(
+                "unsupported artifact status in home import row for table: artifacts: "
+                + str(row["status"])
+            )
+        if "checksum_algorithm" in row and _canonical_checksum_algorithm(
+            row["checksum_algorithm"]
+        ) is None:
+            raise ValueError(
+                "unsupported checksum algorithm in home import row for table: artifacts: "
+                + str(row["checksum_algorithm"])
+            )
+        if "size_bytes" in row:
+            size_bytes = row["size_bytes"]
+            if size_bytes is None or size_bytes < 0:
+                raise ValueError(
+                    "artifact size_bytes must be a non-negative integer in home import "
+                    "row for table: artifacts"
+                )
+        for field, label in (
+            ("provenance", "artifact provenance"),
+            ("metadata", "artifact metadata"),
+        ):
+            if field in row:
+                encoded = row[field]
+                if not isinstance(encoded, str):
+                    raise ValueError(
+                        f"invalid {field} in home import row for table: artifacts"
+                    )
+                parsed = AIDB._parse_strict_json_text(
+                    encoded, f"{label} in home import row for table: artifacts"
+                )
+                if not isinstance(parsed, dict):
+                    raise ValueError(
+                        f"{label} must be a JSON object in home import row for "
+                        "table: artifacts"
+                    )
+                AIDB._validate_json_object(parsed, label)
+        if "transformation_history" in row:
+            encoded = row["transformation_history"]
+            if not isinstance(encoded, str):
+                raise ValueError(
+                    "invalid transformation_history in home import row for table: artifacts"
+                )
+            parsed = AIDB._parse_strict_json_text(
+                encoded,
+                "artifact transformation_history in home import row for table: artifacts",
+            )
+            if not isinstance(parsed, list) or any(
+                not isinstance(step, str) for step in parsed
+            ):
+                raise ValueError(
+                    "artifact transformation_history must be a list of strings in home "
+                    "import row for table: artifacts"
+                )
 
     @staticmethod
     def _require_confidence(confidence: float, label: str) -> float:
@@ -1111,6 +1391,12 @@ class AIDB:
 
     def create_resource(self, resource_type, content=None, owner=None, visibility="private", metadata=None):
         if visibility not in {"public", "private"}: raise ValueError("visibility must be public or private")
+        if not isinstance(resource_type, str) or not resource_type.strip():
+            raise ValueError("resource_type must be a non-empty string")
+        if owner is not None and not isinstance(owner, str):
+            raise ValueError("owner must be a string")
+        _validate_strict_json_value(content, "content")
+        _validate_metadata(metadata)
         rid = "res:" + str(uuid.uuid4())
         self.db.execute("INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)", (rid, resource_type, json.dumps(content), owner, visibility, self._json(metadata or {})))
         self._append_workflow_event("resource_created", "resource created", metadata={"resource_id": rid, "resource_type": resource_type, "owner": owner, "visibility": visibility})
@@ -1144,6 +1430,15 @@ class AIDB:
     def create_note(self, title, content, owner=None, visibility="private", kind="note", metadata=None):
         if visibility not in {"public", "private"}:
             raise ValueError("visibility must be public or private")
+        if not isinstance(title, str) or not title.strip():
+            raise ValueError("title must be a non-empty string")
+        if not isinstance(content, str):
+            raise ValueError("content must be a string")
+        if not isinstance(kind, str) or not kind.strip():
+            raise ValueError("kind must be a non-empty string")
+        if owner is not None and not isinstance(owner, str):
+            raise ValueError("owner must be a string")
+        _validate_metadata(metadata)
         resource_id = "res:" + str(uuid.uuid4())
         resource_content = {"title": title, "content": content, "kind": kind}
         try:
@@ -1290,6 +1585,18 @@ class AIDB:
             # contract. Exclude them from public-only exports until one exists.
             payload["tables"]["artifacts"] = []
             payload["tables"]["artifact_blobs"] = []
+            # Agents are identity/discovery records and the agents table has
+            # no visibility column, so they travel in public exports too.
+            # This follows PR #49's public-only discovery design, but it is
+            # a review point, not a settled contract: agent rows carry
+            # model/permissions/capabilities metadata, and whether that
+            # belongs in a public export is still an open question.
+            agent_columns = ", ".join(_EXPORT_COLUMNS["agents"])
+            payload["tables"]["agents"] = [
+                dict(row) for row in self.db.execute(
+                    f"SELECT {agent_columns} FROM agents"
+                ).fetchall()
+            ]
         if include_private:
             payload["verification"] = self.verify_home()
         else:
@@ -1313,6 +1620,50 @@ class AIDB:
     @staticmethod
     def _reject_json_constant(value):
         raise ValueError("non-standard JSON numeric constant: " + value)
+
+    @staticmethod
+    def _parse_strict_json(text: str, label: str) -> Any:
+        """Parse a JSON-encoded string, rejecting duplicate keys and NaN/Infinity."""
+        try:
+            return json.loads(
+                text,
+                object_pairs_hook=AIDB._unique_json_object,
+                parse_constant=AIDB._reject_json_constant,
+            )
+        except (json.JSONDecodeError, ValueError) as exc:
+            raise ValueError(f"invalid JSON in {label}") from exc
+
+    @staticmethod
+    def _validate_agent_import_row(row: dict) -> None:
+        """Strictly validate one agents import row.
+
+        The generic per-row checks already enforce that string fields are
+        strings, that name/role are non-empty, and that id is an integer.
+        This covers what only the agents table needs: name is required
+        (the column is NOT NULL), id must be non-negative, and the
+        JSON-encoded permissions/capabilities/metadata must parse strictly
+        into a list of strings, a list of strings, and a JSON object.
+        """
+        if "name" not in row or not isinstance(row["name"], str) or not row["name"].strip():
+            raise ValueError("invalid name in home import row for table: agents")
+        agent_id = row.get("id")
+        if agent_id is not None and agent_id < 0:
+            raise ValueError("invalid id in home import row for table: agents")
+        for field in ("permissions", "capabilities"):
+            value = row.get(field)
+            if value is None:
+                continue
+            parsed = AIDB._parse_strict_json(value, f"agent {field}")
+            if not isinstance(parsed, list) or any(
+                not isinstance(item, str) for item in parsed
+            ):
+                raise ValueError(
+                    f"invalid {field} in home import row for table: agents"
+                )
+        metadata = row.get("metadata")
+        if metadata is not None:
+            parsed = AIDB._parse_strict_json(metadata, "agent metadata")
+            AIDB._validate_json_object(parsed, "agent metadata")
 
     def import_home_json(self, content: str | bytes):
         """Import a JSON wire payload while rejecting duplicate keys and NaN/Infinity."""
@@ -1388,6 +1739,10 @@ class AIDB:
                 "parent_artifact_id", "transformation_history", "metadata", "created_at",
             },
             "artifact_blobs": {"artifact_id", "content", "created_at", "content_encoding"},
+            "agents": {
+                "id", "name", "description", "model", "role", "permissions",
+                "capabilities", "metadata",
+            },
         }
         unknown_tables = set(tables) - set(columns_by_table)
         if unknown_tables:
@@ -1426,6 +1781,7 @@ class AIDB:
                     "home_changes": ("change_id", "operation", "actor", "payload"),
                     "artifacts": ("name", "media_type", "checksum", "provenance", "transformation_history", "metadata"),
                     "home_snapshots": ("snapshot_id", "home_format", "content", "content_hash"),
+                    "agents": ("description", "model", "role", "permissions", "capabilities", "metadata"),
                 }.get(table, ())
                 for field in string_fields:
                     if field in row and row[field] is not None and not isinstance(row[field], str):
@@ -1439,6 +1795,7 @@ class AIDB:
                     "home_changes": ("change_id", "operation"),
                     "artifacts": ("name", "media_type", "checksum"),
                     "home_snapshots": ("snapshot_id", "home_format", "content", "content_hash"),
+                    "agents": ("name", "role"),
                 }.get(table, ())
                 for field in nonempty_fields:
                     if field in row and (
@@ -1455,6 +1812,7 @@ class AIDB:
                     "home_snapshots": ("id",),
                     "artifacts": ("id", "size_bytes"),
                     "artifact_blobs": ("artifact_id",),
+                    "agents": ("id",),
                 }.get(table, ())
                 for field in integer_fields:
                     if field in row and row[field] is not None and (
@@ -1476,17 +1834,24 @@ class AIDB:
                 if table == "home_snapshots":
                     content = row.get("content")
                     digest = row.get("content_hash")
+                    if row.get("home_format") not in _ACCEPTED_SNAPSHOT_FORMATS:
+                        raise ValueError(
+                            "unsupported snapshot format: " + str(row.get("home_format"))
+                        )
                     if (
-                        row.get("home_format") != "aidb-home-v1"
-                        or not isinstance(content, str)
+                        not isinstance(content, str)
                         or not isinstance(digest, str)
                         or not re.fullmatch(r"[0-9a-f]{64}", digest)
                         or hashlib.sha256(content.encode("utf-8")).hexdigest() != digest
                         or row.get("snapshot_id") != "snap:" + digest
                     ):
                         raise ValueError("snapshot integrity check failed during import")
+                if table == "agents":
+                    self._validate_agent_import_row(row)
                 if table == "artifact_blobs":
                     row = self._decode_artifact_blob_row(row)
+                if table == "artifacts":
+                    self._validate_artifact_import_row(row)
                 validated_rows[table].append(row)
 
         # Change rows have no schema-level FK, so validate their targets
@@ -1503,6 +1868,53 @@ class AIDB:
             resource_id = row.get("resource_id")
             if resource_id is not None and resource_id not in valid_resource_ids:
                 raise ValueError("home change references a missing resource")
+
+        # Agent identity is home-local: exported integer ids can collide
+        # across homes, and silently remapping an id would rewrite
+        # identity — a contract decision, not a fix. Fail closed, before
+        # touching durable state: any incoming agents row whose id or
+        # name matches an existing agent (or another row in this payload)
+        # with different content is rejected. A byte-identical row is
+        # not a conflict — it is the idempotent re-import the snapshot
+        # restore path relies on — so it passes through as a no-op.
+        agent_rows = validated_rows["agents"]
+        if agent_rows:
+            existing_by_id = {
+                row["id"]: dict(row)
+                for row in self.db.execute("SELECT * FROM agents").fetchall()
+            }
+            existing_by_name = {
+                row["name"]: row for row in existing_by_id.values()
+            }
+            seen_by_id: dict[int, dict] = {}
+            seen_by_name: dict[str, dict] = {}
+            for row in agent_rows:
+                full_row = {
+                    "id": None,
+                    "name": row["name"],
+                    "description": None,
+                    "model": None,
+                    "role": "agent",
+                    "permissions": "[]",
+                    "capabilities": "[]",
+                    "metadata": "{}",
+                    **row,
+                }
+                agent_id = full_row["id"]
+                name = full_row["name"]
+                for other in (
+                    existing_by_id.get(agent_id) if agent_id is not None else None,
+                    existing_by_name.get(name),
+                    seen_by_id.get(agent_id) if agent_id is not None else None,
+                    seen_by_name.get(name),
+                ):
+                    if other is not None and other != full_row:
+                        raise ValueError(
+                            "imported agent collides with an existing agent"
+                        )
+                if agent_id is not None:
+                    seen_by_id[agent_id] = full_row
+                seen_by_name[name] = full_row
 
         # A savepoint makes restore atomic and also works when the caller already
         # has an outer transaction. Existing rows are preserved for idempotency.
@@ -1572,6 +1984,18 @@ class AIDB:
             raise PermissionError("owner mismatch")
         if expected_revision is not None and row["revision"] != expected_revision:
             raise ValueError("revision conflict")
+
+        # Validate before any write: None means "keep existing" and is not
+        # validated. Note rules need the notes row, so they run here too,
+        # before BEGIN.
+        if content is not None:
+            _validate_strict_json_value(content, "content")
+            note_row = self.db.execute(
+                "SELECT 1 FROM notes WHERE resource_id=?", (resource_id,)
+            ).fetchone()
+            if note_row is not None:
+                _validate_note_content(content)
+        _validate_metadata(metadata)
 
         old_revision = row["revision"]
         new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
@@ -1690,14 +2114,16 @@ class AIDB:
         content=json.dumps(payload, sort_keys=True, separators=(",",":"), ensure_ascii=False)
         digest=hashlib.sha256(content.encode("utf-8")).hexdigest()
         snapshot_id="snap:"+digest
-        self.db.execute("INSERT OR IGNORE INTO home_snapshots(snapshot_id,home_format,content,content_hash) VALUES(?,?,?,?)", (snapshot_id,payload["format"],content,digest))
+        self.db.execute("INSERT OR IGNORE INTO home_snapshots(snapshot_id,home_format,content,content_hash) VALUES(?,?,?,?)", (snapshot_id,SNAPSHOT_FORMAT,content,digest))
         self.db.commit()
         return {"snapshot_id":snapshot_id,"content_hash":digest,"created_at":self.db.execute("SELECT created_at FROM home_snapshots WHERE snapshot_id=?",(snapshot_id,)).fetchone()["created_at"]}
 
     def restore_snapshot(self, snapshot_id):
-        row=self.db.execute("SELECT content,content_hash FROM home_snapshots WHERE snapshot_id=?", (snapshot_id,)).fetchone()
+        row=self.db.execute("SELECT home_format,content,content_hash FROM home_snapshots WHERE snapshot_id=?", (snapshot_id,)).fetchone()
         if row is None:
             raise ValueError("snapshot does not exist")
+        if row["home_format"] not in _ACCEPTED_SNAPSHOT_FORMATS:
+            raise ValueError("unsupported snapshot format: " + str(row["home_format"]))
         digest=hashlib.sha256(row["content"].encode("utf-8")).hexdigest()
         if digest != row["content_hash"]:
             raise ValueError("snapshot integrity check failed")
