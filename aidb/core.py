@@ -44,9 +44,11 @@ class Specification:
     capabilities: list[str]
     resource_types: list[str]
     transports: list[dict[str, Any]] = field(default_factory=list)
-    extensions: list[dict[str, Any]] = field(default_factory=list)
+    extensions: list[str] = field(default_factory=list)
     constraints: dict[str, Any] = field(default_factory=dict)
     issued_at: str | None = None
+    contract: dict[str, str] = field(default_factory=dict)
+    supersedes: str | None = None
 
 
 @dataclass
@@ -59,6 +61,8 @@ class Agent:
     capabilities: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     id: int | None = None
+    agent_id: str | None = None
+    visibility: str = "private"
 
 
 @dataclass
@@ -124,10 +128,14 @@ class Artifact:
     transformation_history: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str | None = None
+    artifact_id: str | None = None
+    visibility: str = "private"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
+            "artifact_id": self.artifact_id,
+            "visibility": self.visibility,
             "name": self.name,
             "media_type": self.media_type,
             "filename": self.filename,
