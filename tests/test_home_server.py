@@ -120,3 +120,8 @@ def test_transport_advertisement_is_scoped_to_the_http_adapter():
     assert https["authentication"] == ["bearer"]
     assert "notes.create" not in authenticated["capabilities"]
 
+    create_handler(db, auth_token="")
+    empty_token = db.specification_dict()["transports"][0]
+    assert "notes.create" not in empty_token["capabilities"]
+    assert empty_token["authentication"] == []
+
