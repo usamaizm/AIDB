@@ -43,9 +43,12 @@ def test_reopen_keeps_version_and_data(tmp_path):
 
     reopened = AIDB(path=path)
     assert reopened.schema_version == 1
-    assert reopened.db.execute(
-        "SELECT COUNT(*) FROM home_resources WHERE id = ?", (resource.id,)
-    ).fetchone()[0] == 1
+    assert (
+        reopened.db.execute(
+            "SELECT COUNT(*) FROM home_resources WHERE id = ?", (resource.id,)
+        ).fetchone()[0]
+        == 1
+    )
     reopened.close()
 
 
@@ -61,9 +64,12 @@ def test_pre_versioning_database_is_adopted_as_version_1(tmp_path):
     adopted = AIDB(path=path)
     assert adopted.schema_version == 1
     assert raw_user_version(path) == 1
-    assert adopted.db.execute(
-        "SELECT COUNT(*) FROM home_resources WHERE id = ?", (resource.id,)
-    ).fetchone()[0] == 1
+    assert (
+        adopted.db.execute(
+            "SELECT COUNT(*) FROM home_resources WHERE id = ?", (resource.id,)
+        ).fetchone()[0]
+        == 1
+    )
     adopted.close()
 
 

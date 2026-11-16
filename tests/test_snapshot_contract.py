@@ -150,8 +150,6 @@ def test_snapshot_content_hash_still_enforced_on_import():
     payload = _import_payload_with_snapshot_row(db, SNAPSHOT_FORMAT)
     # Tamper with the row content after the digest was computed: the
     # digest no longer matches, so the import must refuse the row.
-    payload["tables"]["home_snapshots"][0]["content"] = content.replace(
-        '"state"', '"tampered"', 1
-    )
+    payload["tables"]["home_snapshots"][0]["content"] = content.replace('"state"', '"tampered"', 1)
     with pytest.raises(ValueError, match="snapshot integrity check failed"):
         AIDB(":memory:").import_home(payload)

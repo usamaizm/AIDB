@@ -52,9 +52,10 @@ def test_publish_resource_rolls_back_if_change_event_fails():
 
     assert db.get_resource(resource.id).visibility == "private"
     assert db.get_resource(resource.id).revision == 1
-    assert db.db.execute(
-        "SELECT COUNT(*) FROM home_changes WHERE operation='publish'"
-    ).fetchone()[0] == 0
+    assert (
+        db.db.execute("SELECT COUNT(*) FROM home_changes WHERE operation='publish'").fetchone()[0]
+        == 0
+    )
     db.close()
 
 
@@ -77,9 +78,10 @@ def test_relate_resources_rolls_back_if_change_serialization_fails():
         db.relate_resources(source.id, target.id, "references")
 
     assert db.resource_relations(source.id) == []
-    assert db.db.execute(
-        "SELECT COUNT(*) FROM home_changes WHERE operation='relate'"
-    ).fetchone()[0] == 0
+    assert (
+        db.db.execute("SELECT COUNT(*) FROM home_changes WHERE operation='relate'").fetchone()[0]
+        == 0
+    )
     db.close()
 
 

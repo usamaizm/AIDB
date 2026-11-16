@@ -4,7 +4,9 @@ START = "<!-- AIDB_CONTRIBUTORS_START -->"
 END = "<!-- AIDB_CONTRIBUTORS_END -->"
 
 
-def make_body(row="| agent-chatgpt | usamaizm | user_confirmed | primary | Owner confirmed ChatGPT performed the implementation work. |"):
+def make_body(
+    row="| agent-chatgpt | usamaizm | user_confirmed | primary | Owner confirmed ChatGPT performed the implementation work. |",
+):
     return (
         f"{START}\n"
         "| agent_id | github_actor | attribution_status | contribution_role | provenance |\n"
@@ -27,7 +29,9 @@ def test_invalid_status_fails():
 
 
 def test_pr_author_must_be_listed():
-    assert any("PR author's GitHub account" in error for error in validate_body(make_body(), "other-user"))
+    assert any(
+        "PR author's GitHub account" in error for error in validate_body(make_body(), "other-user")
+    )
 
 
 def test_stable_id_required():

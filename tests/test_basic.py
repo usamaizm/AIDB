@@ -1,6 +1,17 @@
 """Basic tests for AIDB core behavior."""
 
-from aidb.core import Agent, Artifact, KnowledgeRecord, Memory, Message, Session, Task, Tool, ToolCall, WorkflowEvent
+from aidb.core import (
+    Agent,
+    Artifact,
+    KnowledgeRecord,
+    Memory,
+    Message,
+    Session,
+    Task,
+    Tool,
+    ToolCall,
+    WorkflowEvent,
+)
 from aidb.store import AIDB
 
 __all__ = [

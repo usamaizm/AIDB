@@ -21,7 +21,9 @@ def test_resources_keep_owner_separate_from_visibility():
     db = AIDB(":memory:")
     note = db.create_note("public note", "shared", owner="agent:one", visibility="public")
     assert note.owner == "agent:one"
-    private_copy = db.create_resource("note", {"copy": True}, owner="agent:one", visibility="private")
+    private_copy = db.create_resource(
+        "note", {"copy": True}, owner="agent:one", visibility="private"
+    )
     assert private_copy.owner == "agent:one"
     assert private_copy.visibility == "private"
 
@@ -84,6 +86,7 @@ def test_snapshot_is_content_addressed_and_restorable():
     assert restored.node_id == "node:one"
     assert db.get_note(note.id).content == "state"
 
+
 def test_public_changes_hide_private_resources():
     db = AIDB(":memory:")
     private = db.create_note("secret", "x")
@@ -91,6 +94,7 @@ def test_public_changes_hide_private_resources():
     changes = db.public_changes()
     assert all(c["resource_id"] != private.id for c in changes)
     assert any(c["resource_id"] == public.id for c in changes)
+
 
 def test_note_update_keeps_resource_and_note_views_consistent():
     db = AIDB(":memory:")
@@ -102,9 +106,7 @@ def test_note_update_keeps_resource_and_note_views_consistent():
         expected_revision=1,
     )
     current_note = db.get_note(note.id)
-    assert updated.content == {
-        "title": "new title", "content": "after", "kind": "observation"
-    }
+    assert updated.content == {"title": "new title", "content": "after", "kind": "observation"}
     assert current_note.title == updated.content["title"]
     assert current_note.content == updated.content["content"]
     assert current_note.kind == updated.content["kind"]
@@ -132,10 +134,7 @@ def test_public_export_excludes_private_relation_endpoints_and_history():
     assert private.id not in serialized
     assert "private-secret-marker" not in serialized
     assert exported["tables"]["resource_relations"] == []
-    assert all(
-        row["resource_id"] != private.id
-        for row in exported["tables"]["home_changes"]
-    )
+    assert all(row["resource_id"] != private.id for row in exported["tables"]["home_changes"])
 
 
 def test_public_change_feed_hides_relation_to_private_target():
@@ -144,10 +143,7 @@ def test_public_change_feed_hides_relation_to_private_target():
     private = db.create_resource("secret", {"text": "private"})
     db.relate_resources(public.id, private.id, "references")
     changes = db.public_changes()
-    assert all(
-        not (c["operation"] == "relate" and private.id in c["payload"])
-        for c in changes
-    )
+    assert all(not (c["operation"] == "relate" and private.id in c["payload"]) for c in changes)
 
 
 def test_snapshots_do_not_embed_prior_snapshots():
@@ -171,13 +167,13 @@ def test_snapshots_do_not_embed_prior_snapshots():
 
 def test_public_export_strips_relation_metadata_and_omits_history(tmp_path):
     db = AIDB(tmp_path / "public-filter.sqlite3")
-    private = db.create_note(
-        "PRIVATE_TITLE_MARKER", "PRIVATE_BODY_MARKER", owner="private-owner"
-    )
+    private = db.create_note("PRIVATE_TITLE_MARKER", "PRIVATE_BODY_MARKER", owner="private-owner")
     first = db.create_note("public one", "shareable", visibility="public")
     second = db.create_note("public two", "shareable", visibility="public")
     db.relate_resources(
-        first.id, second.id, "related",
+        first.id,
+        second.id,
+        "related",
         metadata={"secret": "PRIVATE_RELATION_METADATA_MARKER"},
     )
     db.relate_resources(first.id, private.id, "references")
@@ -193,15 +189,14 @@ def test_public_export_strips_relation_metadata_and_omits_history(tmp_path):
     assert len(exported["tables"]["resource_relations"]) == 1
     assert exported["tables"]["resource_relations"][0]["metadata"] == "{}"
     assert exported["tables"]["home_changes"] == []
-    assert exported["verification"] == {
-        "ok": None, "issues": [], "scope": "filtered_public_export"
-    }
+    assert exported["verification"] == {"ok": None, "issues": [], "scope": "filtered_public_export"}
 
 
 def test_public_changes_do_not_reveal_events_before_resource_publication():
     db = AIDB(":memory:")
     note = db.create_note(
-        "HISTORIC_PRIVATE_TITLE", "HISTORIC_PRIVATE_BODY",
+        "HISTORIC_PRIVATE_TITLE",
+        "HISTORIC_PRIVATE_BODY",
         owner="HISTORIC_PRIVATE_OWNER",
     )
     db.update_resource(note.id, content="HISTORIC_PRIVATE_UPDATE")

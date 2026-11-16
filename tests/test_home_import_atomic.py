@@ -61,6 +61,7 @@ def test_home_import_rolls_back_when_foreign_key_validation_fails():
     with pytest.raises(ValueError, match="resource does not exist"):
         db.get_resource("must-rollback")
 
+
 def test_artifact_bytes_are_stored_and_survive_home_export_import(tmp_path):
     source = AIDB(tmp_path / "source.sqlite3")
     payload = b"original artifact bytes\x00\x01"
@@ -87,6 +88,7 @@ def test_import_rejects_conflicting_existing_rows():
         db.import_home(payload)
     assert db.get_note(note.id).title == "original"
     assert db.get_note(note.id).content == "content"
+
 
 def test_artifact_payload_reads_verify_checksum(tmp_path):
     db = AIDB(tmp_path / "artifact-integrity.sqlite3")
@@ -190,15 +192,17 @@ def test_import_rejects_invalid_resource_ids(resource_id):
     payload = {
         "format": "aidb-home-v1",
         "tables": {
-            "home_resources": [{
-                "id": resource_id,
-                "resource_type": "document",
-                "content": "{}",
-                "owner": None,
-                "visibility": "private",
-                "metadata": "{}",
-                "revision": 1,
-            }]
+            "home_resources": [
+                {
+                    "id": resource_id,
+                    "resource_type": "document",
+                    "content": "{}",
+                    "owner": None,
+                    "visibility": "private",
+                    "metadata": "{}",
+                    "revision": 1,
+                }
+            ]
         },
     }
     # A null id is now reported as missing by the required-columns check;
@@ -214,24 +218,28 @@ def test_import_rejects_dangling_home_change_reference_atomically():
     payload = {
         "format": "aidb-home-v1",
         "tables": {
-            "home_resources": [{
-                "id": "incoming-resource",
-                "resource_type": "document",
-                "content": "{}",
-                "owner": None,
-                "visibility": "public",
-                "metadata": "{}",
-                "revision": 1,
-            }],
-            "home_changes": [{
-                "change_id": "change:missing-target",
-                "resource_id": "not-in-payload",
-                "operation": "update",
-                "actor": None,
-                "previous_revision": 1,
-                "new_revision": 2,
-                "payload": "{}",
-            }],
+            "home_resources": [
+                {
+                    "id": "incoming-resource",
+                    "resource_type": "document",
+                    "content": "{}",
+                    "owner": None,
+                    "visibility": "public",
+                    "metadata": "{}",
+                    "revision": 1,
+                }
+            ],
+            "home_changes": [
+                {
+                    "change_id": "change:missing-target",
+                    "resource_id": "not-in-payload",
+                    "operation": "update",
+                    "actor": None,
+                    "previous_revision": 1,
+                    "new_revision": 2,
+                    "payload": "{}",
+                }
+            ],
         },
     }
     with pytest.raises(ValueError, match="home change references a missing resource"):
@@ -246,12 +254,14 @@ def test_import_rejects_tampered_snapshot_before_writing():
     payload = {
         "format": "aidb-home-v1",
         "tables": {
-            "home_snapshots": [{
-                "snapshot_id": "snap:" + digest,
-                "home_format": "aidb-home-v1",
-                "content": content + "tampered",
-                "content_hash": digest,
-            }]
+            "home_snapshots": [
+                {
+                    "snapshot_id": "snap:" + digest,
+                    "home_format": "aidb-home-v1",
+                    "content": content + "tampered",
+                    "content_hash": digest,
+                }
+            ]
         },
     }
     with pytest.raises(ValueError, match="snapshot integrity check failed"):
@@ -264,14 +274,16 @@ def test_import_rejects_programmatic_non_finite_numbers():
     payload = {
         "format": "aidb-home-v1",
         "tables": {
-            "home_changes": [{
-                "change_id": "change:nan",
-                "resource_id": None,
-                "operation": "system",
-                "previous_revision": float("nan"),
-                "new_revision": 1,
-                "payload": "{}",
-            }]
+            "home_changes": [
+                {
+                    "change_id": "change:nan",
+                    "resource_id": None,
+                    "operation": "system",
+                    "previous_revision": float("nan"),
+                    "new_revision": 1,
+                    "payload": "{}",
+                }
+            ]
         },
     }
     with pytest.raises(ValueError, match="non-finite number"):

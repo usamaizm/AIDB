@@ -33,7 +33,17 @@ def test_agent_command_registers_agent_and_uses_database_path(monkeypatch, capsy
     monkeypatch.setattr(cli, "AIDB", FakeDatabase)
     monkeypatch.setattr(
         "sys.argv",
-        ["aidb", "--db", "test.sqlite3", "agent", "worker", "--description", "test agent", "--model", "local"],
+        [
+            "aidb",
+            "--db",
+            "test.sqlite3",
+            "agent",
+            "worker",
+            "--description",
+            "test agent",
+            "--model",
+            "local",
+        ],
     )
 
     cli.main()
