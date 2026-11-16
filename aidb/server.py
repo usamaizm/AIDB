@@ -13,9 +13,37 @@ from .store import AIDB
 logger = logging.getLogger(__name__)
 
 
-def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int = 1048576, max_page_size: int = 200):
+def create_handler(
+    db: AIDB,
+    auth_token: str | None = None,
+    max_body_bytes: int = 1048576,
+    max_page_size: int = 200,
+    transport_protocol: str = "http/1.1",
+):
     if max_body_bytes < 1 or max_page_size < 1:
         raise ValueError("limits must be positive")
+    if transport_protocol not in {"http/1.1", "https/1.1"}:
+        raise ValueError("unsupported transport protocol")
+
+    transport_capabilities = [
+        "health.read",
+        "specification.read",
+        "notes.read",
+        "resources.read",
+        "changes.read",
+    ]
+    if auth_token is not None:
+        transport_capabilities.extend(
+            ["notes.create", "resources.create", "resources.relate"]
+        )
+    transport = {
+        "id": "https-json" if transport_protocol.startswith("https") else "http-json",
+        "protocol": transport_protocol,
+        "capabilities": transport_capabilities,
+        "authentication": ["bearer"] if auth_token is not None else [],
+    }
+    # Publish the adapter's real surface separately from node-level capabilities.
+    db.current_specification(transports=[transport])
 
     class Handler(BaseHTTPRequestHandler):
         def _send(self, status: int, payload) -> None:
@@ -185,7 +213,11 @@ def create_server(
     tls_keyfile: str | None = None,
 ) -> ThreadingHTTPServer:
     validate_bind_security(host, auth_token, tls_certfile, tls_keyfile)
-    server = ThreadingHTTPServer((host, port), create_handler(db, auth_token))
+    transport_protocol = "https/1.1" if tls_certfile and tls_keyfile else "http/1.1"
+    server = ThreadingHTTPServer(
+        (host, port),
+        create_handler(db, auth_token, transport_protocol=transport_protocol),
+    )
     if tls_certfile and tls_keyfile:
         try:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
