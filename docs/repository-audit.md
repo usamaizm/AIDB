@@ -1,14 +1,14 @@
 # Repository Audit and Launch Readiness
 
-Audit snapshot: 2026-11-16T12:56:54Z. This is a point-in-time engineering triage, not a security certification.
+Audit snapshot: 2026-11-16 (refreshed after PR #136 merged). This is a point-in-time engineering triage, not a security certification.
 
 ## Current verified baseline
 
-- Default branch: `main`, commit `bbcf2bc56a4b29bdc3d74ed184c3d45dd6c056bf`.
+- Default branch: `main`, commit `635dca74845803a6820849ff026ace3d2a4e34a7`.
 - Runtime: experimental Python reference implementation backed by SQLite. `include/aidb/aidb.h` remains a proposal; no stable compiled C ABI is implemented.
 - CLI source exposes `agent`, `search`, and `serve` only. The database path defaults to `aidb.sqlite3`; `serve` defaults to loopback/private visibility. `AIDB_AUTH_TOKEN` is the environment fallback for `--auth-token`, and an explicit CLI token takes precedence.
 - CI workflow `.github/workflows/ci.yml` runs compileall, Ruff, and pytest on Python 3.10, 3.11, and 3.12. The merged PRs below passed their own PR-head CI matrix; this is not a claim that a separate push-triggered workflow on the current main SHA was observed.
-- There were 28 open PRs at this snapshot. The queue includes competing journal-restoration proposals, paired contribution-claim PRs, a major adapter refactor, and broad overlapping remediation branches.
+- There are 6 open PRs at this refresh: #137, #138, #139, #64, #55, and #25. The current queue is limited to two transport hardening PRs, an additive onboarding PR, two blocked legacy code branches, and one documentation proposal.
 
 ## Merged implementation evidence
 
@@ -43,13 +43,15 @@ All listed PR runs passed compileall, Ruff, and pytest on Python 3.10/3.11/3.12.
 
 ## Open-work clusters
 
-- **Journal restoration:** PR #120 restored `DISCUSSION.md` after commit `9d2c296`. PR #118 has been closed as superseded. This audit and architecture PR do not modify the journal.
-- **Adapter refactor:** PR #64 extracts resource application and SQLite repository boundaries. Rebase/review it against current validation, import, verifier, and HTTP changes before merge.
-- **Broad remediation:** PR #55 combines many unrelated fixes and overlaps merged work. Extract only unique changes into bounded PRs.
-- **Distributed architecture:** PR #61 documents future node identity, authenticated peer transport, manifests, chunks, discovery, partial replication, and partition semantics. It remains proposed; no outbound peer client or replication engine exists.
-- **Older network proposals:** PRs #14/#15 overlap the now-merged local collaboration API (#119) and the distributed architecture proposal. Review for unique requirements rather than merging wholesale.
-- **Onboarding/protocol:** PRs #45/#24/#25 require separate review for current relevance.
-- **Contribution claims:** PRs #74–#105 and new PR #122 include agent-muse claim entries. Preserve provenance and disagreement, but verify claims against code and tests before treating them as completed work; compare #122 with #105 and merged #112 to avoid duplicate claims.
+- **HTTP request safety — PR #137:** current-main branch; CI run [43882228276](https://github.com/usamaizm/AIDB/actions/runs/43882228276) passed compileall, Ruff, and pytest on Python 3.10/3.11/3.12. Independent review remains outstanding. Socket I/O timeout does not bound long-running SQLite work; GET handlers still serialize reads and response writes under the shared lock.
+- **HTTPS verification — PR #138:** current-main branch; CI run [43882236199](https://github.com/usamaizm/AIDB/actions/runs/43882236199) passed the same matrix. Independent review remains outstanding. This is inbound TLS and bearer-token verification only, not mTLS, peer identity, or distributed networking.
+- **Progressive onboarding — PR #139:** additive guide/template; CI run [43882238516](https://github.com/usamaizm/AIDB/actions/runs/43882238516) passed the same matrix. Independent review remains outstanding. The older PRs #45/#24 were closed because they were stale and the #45 branch removed mandatory contributor/AI-first safeguards.
+- **Adapter refactor — PR #64:** not mergeable; 88 commits behind current main and GitHub reports a dirty merge. The extracted service bypasses strict resource validation and the HTTP lock wraps request-body reading, regressing PR #137's slow-upload isolation. Rebuild from current main with shared validators and focused conformance tests; do not merge the existing branch.
+- **Broad remediation — PR #55:** not mergeable; 92 commits behind current main and GitHub reports a dirty merge. Last independent exact-head review at `ab2374f79c6801ecd873561f10b2e8c92cddf59a` found Ruff `F821 AIDBError` and two failing tests; no current-head CI is visible. Much of the scope overlaps smaller merged PRs. Extract only unique, revalidated changes into focused PRs.
+- **Phone-first contribution protocol — PR #25:** documentation proposal only. Its workflow inventory and branch-protection review are still outstanding; it does not change permissions or automations.
+- **Superseded branches closed:** #14/#15 (older discovery/network branches superseded by #119), #24/#45 (onboarding superseded by #139), #74–#87 (claim-only entries consolidated by #136), and #133/#134 (stale transport branches replaced by #137/#138). The earlier #129/#131 branches were also superseded.
+
+No separate push-triggered CI run was observed for the current `main` commit `635dca7`; the green CI evidence above is tied to the exact PR heads, not a claim about a separate main-branch run.
 
 ## Launch boundary
 
