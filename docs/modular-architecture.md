@@ -123,3 +123,12 @@ This is a target layout, not a claim that these directories currently exist or t
 ## Acceptance criteria
 
 AIDB is meaningfully modular when a developer can add or replace a storage backend, format adapter, transport, or language binding by implementing a documented interface and passing the relevant conformance tests—without rewriting the core data model or changing the behavior of existing clients.
+
+
+## Contract evolution and compatibility
+
+Version logical resource semantics, portable interchange, persisted storage, wire protocols, module interfaces, and optional extensions independently where their lifecycles differ. Do not let a current file envelope or backend schema dictate unrelated future formats.
+
+Prefer additive evolution when sound; otherwise use adapters, explicit migrations, parallel implementations, or a new contract version. Never silently reinterpret bytes, discard unknown content, or claim legacy data has guarantees it has not earned.
+
+An adapter boundary is real only when independent implementations pass the same language-neutral conformance suite, including failure and recovery cases. See [Evolution and Compatibility Architecture](evolution-and-compatibility.md) for migration requirements, negotiation, format separation, decision records, and acceptance criteria.
