@@ -302,7 +302,9 @@ def test_register_artifact_from_bytes_supports_sha512_and_alias_spellings() -> N
     assert sha512_artifact.checksum == hashlib.sha512(PAYLOAD).hexdigest()
     assert db.get_artifact_bytes(sha512_artifact.id) == PAYLOAD
     alias_artifact = db.register_artifact_from_bytes(
-        name="alias.txt", data=b"other payload", media_type="text/plain",
+        name="alias.txt",
+        data=b"other payload",
+        media_type="text/plain",
         checksum_algorithm="sha256",
     )
     assert alias_artifact.checksum == hashlib.sha256(b"other payload").hexdigest()

@@ -9,9 +9,9 @@ Status: experimental, concept-first, standards-aware, and reviewable.
 
 Fast path for a fresh agent session: read the machine-readable [session context manifest](.aidb/session-context.yml), then [project handoff](docs/PROJECT_CONTEXT.md), [`AGENTS.md`](AGENTS.md), and the [repository audit](docs/repository-audit.md). These point to the right code, tests, architecture contracts, known limitations, and next priorities. Fetch current `main` and verify live CI/PR state before acting; do not rediscover the project from chat history or treat proposals as shipped features.
 
-AIDB is a local-first knowledge and memory substrate for AI systems. It gives agents a durable place to store operational memory, session state, shared knowledge, workflow events, and project context without depending on a central cloud service.
+AIDB is a local-first knowledge and memory substrate for AI systems. It gives agents a durable place to store operational memory, shared knowledge, workflow events, and project context without depending on a central cloud service.
 
-AIDB is intentionally model-agnostic and repository-native. It does not run models or call external AI services by itself. Instead, it provides a durable coordination layer for AI workflows, knowledge capture, task tracking, and reviewable provenance.
+AIDB is intentionally model-agnostic and repository-native. It does not run models or call external AI services by itself. Instead, it provides a durable coordination layer for AI workflows, knowledge capture, agent collaboration, and reviewable provenance.
 
 ## Quick start (Python reference implementation)
 
@@ -52,9 +52,9 @@ This lets agents discover what a node **is and can currently do** rather than re
 
 - Local-first memory and knowledge storage
 - Language-neutral node contract
-- Dynamic discovery and capability negotiation
+- Dynamic discovery and capability advertisement
 - Durable state plus change history
-- Session and task orchestration
+- Agent discovery and collaboration records
 - Reviewable provenance and source hierarchy
 - Format-agnostic artifact handling for mixed media
 - Portable recovery as a first-class concern
@@ -131,7 +131,7 @@ AIDB prefers known-good standards over ad hoc formats where possible. Concrete t
 
 ## What AIDB is not
 
-AIDB is not a claim that one ontology or one schema solves all knowledge representation. It is not an autonomous execution environment by default. It is not a replacement for human review. It is a durable, reviewable substrate for AI memory, workflow state, and concept formation.
+AIDB is not a claim that one ontology or one schema solves all knowledge representation. It is not an autonomous execution environment by default. It is not a replacement for human review. It is a durable, reviewable substrate for AI memory, workflow events, and concept formation.
 
 ## In one sentence
 

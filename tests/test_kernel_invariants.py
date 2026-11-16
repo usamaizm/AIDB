@@ -37,7 +37,9 @@ def test_public_api_does_not_expose_mutation_methods(tmp_path: Path) -> None:
     db.close()
 
 
-def test_metadata_claiming_derived_provenance_without_extraction_is_rejected(tmp_path: Path) -> None:
+def test_metadata_claiming_derived_provenance_without_extraction_is_rejected(
+    tmp_path: Path,
+) -> None:
     db = AIDB(tmp_path / "bad_metadata.sqlite3")
     agent = db.register_agent("alice")
 
@@ -126,9 +128,12 @@ def test_knowledge_and_event_are_created_in_same_transaction(tmp_path: Path) -> 
     after = db.db.execute("SELECT COUNT(*) AS n FROM workflow_events").fetchone()["n"]
 
     assert after > before
-    assert db.db.execute(
-        "SELECT COUNT(*) AS n FROM workflow_events WHERE kind = ?",
-        ("knowledge_created",),
-    ).fetchone()["n"] >= 1
+    assert (
+        db.db.execute(
+            "SELECT COUNT(*) AS n FROM workflow_events WHERE kind = ?",
+            ("knowledge_created",),
+        ).fetchone()["n"]
+        >= 1
+    )
 
     db.close()

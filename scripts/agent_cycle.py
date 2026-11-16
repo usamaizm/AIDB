@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run bounded, evidence-producing AIDB contributor checks."""
+
 from __future__ import annotations
 
 import argparse
@@ -16,64 +17,127 @@ CHECKS = (
     ("ruff", (sys.executable, "-m", "ruff", "check", "aidb", "tests")),
     ("pytest", (sys.executable, "-m", "pytest", "-q")),
 )
-CONTEXT_FILES = (".aidb/session-context.yml", "docs/PROJECT_CONTEXT.md", "AGENTS.md", "docs/IMPLEMENTATION_ROADMAP.md")
+CONTEXT_FILES = (
+    ".aidb/session-context.yml",
+    "docs/PROJECT_CONTEXT.md",
+    "AGENTS.md",
+    "docs/IMPLEMENTATION_ROADMAP.md",
+)
 
 
 def run_check(name: str, command: Sequence[str], root: Path, timeout: int) -> dict:
     """Run a fixed check and preserve its actual exit status and bounded output."""
     started = time.monotonic()
     try:
-        result = subprocess.run(list(command), cwd=root, capture_output=True, text=True, timeout=timeout, check=False)
-        return {"name": name, "command": list(command), "status": "passed" if result.returncode == 0 else "failed",
-                "exit_code": result.returncode, "duration_seconds": round(time.monotonic() - started, 3),
-                "stdout": result.stdout[-12000:], "stderr": result.stderr[-12000:]}
+        result = subprocess.run(
+            list(command), cwd=root, capture_output=True, text=True, timeout=timeout, check=False
+        )
+        return {
+            "name": name,
+            "command": list(command),
+            "status": "passed" if result.returncode == 0 else "failed",
+            "exit_code": result.returncode,
+            "duration_seconds": round(time.monotonic() - started, 3),
+            "stdout": result.stdout[-12000:],
+            "stderr": result.stderr[-12000:],
+        }
     except subprocess.TimeoutExpired as exc:
+
         def decode(value: str | bytes | None) -> str:
             if value is None:
                 return ""
             return value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value
-        return {"name": name, "command": list(command), "status": "timed_out", "exit_code": None,
-                "duration_seconds": round(time.monotonic() - started, 3),
-                "stdout": decode(exc.stdout)[-12000:], "stderr": decode(exc.stderr)[-12000:], "timeout_seconds": timeout}
+
+        return {
+            "name": name,
+            "command": list(command),
+            "status": "timed_out",
+            "exit_code": None,
+            "duration_seconds": round(time.monotonic() - started, 3),
+            "stdout": decode(exc.stdout)[-12000:],
+            "stderr": decode(exc.stderr)[-12000:],
+            "timeout_seconds": timeout,
+        }
     except OSError as exc:
-        return {"name": name, "command": list(command), "status": "could_not_run", "exit_code": None,
-                "duration_seconds": round(time.monotonic() - started, 3), "stdout": "", "stderr": str(exc)}
+        return {
+            "name": name,
+            "command": list(command),
+            "status": "could_not_run",
+            "exit_code": None,
+            "duration_seconds": round(time.monotonic() - started, 3),
+            "stdout": "",
+            "stderr": str(exc),
+        }
 
 
 def inspect(root: Path) -> dict:
     """Collect compact project state and indicate which handoff files exist."""
-    git = subprocess.run(["git", "rev-parse", "--show-toplevel", "--abbrev-ref", "HEAD", "HEAD"],
-                         cwd=root, capture_output=True, text=True, check=False)
+    git = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel", "--abbrev-ref", "HEAD", "HEAD"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     lines = git.stdout.splitlines()
     files = []
     for relative in CONTEXT_FILES:
         path = root / relative
         exists = path.is_file()
-        files.append({"path": relative, "exists": exists, "bytes": path.stat().st_size if exists else 0})
-    return {"repository_root": lines[0] if git.returncode == 0 and lines else str(root),
-            "branch": lines[1] if git.returncode == 0 and len(lines) > 1 else None,
-            "commit": lines[2] if git.returncode == 0 and len(lines) > 2 else None,
-            "git_status": "available" if git.returncode == 0 else "unavailable", "context_files": files}
+        files.append(
+            {"path": relative, "exists": exists, "bytes": path.stat().st_size if exists else 0}
+        )
+    return {
+        "repository_root": lines[0] if git.returncode == 0 and lines else str(root),
+        "branch": lines[1] if git.returncode == 0 and len(lines) > 1 else None,
+        "commit": lines[2] if git.returncode == 0 and len(lines) > 2 else None,
+        "git_status": "available" if git.returncode == 0 else "unavailable",
+        "context_files": files,
+    }
 
 
 def verify(root: Path, timeout: int) -> dict:
     """Run the same compile, lint, and test commands used by CI."""
     results = [run_check(name, command, root, timeout) for name, command in CHECKS]
-    return {"schema_version": 1, "created_at": datetime.now(timezone.utc).isoformat(),
-            "repository": inspect(root), "checks": results,
-            "overall_status": "passed" if all(item["status"] == "passed" for item in results) else "failed",
-            "limitations": ["Checks do not prove behavioral completeness or security.",
-                            "This tool does not edit files, retry failures, merge changes, or execute imported artifacts."]}
+    return {
+        "schema_version": 1,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "repository": inspect(root),
+        "checks": results,
+        "overall_status": "passed"
+        if all(item["status"] == "passed" for item in results)
+        else "failed",
+        "limitations": [
+            "Checks do not prove behavioral completeness or security.",
+            "This tool does not edit files, retry failures, merge changes, or execute imported artifacts.",
+        ],
+    }
 
 
 def render_handoff(report: dict) -> str:
-    lines = ["# AIDB Agent Verification Handoff", "", "Result: **" + report["overall_status"].upper() + "**",
-             "Created: " + report["created_at"],
-             "Branch: " + str(report["repository"].get("branch") or "unknown"),
-             "Commit: " + str(report["repository"].get("commit") or "unknown"), "", "## Check results", ""]
+    lines = [
+        "# AIDB Agent Verification Handoff",
+        "",
+        "Result: **" + report["overall_status"].upper() + "**",
+        "Created: " + report["created_at"],
+        "Branch: " + str(report["repository"].get("branch") or "unknown"),
+        "Commit: " + str(report["repository"].get("commit") or "unknown"),
+        "",
+        "## Check results",
+        "",
+    ]
     for item in report["checks"]:
-        lines.append("- **" + item["name"] + "**: " + item["status"] + " (exit=" + str(item["exit_code"]) +
-                     ", " + str(item["duration_seconds"]) + "s)")
+        lines.append(
+            "- **"
+            + item["name"]
+            + "**: "
+            + item["status"]
+            + " (exit="
+            + str(item["exit_code"])
+            + ", "
+            + str(item["duration_seconds"])
+            + "s)"
+        )
         detail = (item.get("stderr") or item.get("stdout") or "").strip()
         if detail:
             lines.extend(["", "  Output:"])
@@ -82,9 +146,13 @@ def render_handoff(report: dict) -> str:
     lines.extend("- " + item for item in report["limitations"])
     lines.extend(["", "## Next action", ""])
     if any(item["status"] != "passed" for item in report["checks"]):
-        lines.append("Inspect failure output, fix the cause in a bounded change, then rerun verification.")
+        lines.append(
+            "Inspect failure output, fix the cause in a bounded change, then rerun verification."
+        )
     else:
-        lines.append("Review the diff and acceptance criteria; passing checks alone do not approve or merge a change.")
+        lines.append(
+            "Review the diff and acceptance criteria; passing checks alone do not approve or merge a change."
+        )
     return "\n".join(lines) + "\n"
 
 

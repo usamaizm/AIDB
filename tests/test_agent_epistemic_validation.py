@@ -179,20 +179,24 @@ def test_add_event_validates_inputs():
 def test_remember_legacy_validates_inputs():
     db = AIDB(":memory:")
     agent = db.register_agent("alice")
-    with pytest.warns(DeprecationWarning), pytest.raises(
-        ValueError, match="agent 9999 does not exist"
+    with (
+        pytest.warns(DeprecationWarning),
+        pytest.raises(ValueError, match="agent 9999 does not exist"),
     ):
         db.remember(9999, "content")
-    with pytest.warns(DeprecationWarning), pytest.raises(
-        ValueError, match="legacy memory content must be a string"
+    with (
+        pytest.warns(DeprecationWarning),
+        pytest.raises(ValueError, match="legacy memory content must be a string"),
     ):
         db.remember(agent.id, 42)
-    with pytest.warns(DeprecationWarning), pytest.raises(
-        ValueError, match="legacy memory importance must be between 0 and 1"
+    with (
+        pytest.warns(DeprecationWarning),
+        pytest.raises(ValueError, match="legacy memory importance must be between 0 and 1"),
     ):
         db.remember(agent.id, "content", importance=1.5)
-    with pytest.warns(DeprecationWarning), pytest.raises(
-        ValueError, match="legacy memory importance must be between 0 and 1"
+    with (
+        pytest.warns(DeprecationWarning),
+        pytest.raises(ValueError, match="legacy memory importance must be between 0 and 1"),
     ):
         db.remember(agent.id, "content", importance=True)
     assert db.db.execute("SELECT COUNT(*) FROM memories").fetchone()[0] == 0

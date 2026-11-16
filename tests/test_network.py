@@ -28,7 +28,8 @@ from aidb.server import create_handler
 def test_agent_profile_is_published_and_discoverable():
     db = AIDB(":memory:")
     agent = db.register_agent(
-        "Muse", description="Independent implementation reviewer",
+        "Muse",
+        description="Independent implementation reviewer",
         capabilities=["provenance", "python", "review"],
     )
     profile = publish_agent_profile(db, agent, agent_id="agent-muse")
@@ -42,19 +43,20 @@ def test_agent_profile_is_published_and_discoverable():
 def test_private_agent_profiles_are_not_discoverable():
     db = AIDB(":memory:")
     agent = db.register_agent("private-agent", capabilities=["review"])
-    publish_agent_profile(
-        db, agent, agent_id="agent-private", visibility="private"
-    )
+    publish_agent_profile(db, agent, agent_id="agent-private", visibility="private")
     assert discover_agents(db) == []
 
 
 def test_knowledge_offers_remain_provisional_and_topic_searchable():
     db = AIDB(":memory:")
     offer = publish_knowledge_offer(
-        db, "Lineage validation",
+        db,
+        "Lineage validation",
         "Derived knowledge must preserve source lineage.",
-        owner="agent-muse", topics=["provenance", "integrity"],
-        confidence=0.9, source="docs/invariants.md",
+        owner="agent-muse",
+        topics=["provenance", "integrity"],
+        confidence=0.9,
+        source="docs/invariants.md",
     )
     assert offer.resource_type == KNOWLEDGE_OFFER
     assert offer.content["status"] == "proposed"
@@ -65,12 +67,17 @@ def test_knowledge_offers_remain_provisional_and_topic_searchable():
 def test_agents_can_discover_knowledge_and_collaboration_requests():
     db = AIDB(":memory:")
     knowledge = request_knowledge(
-        db, "Can you verify this artifact lineage?",
-        requester="agent-chatgpt", intent="verify", topics=["provenance"],
+        db,
+        "Can you verify this artifact lineage?",
+        requester="agent-chatgpt",
+        intent="verify",
+        topics=["provenance"],
     )
     collaboration = request_collaboration(
-        db, "Review the network adapter design",
-        requester="agent-chatgpt", capabilities=["python", "architecture"],
+        db,
+        "Review the network adapter design",
+        requester="agent-chatgpt",
+        capabilities=["python", "architecture"],
     )
     assert knowledge.resource_type == KNOWLEDGE_REQUEST
     assert collaboration.resource_type == COLLABORATION_REQUEST
@@ -83,8 +90,11 @@ def test_agents_can_discover_knowledge_and_collaboration_requests():
 def test_private_requests_are_excluded_from_public_discovery():
     db = AIDB(":memory:")
     request_knowledge(
-        db, "Private question", requester="agent-owner",
-        topics=["private"], visibility="private",
+        db,
+        "Private question",
+        requester="agent-owner",
+        topics=["private"],
+        visibility="private",
     )
     assert discover_requests(db, topics=["private"]) == []
 
@@ -92,18 +102,21 @@ def test_private_requests_are_excluded_from_public_discovery():
 def test_response_is_a_durable_resource_linked_to_request():
     db = AIDB(":memory:")
     request = request_knowledge(
-        db, "Please review this finding", requester="agent-one",
+        db,
+        "Please review this finding",
+        requester="agent-one",
         topics=["review"],
     )
     response = respond_to_request(
-        db, request.id, responder="agent-two",
+        db,
+        request.id,
+        responder="agent-two",
         response="I can review the source and reproduce the result.",
     )
     assert response.resource_type == "agent_response"
     assert response.content["request_id"] == request.id
     assert any(
-        relation["relation"] == "responds_to"
-        and relation["target_resource_id"] == request.id
+        relation["relation"] == "responds_to" and relation["target_resource_id"] == request.id
         for relation in db.resource_relations(response.id)
     )
     # A responder's acknowledgement does not silently rewrite the request owner's state.
@@ -113,19 +126,25 @@ def test_response_is_a_durable_resource_linked_to_request():
 def test_knowledge_review_is_independent_and_linked_to_offer():
     db = AIDB(":memory:")
     offer = publish_knowledge_offer(
-        db, "A claim", "This claim can be checked.",
-        owner="agent-one", topics=["review"], confidence=0.7,
+        db,
+        "A claim",
+        "This claim can be checked.",
+        owner="agent-one",
+        topics=["review"],
+        confidence=0.7,
     )
     review = review_knowledge(
-        db, offer.id, reviewer="agent-two",
+        db,
+        offer.id,
+        reviewer="agent-two",
         assessment="Evidence supports the claim with one limitation.",
-        confidence=0.85, accepted=True,
+        confidence=0.85,
+        accepted=True,
     )
     assert review.resource_type == "knowledge_review"
     assert review.content["accepted"] is True
     assert any(
-        relation["relation"] == "reviews"
-        and relation["target_resource_id"] == offer.id
+        relation["relation"] == "reviews" and relation["target_resource_id"] == offer.id
         for relation in db.resource_relations(review.id)
     )
     assert db.get_resource(offer.id).content["status"] == "proposed"
@@ -142,13 +161,14 @@ def test_agent_profile_requires_stable_agent_id(agent_id):
 def test_invalid_confidence_and_non_boolean_review_rejected():
     db = AIDB(":memory:")
     with pytest.raises(ValueError, match="confidence"):
-        publish_knowledge_offer(
-            db, "Title", "Claim", owner="agent-one", confidence=float("nan")
-        )
+        publish_knowledge_offer(db, "Title", "Claim", owner="agent-one", confidence=float("nan"))
     offer = publish_knowledge_offer(db, "Title", "Claim", owner="agent-one")
     with pytest.raises(ValueError, match="accepted must be a boolean"):
         review_knowledge(
-            db, offer.id, reviewer="agent-two", assessment="review",
+            db,
+            offer.id,
+            reviewer="agent-two",
+            assessment="review",
             accepted="false",
         )
 
@@ -167,9 +187,7 @@ def test_http_discovery_filters_by_resource_type_and_serves_agent_card():
         db, "Review a PR", requester="agent-one", capabilities=["review"]
     )
     db.create_resource("ordinary_document", {"title": "not a request"}, visibility="public")
-    server = ThreadingHTTPServer(
-        ("127.0.0.1", 0), create_handler(db)
-    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), create_handler(db))
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -205,24 +223,31 @@ def test_public_profile_does_not_expose_local_agent_row_id():
 def test_private_offer_review_inherits_private_visibility():
     db = AIDB(":memory:")
     offer = publish_knowledge_offer(
-        db, "Private claim", "Do not expose this review.", owner="agent-one",
+        db,
+        "Private claim",
+        "Do not expose this review.",
+        owner="agent-one",
         visibility="private",
     )
-    review = review_knowledge(
-        db, offer.id, reviewer="agent-two", assessment="Private review"
-    )
+    review = review_knowledge(db, offer.id, reviewer="agent-two", assessment="Private review")
     assert review.visibility == "private"
 
 
 def test_private_offer_cannot_be_reviewed_publicly():
     db = AIDB(":memory:")
     offer = publish_knowledge_offer(
-        db, "Private claim", "Do not expose this review.", owner="agent-one",
+        db,
+        "Private claim",
+        "Do not expose this review.",
+        owner="agent-one",
         visibility="private",
     )
     with pytest.raises(ValueError, match="private offer"):
         review_knowledge(
-            db, offer.id, reviewer="agent-two", assessment="Review",
+            db,
+            offer.id,
+            reviewer="agent-two",
+            assessment="Review",
             visibility="public",
         )
 
@@ -233,8 +258,6 @@ def test_invalid_intent_status_and_request_type_are_value_errors():
         request_knowledge(db, "question", requester="agent-one", intent=[])
     request = request_knowledge(db, "question", requester="agent-one")
     with pytest.raises(ValueError, match="status"):
-        respond_to_request(
-            db, request.id, responder="agent-two", response="response", status=[]
-        )
+        respond_to_request(db, request.id, responder="agent-two", response="response", status=[])
     with pytest.raises(ValueError, match="request_type"):
         discover_requests(db, request_type=[])

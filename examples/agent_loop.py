@@ -1,4 +1,5 @@
 """Demonstrate durable agent-to-agent discovery through a shared AIDB home."""
+
 from tempfile import TemporaryDirectory
 
 from aidb import (

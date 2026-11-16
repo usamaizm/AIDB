@@ -4,6 +4,7 @@ All network objects are ordinary AIDB resources. They inherit the store's
 ownership, visibility, relationships, revision, history, and portability
 semantics; this module does not create a parallel collaboration database.
 """
+
 from __future__ import annotations
 
 import math
@@ -81,9 +82,7 @@ def publish_agent_profile(
             offset=offset,
         )
         for existing in existing_profiles:
-            existing_content = (
-                existing.content if isinstance(existing.content, dict) else {}
-            )
+            existing_content = existing.content if isinstance(existing.content, dict) else {}
             if existing_content.get("agent_id") == stable_id:
                 raise ValueError("agent_id already has a published profile")
         if len(existing_profiles) < 100:
@@ -223,9 +222,7 @@ def _discover(
             if content.get("status") not in {"requested", "proposed"}:
                 continue
             available = {
-                value.casefold()
-                for value in content.get(term_field, [])
-                if isinstance(value, str)
+                value.casefold() for value in content.get(term_field, []) if isinstance(value, str)
             }
             if wanted and not wanted.intersection(available):
                 continue
@@ -274,9 +271,7 @@ def discover_knowledge_offers(
     db: AIDB, *, topics: list[str] | None = None, limit: int = 20
 ) -> list[Resource]:
     """Find public, provisional knowledge offers by topic."""
-    return _discover(
-        db, KNOWLEDGE_OFFER, terms=topics, term_field="topics", limit=limit
-    )
+    return _discover(db, KNOWLEDGE_OFFER, terms=topics, term_field="topics", limit=limit)
 
 
 def discover_requests(

@@ -27,9 +27,7 @@ def main() -> None:
     paper = db.create_resource(
         "document", {"title": "Attention notes", "body": "draft"}, owner="demo"
     )
-    dataset = db.create_resource(
-        "dataset", {"title": "Token counts", "rows": 1200}, owner="demo"
-    )
+    dataset = db.create_resource("dataset", {"title": "Token counts", "rows": 1200}, owner="demo")
     print(f"created {paper.id} and {dataset.id}")
 
     note = db.create_note("Reading note", "The draft cites the dataset.", owner="demo")

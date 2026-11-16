@@ -62,14 +62,15 @@ TABLE_KEYS = {
     "node_specifications": lambda r: r.get("specification_id"),
     "home_resources": lambda r: r.get("id"),
     "notes": lambda r: r.get("id"),
-    "resource_relations": lambda r: (r.get("source_resource_id"),
-                                     r.get("target_resource_id"),
-                                     r.get("relation")),
+    "resource_relations": lambda r: (
+        r.get("source_resource_id"),
+        r.get("target_resource_id"),
+        r.get("relation"),
+    ),
     "home_changes": lambda r: r.get("change_id"),
     "home_snapshots": lambda r: r.get("snapshot_id"),
 }
-EXCLUDED_PK = {"resource_relations": {"id"}, "home_changes": {"id"},
-               "home_snapshots": {"id"}}
+EXCLUDED_PK = {"resource_relations": {"id"}, "home_changes": {"id"}, "home_snapshots": {"id"}}
 TS_FIELDS = {"created_at", "updated_at", "issued_at"}
 
 
@@ -85,8 +86,7 @@ def parse_instant(s):
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
         else:
-            dt = datetime.strptime(t, "%Y-%m-%d %H:%M:%S").replace(
-                tzinfo=timezone.utc)
+            dt = datetime.strptime(t, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
         return dt.timestamp()
     except Exception:
         return None
@@ -215,22 +215,45 @@ RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 # vocabulary changes again, that pin fails and these constants must
 # be updated -- the ratchet working as designed.
 CURRENT_CAPABILITIES = [
-    "resources", "notes", "artifacts", "knowledge", "changes", "export",
-    "restore", "public_private", "ownership", "agent_network", "agent_profiles",
-    "knowledge_offers", "knowledge_requests", "collaboration_requests",
-    "agent_responses", "knowledge_reviews", "public_discovery",
+    "resources",
+    "notes",
+    "artifacts",
+    "knowledge",
+    "changes",
+    "export",
+    "restore",
+    "public_private",
+    "ownership",
+    "agent_network",
+    "agent_profiles",
+    "knowledge_offers",
+    "knowledge_requests",
+    "collaboration_requests",
+    "agent_responses",
+    "knowledge_reviews",
+    "public_discovery",
 ]
 CURRENT_RESOURCE_TYPES = [
-    "resource", "note", "artifact", "knowledge", "memory", "agent_profile",
-    "knowledge_offer", "knowledge_request", "collaboration_request",
-    "agent_response", "knowledge_review",
+    "resource",
+    "note",
+    "artifact",
+    "knowledge",
+    "memory",
+    "agent_profile",
+    "knowledge_offer",
+    "knowledge_request",
+    "collaboration_request",
+    "agent_response",
+    "knowledge_review",
 ]
 
 
 def _is_appended_spec_row(row):
     try:
-        return (json.loads(row["capabilities"]) == CURRENT_CAPABILITIES
-                and json.loads(row["resource_types"]) == CURRENT_RESOURCE_TYPES)
+        return (
+            json.loads(row["capabilities"]) == CURRENT_CAPABILITIES
+            and json.loads(row["resource_types"]) == CURRENT_RESOURCE_TYPES
+        )
     except Exception:
         return False
 
@@ -240,8 +263,7 @@ def without_appended_spec(payload):
     row (see above) removed from node_specifications."""
     p = wire(payload)
     rows = p["tables"].get("node_specifications") or []
-    p["tables"]["node_specifications"] = [
-        r for r in rows if not _is_appended_spec_row(r)]
+    p["tables"]["node_specifications"] = [r for r in rows if not _is_appended_spec_row(r)]
     return p
 
 
@@ -254,8 +276,9 @@ def test_node_specification_row_appended_on_import(tmp_path):
     assert len(appended) == 1
     assert json.loads(appended[0]["capabilities"]) == CURRENT_CAPABILITIES
     assert json.loads(appended[0]["resource_types"]) == CURRENT_RESOURCE_TYPES
-    fixture_ids = {r["specification_id"] for r in
-                   load_fixture("f1.json")["tables"]["node_specifications"]}
+    fixture_ids = {
+        r["specification_id"] for r in load_fixture("f1.json")["tables"]["node_specifications"]
+    }
     assert appended[0]["specification_id"].startswith("spec:")
     assert appended[0]["specification_id"] not in fixture_ids
 
@@ -285,10 +308,8 @@ def test_f2_pass_through_fidelity(tmp_path):
 
 def test_f2_native_timestamps_are_rfc3339(tmp_path):
     db = make_db(tmp_path, "f2_api")
-    made = db.create_resource("document", {"title": "x"}, owner="agent-muse",
-                              visibility="public")
-    row = [r for r in db.export_home()["tables"]["home_resources"]
-           if r["id"] == made.id][0]
+    made = db.create_resource("document", {"title": "x"}, owner="agent-muse", visibility="public")
+    row = [r for r in db.export_home()["tables"]["home_resources"] if r["id"] == made.id][0]
     assert RFC3339.match(row["created_at"])
     assert RFC3339.match(row["updated_at"])
 
@@ -398,8 +419,7 @@ def test_f5_reshaped_variant_equivalent_but_byte_different(tmp_path):
     variant = json.loads(load_fixture_text("f5_v.json"))
     e1_v, _ = roundtrip(tmp_path, "f5v", variant)
     e1_f, _ = roundtrip(tmp_path, "f5f", load_fixture("f1.json"))
-    assert equiv_diff(without_appended_spec(e1_v),
-                      without_appended_spec(e1_f)) == []
+    assert equiv_diff(without_appended_spec(e1_v), without_appended_spec(e1_f)) == []
     assert json.dumps(e1_v, sort_keys=True) != json.dumps(e1_f, sort_keys=True)
 
 
@@ -424,8 +444,9 @@ def test_f5_snapshot_create_hash_is_canonical_for_current_payload(tmp_path):
     db = make_db(tmp_path, "f5_snap")
     db.import_home(wire(load_fixture("f5_s.json")))
     made = db.create_snapshot()
-    canonical = json.dumps(db.export_home(), sort_keys=True,
-                           separators=(",", ":"), ensure_ascii=False)
+    canonical = json.dumps(
+        db.export_home(), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     assert made["content_hash"] == digest
     assert made["snapshot_id"] == "snap:" + digest
@@ -444,8 +465,7 @@ def test_f5_snapshot_fixture_row_restores(tmp_path):
     db = make_db(tmp_path, "f5_restore")
     db.import_home(wire(load_fixture("f5_snapshot_fixture.json")))
     db.restore_snapshot("snap:" + _snapshot_digest())
-    assert equiv_diff_excluding_snapshots(
-        without_appended_spec(db.export_home()), source) == []
+    assert equiv_diff_excluding_snapshots(without_appended_spec(db.export_home()), source) == []
 
 
 def test_f5_export_performs_no_canonicalization(tmp_path):
@@ -468,8 +488,7 @@ def test_f6_artifacts_table_importable_without_blob(tmp_path):
     db.import_home(wire(load_fixture("f6_probe.json")))
     arts = db.list_artifacts()
     assert [a.name for a in arts] == ["fixture-greeting"]
-    assert arts[0].checksum == \
-        "69fb3d1fd21155c618ba8a5f508c872da8494069ef6dfae74d8c5b8a3b6a4361"
+    assert arts[0].checksum == "69fb3d1fd21155c618ba8a5f508c872da8494069ef6dfae74d8c5b8a3b6a4361"
     assert db.get_artifact_bytes(arts[0].id) is None
     exp = db.export_home()
     assert len(exp["tables"]["artifacts"]) == 1
@@ -482,11 +501,15 @@ def test_f6_registered_artifact_appears_in_export(tmp_path):
     # a registered artifact appears in the portable format.
     db = make_db(tmp_path, "f6_reg")
     art = db.register_artifact_from_bytes(
-        name="fixture-greeting", data=b"hello aidb\n",
-        media_type="text/plain", filename="greeting.txt",
-        provenance={"creator": "agent-muse", "tool": "e1-fixture",
-                    "source": "hand-written"},
-        status="raw", encoding="utf-8", metadata={"fixture": "F6"})
+        name="fixture-greeting",
+        data=b"hello aidb\n",
+        media_type="text/plain",
+        filename="greeting.txt",
+        provenance={"creator": "agent-muse", "tool": "e1-fixture", "source": "hand-written"},
+        status="raw",
+        encoding="utf-8",
+        metadata={"fixture": "F6"},
+    )
     assert art.checksum == hashlib.sha256(b"hello aidb\n").hexdigest()
     assert len(db.list_artifacts()) == 1
     assert "fixture-greeting" in json.dumps(db.export_home())
@@ -504,11 +527,15 @@ def test_f6_full_artifact_round_trip(tmp_path):
     assert hashlib.sha256(data).hexdigest() == fixture["checksum"]
     source = make_db(tmp_path, "f6_full_src")
     art = source.register_artifact_from_bytes(
-        name=fixture["name"], data=data,
-        media_type=fixture["media_type"], filename=fixture["filename"],
+        name=fixture["name"],
+        data=data,
+        media_type=fixture["media_type"],
+        filename=fixture["filename"],
         provenance=json.loads(fixture["provenance"]),
-        status=fixture["status"], encoding=fixture["encoding"],
-        metadata=json.loads(fixture["metadata"]))
+        status=fixture["status"],
+        encoding=fixture["encoding"],
+        metadata=json.loads(fixture["metadata"]),
+    )
     target = make_db(tmp_path, "f6_full_dst")
     target.import_home(wire(source.export_home()))
     assert target.get_artifact_bytes(art.id) == data
@@ -537,12 +564,15 @@ def build_f8_db(tmp_path):
     nested-snapshot check has an object to inspect.
     """
     db = make_db(tmp_path, "f8")
-    r = db.create_resource("document", {"body": "draft-secret-marker"},
-                           owner="agent-muse", visibility="private")
-    s = db.create_resource("document", {"body": "public-note"},
-                           owner="agent-muse", visibility="public")
-    t = db.create_resource("document", {"body": "t-secret-marker-zzz"},
-                           owner="agent-muse", visibility="private")
+    r = db.create_resource(
+        "document", {"body": "draft-secret-marker"}, owner="agent-muse", visibility="private"
+    )
+    s = db.create_resource(
+        "document", {"body": "public-note"}, owner="agent-muse", visibility="public"
+    )
+    t = db.create_resource(
+        "document", {"body": "t-secret-marker-zzz"}, owner="agent-muse", visibility="private"
+    )
     db.relate_resources(s.id, r.id, "references")
     db.relate_resources(s.id, t.id, "references")
     db.publish_resource(r.id)
@@ -565,8 +595,10 @@ def test_f8_tier_i_filtered_export_leaks_nothing_private(tmp_path):
         leaks.append("T note row")
     if any(row.get("resource_id") == t.id for row in tables["home_changes"]):
         leaks.append("T change rows")
-    if any(t.id in (row["source_resource_id"], row["target_resource_id"])
-           for row in tables["resource_relations"]):
+    if any(
+        t.id in (row["source_resource_id"], row["target_resource_id"])
+        for row in tables["resource_relations"]
+    ):
         leaks.append("relations naming T")
     if "t-secret-marker-zzz" in json.dumps(exp):
         leaks.append("T body marker")
@@ -586,12 +618,15 @@ def test_f8_filtered_export_carries_no_snapshots(tmp_path):
     assert "home_snapshots" not in tables
 
 
-@pytest.mark.skip(reason=(
-    "E1 F8 tier (ii) is an open format-registry section 9 policy "
-    "question: whether a now-public resource's create event, "
-    "disclosing it was private at creation, may appear in filtered "
-    "exports. Observed on main: the create and publish rows DO "
-    "appear. No expectation asserted until the policy is decided"))
+@pytest.mark.skip(
+    reason=(
+        "E1 F8 tier (ii) is an open format-registry section 9 policy "
+        "question: whether a now-public resource's create event, "
+        "disclosing it was private at creation, may appear in filtered "
+        "exports. Observed on main: the create and publish rows DO "
+        "appear. No expectation asserted until the policy is decided"
+    )
+)
 def test_f8_tier_ii_private_at_creation_history(tmp_path):
     raise NotImplementedError
 
@@ -658,14 +693,12 @@ def test_n2b_observed_fallback_surfaces_in_verification(tmp_path):
     # time to import time, so the dangling reference now never
     # reaches verification at all.
     db = make_db(tmp_path, "n2b_obs")
-    with pytest.raises(
-            ValueError, match="home change references a missing resource"):
+    with pytest.raises(ValueError, match="home change references a missing resource"):
         db.import_home(wire(load_fixture("n2b.json")))
     assert_nothing_imported(db)
     verification = db.export_home()["verification"]
     assert verification["ok"] is True
-    assert not any(i.startswith("missing resource:")
-                   for i in verification["issues"])
+    assert not any(i.startswith("missing resource:") for i in verification["issues"])
 
 
 # ---------------------------------------------------------- N3
@@ -696,8 +729,7 @@ def test_n4a_tampered_snapshot_rejected_at_import(tmp_path):
     # snapshot row is rejected before any insert (E1 N4a import
     # path: import_home previously never recomputed the hash).
     db = make_db(tmp_path, "n4a_imp")
-    with pytest.raises(
-            ValueError, match="snapshot integrity check failed during import"):
+    with pytest.raises(ValueError, match="snapshot integrity check failed during import"):
         db.import_home(wire(load_fixture("n4a.json")))
     assert_nothing_imported(db)
 
@@ -715,21 +747,24 @@ def test_n4a_tampered_snapshot_detected_at_restore(tmp_path):
     db.db.execute(
         "INSERT INTO home_snapshots"
         "(snapshot_id, home_format, content, content_hash) VALUES(?,?,?,?)",
-        (row["snapshot_id"], row["home_format"],
-         row["content"], row["content_hash"]))
+        (row["snapshot_id"], row["home_format"], row["content"], row["content_hash"]),
+    )
     db.db.commit()
     snapshot_id = row["snapshot_id"]
-    stored = db.db.execute(
-        "SELECT content, content_hash FROM home_snapshots").fetchone()
+    stored = db.db.execute("SELECT content, content_hash FROM home_snapshots").fetchone()
     assert hashlib.sha256(stored[0].encode("utf-8")).hexdigest() != stored[1]
     with pytest.raises(ValueError, match="snapshot integrity check failed"):
         db.restore_snapshot(snapshot_id)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "E1 N4b: tampered resource content is undetectable -- "
-    "aidb-home-v1 carries no per-record digest, and verify_home "
-    f"reports ok on altered content ({RESULTS_REF})"))
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "E1 N4b: tampered resource content is undetectable -- "
+        "aidb-home-v1 carries no per-record digest, and verify_home "
+        f"reports ok on altered content ({RESULTS_REF})"
+    ),
+)
 def test_n4b_tampered_resource_content_detected(tmp_path):
     db = make_db(tmp_path, "n4b")
     try:
@@ -746,8 +781,7 @@ def test_n4c_untampered_snapshot_control(tmp_path):
     db = make_db(tmp_path, "n4c")
     db.import_home(wire(load_fixture("f5_snapshot_fixture.json")))
     db.restore_snapshot("snap:" + _snapshot_digest())
-    assert equiv_diff_excluding_snapshots(
-        without_appended_spec(db.export_home()), source) == []
+    assert equiv_diff_excluding_snapshots(without_appended_spec(db.export_home()), source) == []
 
 
 # ---------------------------------------------------------- N5
@@ -800,21 +834,27 @@ def test_n5b2_programmatic_nan_row_not_silently_dropped(tmp_path):
 
 
 # ---------------------------------------------------------- N6
-@pytest.mark.skip(reason=(
-    "E1 N6: no JSONL/NDJSON consumer exists in aidb/ -- import_home "
-    "takes a parsed dict, so a truncated stream cannot be fed to the "
-    "implementation. Fixture n6_truncated.jsonl is retained (its "
-    "truncated line IS detectable at parse time) for the future "
-    "stream adapter"))
+@pytest.mark.skip(
+    reason=(
+        "E1 N6: no JSONL/NDJSON consumer exists in aidb/ -- import_home "
+        "takes a parsed dict, so a truncated stream cannot be fed to the "
+        "implementation. Fixture n6_truncated.jsonl is retained (its "
+        "truncated line IS detectable at parse time) for the future "
+        "stream adapter"
+    )
+)
 def test_n6_truncated_jsonl_stream(tmp_path):
     raise NotImplementedError
 
 
-@pytest.mark.skip(reason=(
-    "E1 N6b as a stream: no JSONL/NDJSON consumer exists in aidb/; "
-    "fixture n6b_duplicate.jsonl is retained for the future stream "
-    "adapter. The dict-path analogue that did run is pinned by the "
-    "test_n6b_dict_path_* tests below"))
+@pytest.mark.skip(
+    reason=(
+        "E1 N6b as a stream: no JSONL/NDJSON consumer exists in aidb/; "
+        "fixture n6b_duplicate.jsonl is retained for the future stream "
+        "adapter. The dict-path analogue that did run is pinned by the "
+        "test_n6b_dict_path_* tests below"
+    )
+)
 def test_n6b_duplicate_change_id_stream(tmp_path):
     raise NotImplementedError
 
@@ -844,13 +884,11 @@ def test_n6b_dict_path_conflicting_duplicate_rejected(tmp_path):
     # check compares the full row found by primary key.)
     payload = wire(load_fixture("f1.json"))
     extra = dict(payload["tables"]["home_changes"][0])
-    extra["payload"] = "{\"tampered\":true}"
+    extra["payload"] = '{"tampered":true}'
     payload["tables"]["home_changes"].append(extra)
     db = make_db(tmp_path, "n6b_conflict")
     # The tampered payload is malformed before the insert-time duplicate
     # conflict check; the whole import must still be rejected atomically.
-    with pytest.raises(
-        ValueError, match="home change create payload must have resource_type"
-    ):
+    with pytest.raises(ValueError, match="home change create payload must have resource_type"):
         db.import_home(payload)
     assert_nothing_imported(db)

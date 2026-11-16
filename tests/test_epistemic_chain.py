@@ -23,7 +23,9 @@ def test_trace_memory_to_source_direct_origin(tmp_path):
         confidence=0.9,
     )
     knowledge = db.create_knowledge(interpretation_id=interpretation.id, status="proposed")
-    memory = db.remember_knowledge(agent_id=agent.id, knowledge_id=knowledge.id, kind="fact", confidence=0.8)
+    memory = db.remember_knowledge(
+        agent_id=agent.id, knowledge_id=knowledge.id, kind="fact", confidence=0.8
+    )
 
     chain = db.trace_memory_to_source(memory.id)
 
@@ -44,7 +46,9 @@ def test_trace_memory_to_source_extraction_origin(tmp_path):
         data=b"%PDF-1.4",
         media_type="application/pdf",
     )
-    extraction = db.create_extraction(input_artifact_id=source.id, method="ocr", status="success", confidence=0.8)
+    extraction = db.create_extraction(
+        input_artifact_id=source.id, method="ocr", status="success", confidence=0.8
+    )
     output = db.derive_artifact(
         parent_artifact_id=source.id,
         name="source.txt",
@@ -52,7 +56,9 @@ def test_trace_memory_to_source_extraction_origin(tmp_path):
         content=b"The invoice says payment is due in 30 days.",
         transformation_step="ocr",
     )
-    db.record_extraction_output(extraction_id=extraction.id, output_artifact_id=output.id, sequence=0)
+    db.record_extraction_output(
+        extraction_id=extraction.id, output_artifact_id=output.id, sequence=0
+    )
 
     interpretation = db.create_interpretation(
         output_artifact_id=output.id,
@@ -60,8 +66,12 @@ def test_trace_memory_to_source_extraction_origin(tmp_path):
         interpreter="ocr-model-v1",
         confidence=0.87,
     )
-    knowledge = db.create_knowledge(interpretation_id=interpretation.id, status="accepted", confidence=0.83)
-    memory = db.remember_knowledge(agent_id=agent.id, knowledge_id=knowledge.id, kind="fact", confidence=0.9)
+    knowledge = db.create_knowledge(
+        interpretation_id=interpretation.id, status="accepted", confidence=0.83
+    )
+    memory = db.remember_knowledge(
+        agent_id=agent.id, knowledge_id=knowledge.id, kind="fact", confidence=0.9
+    )
 
     chain = db.trace_memory_to_source(memory.id)
 
@@ -92,7 +102,9 @@ def test_trace_memory_to_source_rejects_corrupt_provenance(tmp_path):
         metadata={"evidence_kind": "extraction"},
     )
     knowledge = db.create_knowledge(interpretation_id=interpretation.id, status="proposed")
-    memory = db.remember_knowledge(agent_id=agent.id, knowledge_id=knowledge.id, kind="fact", confidence=0.7)
+    memory = db.remember_knowledge(
+        agent_id=agent.id, knowledge_id=knowledge.id, kind="fact", confidence=0.7
+    )
 
     with pytest.raises(EpistemicChainBrokenError):
         db.trace_memory_to_source(memory.id)
@@ -124,6 +136,7 @@ def test_trace_artifact_lineage(tmp_path):
 
     assert [artifact.id for artifact in lineage] == [normalized.id, extracted.id, original.id]
 
+
 def test_record_extraction_output_rejects_mismatched_parent(tmp_path):
     db = AIDB(tmp_path / "mismatched-provenance.sqlite3")
     source = db.register_artifact_from_bytes(
@@ -139,8 +152,6 @@ def test_record_extraction_output_rejects_mismatched_parent(tmp_path):
         content=b"derived from unrelated",
         transformation_step="extract",
     )
-    extraction = db.create_extraction(
-        input_artifact_id=source.id, method="ocr", status="success"
-    )
+    extraction = db.create_extraction(input_artifact_id=source.id, method="ocr", status="success")
     with pytest.raises(ValueError, match="parent must match"):
         db.record_extraction_output(extraction.id, output.id)

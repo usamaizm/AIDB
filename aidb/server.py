@@ -28,11 +28,7 @@ class AIDBHTTPServer(ThreadingHTTPServer):
         bind_and_activate=True,
         max_workers=16,
     ):
-        if (
-            isinstance(max_workers, bool)
-            or not isinstance(max_workers, int)
-            or max_workers < 1
-        ):
+        if isinstance(max_workers, bool) or not isinstance(max_workers, int) or max_workers < 1:
             raise ValueError("max_workers must be a positive integer")
         self.max_workers = max_workers
         self._worker_slots = BoundedSemaphore(max_workers)
@@ -70,7 +66,9 @@ class AIDBHTTPServer(ThreadingHTTPServer):
             self._worker_slots.release()
 
 
-def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int = 1048576, max_page_size: int = 200):
+def create_handler(
+    db: AIDB, auth_token: str | None = None, max_body_bytes: int = 1048576, max_page_size: int = 200
+):
     if max_body_bytes < 1 or max_page_size < 1:
         raise ValueError("limits must be positive")
 
@@ -118,16 +116,34 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
                     raise ValueError("limit must be positive and offset non-negative")
                 if path == "/healthz":
                     return self._send(200, {"ok": True})
-                if path in {"/specification", "/.well-known/aidb.json", "/.well-known/agent-card.json"}:
+                if path in {
+                    "/specification",
+                    "/.well-known/aidb.json",
+                    "/.well-known/agent-card.json",
+                }:
                     return self._send(200, db.specification_dict())
                 if path == "/v1/notes":
                     return self._send(
-                        200, [note.__dict__ for note in db.list_notes(include_private=False, limit=limit, offset=offset)]
+                        200,
+                        [
+                            note.__dict__
+                            for note in db.list_notes(
+                                include_private=False, limit=limit, offset=offset
+                            )
+                        ],
                     )
                 if path == "/v1/resources":
                     return self._send(
                         200,
-                        [resource.__dict__ for resource in db.list_resources(resource_type=query.get("resource_type", [None])[0], include_private=False, limit=limit, offset=offset)],
+                        [
+                            resource.__dict__
+                            for resource in db.list_resources(
+                                resource_type=query.get("resource_type", [None])[0],
+                                include_private=False,
+                                limit=limit,
+                                offset=offset,
+                            )
+                        ],
                     )
                 if path == "/v1/changes":
                     after_id = int(query.get("after_id", ["0"])[0])
@@ -153,7 +169,9 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
             if auth_token is None:
                 return self._send(
                     503,
-                    {"error": "network writes are disabled until an authorization token is configured"},
+                    {
+                        "error": "network writes are disabled until an authorization token is configured"
+                    },
                 )
             expected = "Bearer " + auth_token
             supplied = self.headers.get("Authorization", "")
@@ -265,9 +283,7 @@ def create_server(
             context.verify_mode = ssl.CERT_REQUIRED
             context.load_verify_locations(cafile=tls_client_ca)
 
-    server = AIDBHTTPServer(
-        (host, port), create_handler(db, auth_token), max_workers=max_workers
-    )
+    server = AIDBHTTPServer((host, port), create_handler(db, auth_token), max_workers=max_workers)
     try:
         if context is not None:
             server.socket = context.wrap_socket(server.socket, server_side=True)
@@ -291,7 +307,9 @@ def serve(
     server = None
     try:
         db.initialize_home(visibility=visibility)
-        server = create_server(db, host, port, auth_token, tls_certfile, tls_keyfile, tls_client_ca=tls_client_ca)
+        server = create_server(
+            db, host, port, auth_token, tls_certfile, tls_keyfile, tls_client_ca=tls_client_ca
+        )
         scheme = "https" if tls_certfile else "http"
         print(f"AIDB listening at {scheme}://{host}:{server.server_port}")
         server.serve_forever()

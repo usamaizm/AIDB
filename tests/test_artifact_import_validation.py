@@ -86,9 +86,7 @@ def test_import_rejects_infinity_metadata() -> None:
 def test_import_rejects_nan_in_transformation_history() -> None:
     db = make_db()
     with pytest.raises(ValueError, match="must be strict JSON"):
-        db.import_home(
-            payload_with_rows(valid_artifact_row(transformation_history='["ok", NaN]'))
-        )
+        db.import_home(payload_with_rows(valid_artifact_row(transformation_history='["ok", NaN]')))
 
 
 # --- Rejections: wrong JSON shape ------------------------------------------
@@ -121,33 +119,25 @@ def test_import_rejects_malformed_provenance_json() -> None:
 def test_import_rejects_duplicate_provenance_keys() -> None:
     db = make_db()
     with pytest.raises(ValueError, match="must be strict JSON"):
-        db.import_home(
-            payload_with_rows(valid_artifact_row(provenance='{"a": 1, "a": 2}'))
-        )
+        db.import_home(payload_with_rows(valid_artifact_row(provenance='{"a": 1, "a": 2}')))
 
 
 def test_import_rejects_non_list_transformation_history() -> None:
     db = make_db()
     with pytest.raises(ValueError, match="must be a list of strings"):
-        db.import_home(
-            payload_with_rows(valid_artifact_row(transformation_history='{"a": 1}'))
-        )
+        db.import_home(payload_with_rows(valid_artifact_row(transformation_history='{"a": 1}')))
 
 
 def test_import_rejects_non_string_transformation_history_entry() -> None:
     db = make_db()
     with pytest.raises(ValueError, match="must be a list of strings"):
-        db.import_home(
-            payload_with_rows(valid_artifact_row(transformation_history='["ok", 7]'))
-        )
+        db.import_home(payload_with_rows(valid_artifact_row(transformation_history='["ok", 7]')))
 
 
 def test_import_rejects_malformed_transformation_history_json() -> None:
     db = make_db()
     with pytest.raises(ValueError, match="must be strict JSON"):
-        db.import_home(
-            payload_with_rows(valid_artifact_row(transformation_history="[unclosed"))
-        )
+        db.import_home(payload_with_rows(valid_artifact_row(transformation_history="[unclosed")))
 
 
 # --- Rejections: status / algorithm / size ---------------------------------
@@ -168,17 +158,13 @@ def test_import_rejects_null_status() -> None:
 def test_import_rejects_unknown_checksum_algorithm() -> None:
     db = make_db()
     with pytest.raises(ValueError, match="unsupported checksum algorithm"):
-        db.import_home(
-            payload_with_rows(valid_artifact_row(checksum_algorithm="crc32"))
-        )
+        db.import_home(payload_with_rows(valid_artifact_row(checksum_algorithm="crc32")))
 
 
 def test_import_rejects_null_checksum_algorithm() -> None:
     db = make_db()
     with pytest.raises(ValueError, match="unsupported checksum algorithm"):
-        db.import_home(
-            payload_with_rows(valid_artifact_row(checksum_algorithm=None))
-        )
+        db.import_home(payload_with_rows(valid_artifact_row(checksum_algorithm=None)))
 
 
 def test_import_rejects_negative_size_bytes() -> None:
@@ -216,9 +202,7 @@ def test_import_accepts_valid_artifact_row() -> None:
 def test_import_accepts_derived_status_and_alias_algorithm() -> None:
     db = make_db()
     db.import_home(
-        payload_with_rows(
-            valid_artifact_row(status="derived", checksum_algorithm="sha256")
-        )
+        payload_with_rows(valid_artifact_row(status="derived", checksum_algorithm="sha256"))
     )
     artifact = db.get_artifact(1)
     assert artifact is not None
