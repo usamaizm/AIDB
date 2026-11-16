@@ -125,3 +125,30 @@ def test_transport_advertisement_is_scoped_to_the_http_adapter():
     assert "notes.create" not in empty_token["capabilities"]
     assert empty_token["authentication"] == []
 
+def test_empty_bearer_token_disables_network_writes():
+    db = AIDB(":memory:")
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0), create_handler(db, auth_token="")
+    )
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    base = "http://127.0.0.1:" + str(server.server_port)
+    try:
+        request = Request(
+            base + "/v1/notes",
+            data=json.dumps({"title": "x", "content": "y"}).encode(),
+            headers={"Content-Type": "application/json", "Authorization": "Bearer "},
+            method="POST",
+        )
+        try:
+            urlopen(request)
+        except Exception as exc:
+            assert getattr(exc, "code", None) == 503
+        else:
+            raise AssertionError("empty bearer token unexpectedly authorized a write")
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=2)
+        db.close()
+
