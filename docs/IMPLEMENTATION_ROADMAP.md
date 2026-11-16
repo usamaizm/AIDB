@@ -78,9 +78,9 @@ Acceptance evidence: reproducible scripts or workflow runs, test results, and a 
 
 ## Pull-request reconciliation (snapshot 2026-11-16T12:56:54Z)
 
-There were 28 open PRs at snapshot time. This is a review queue, not a merge plan.
+There were 27 open PRs at snapshot time. This is a review queue, not a merge plan.
 
-- #118 and #120 both propose restoring `DISCUSSION.md` after commit `9d2c296`; they conflict and require the repository owner's decision. This PR intentionally leaves that file unchanged.
+- #120 has restored `DISCUSSION.md` from history. PR #118 is a redundant restoration proposal and should be closed as superseded. This PR intentionally leaves the journal unchanged.
 - #64 resource application and SQLite adapter extraction: next major refactor; rebase against current main and preserve strict input validation, import validation, integrity checks, and server logging.
 - #55 broad audit/remediation: overlaps several merged narrow fixes. Split or reconcile its unique changes before considering merge.
 - #61 distributed networking/evolution architecture: documentation proposal; this rebased companion preserves the architecture while excluding the conflicting journal edit.
