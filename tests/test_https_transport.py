@@ -86,6 +86,34 @@ def test_https_rejects_untrusted_certificate(tmp_path):
         db.close()
 
 
+def test_https_rejects_hostname_mismatch(tmp_path):
+    cert, key = _make_test_certificate(tmp_path)
+    db = AIDB(":memory:")
+    server = create_server(
+        db,
+        host="127.0.0.1",
+        port=0,
+        auth_token="t" * 40,
+        tls_certfile=str(cert),
+        tls_keyfile=str(key),
+    )
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    context = ssl.create_default_context(cafile=str(cert))
+    try:
+        with pytest.raises(URLError):
+            urlopen(
+                f"https://127.0.0.1:{server.server_port}/healthz",
+                context=context,
+                timeout=3,
+            )
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
+        db.close()
+
+
 def test_https_write_requires_and_accepts_bearer_token(tmp_path):
     cert, key = _make_test_certificate(tmp_path)
     db = AIDB(":memory:")
