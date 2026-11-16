@@ -34,6 +34,10 @@ The certificate must be valid for the hostname clients use. Protect the private 
 The adapter is intentionally minimal. It does not currently implement user-level authorization scopes, rate limiting, audit-grade identity, or multi-tenant isolation. A bearer token grants write access to the exposed write endpoints; it is not a substitute for per-agent authorization. Do not treat the service as production-ready for untrusted multi-tenant workloads.
 
 
+
+
+The threaded server uses a bounded listen backlog, but it does not cap the number of active request threads. The per-socket timeout bounds individual socket I/O waits, not total operation duration or concurrent worker count. For deployments exposed beyond a trusted local network, place AIDB behind a reverse proxy or gateway that enforces connection/concurrency limits and rate limiting; do not treat the built-in server as a public multi-tenant gateway.
+
 ## Distributed networking boundary
 
 The TLS configuration above protects inbound connections to this HTTP server when it is bound beyond loopback. It does not implement outbound peer connections, mutual peer authentication, stable cryptographic AIDB node identities, discovery, content-addressed chunk transfer, or replication. The current bearer token is a coarse write gate, not an agent identity or distributed authorization system.
