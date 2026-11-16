@@ -192,6 +192,12 @@ def _validate_note_content(content: Any) -> None:
         raise ValueError("note content must be a string")
 
 
+_SPECIFICATION_CONTRACT = {
+    "id": "org.aidb.node-specification",
+    "version": "0.1.0",
+}
+
+
 class AIDB:
     """SQLite-backed state layer for AI agents, sessions, tasks, memory, tools, workflow events, and artifacts."""
 
@@ -1492,21 +1498,149 @@ class AIDB:
         self.db.commit()
         return self.get_resource(resource_id)
 
-    def current_specification(self):
-        identity=self.initialize_home()
-        caps=["resources","notes","artifacts","knowledge","changes","export","restore","public_private","ownership","agent_network","agent_profiles","knowledge_offers","knowledge_requests","collaboration_requests","agent_responses","knowledge_reviews","public_discovery"]
-        types=["resource","note","artifact","knowledge","memory","agent_profile","knowledge_offer","knowledge_request","collaboration_request","agent_response","knowledge_review"]
-        latest=self.db.execute("SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1").fetchone()
-        desired=(caps,types)
-        if latest is None or (json.loads(latest["capabilities"]), json.loads(latest["resource_types"])) != desired:
-            self.db.execute("INSERT INTO node_specifications(specification_id,node_id,visibility,capabilities,resource_types,transports) VALUES(?,?,?,?,?,?)", ("spec:"+str(uuid.uuid4()),identity["node_id"],"public",self._json(caps),self._json(types),self._json([])))
+    def _validate_specification_transports(self, transports):
+        """Accept legacy transport names and structured, capability-scoped adapters."""
+        if not isinstance(transports, list):
+            raise ValueError("transports must be a list")
+        for index, transport in enumerate(transports):
+            label = f"specification transports[{index}]"
+            if isinstance(transport, str):
+                if not transport.strip():
+                    raise ValueError(f"{label} must be a non-empty string")
+                continue
+            if not isinstance(transport, dict):
+                raise ValueError(f"{label} must be a string or object")
+            for field in ("id", "protocol"):
+                if not isinstance(transport.get(field), str) or not transport[field].strip():
+                    raise ValueError(f"{label}.{field} must be a non-empty string")
+            capabilities = transport.get("capabilities")
+            if not isinstance(capabilities, list) or any(
+                not isinstance(item, str) or not item.strip()
+                for item in capabilities
+            ):
+                raise ValueError(f"{label}.capabilities must be a list of non-empty strings")
+            authentication = transport.get("authentication", [])
+            if not isinstance(authentication, list) or any(
+                not isinstance(item, str) or not item.strip()
+                for item in authentication
+            ):
+                raise ValueError(f"{label}.authentication must be a list of non-empty strings")
+            self._validate_json_object(transport, label)
+
+    def current_specification(self, *, transports=None, extensions=None, constraints=None):
+        identity = self.initialize_home()
+        capabilities = [
+            "resources", "notes", "artifacts", "knowledge", "changes",
+            "export", "restore", "public_private", "ownership", "agent_network",
+            "agent_profiles", "knowledge_offers", "knowledge_requests",
+            "collaboration_requests", "agent_responses", "knowledge_reviews",
+            "public_discovery",
+        ]
+        resource_types = [
+            "resource", "note", "artifact", "knowledge", "memory",
+            "agent_profile", "knowledge_offer", "knowledge_request",
+            "collaboration_request", "agent_response", "knowledge_review",
+        ]
+        latest = self.db.execute(
+            "SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1"
+        ).fetchone()
+
+        # Omitted optional fields preserve the last published value. Passing an
+        # explicit empty list/object removes that field's prior declarations.
+        if transports is None:
+            transports = json.loads(latest["transports"]) if latest else []
+        if extensions is None:
+            extensions = json.loads(latest["extensions"]) if latest else []
+        if constraints is None:
+            constraints = json.loads(latest["constraints"]) if latest else {}
+
+        if not isinstance(capabilities, list) or any(
+            not isinstance(item, str) or not item.strip() for item in capabilities
+        ):
+            raise ValueError("capabilities must be a list of non-empty strings")
+        if not isinstance(resource_types, list) or any(
+            not isinstance(item, str) or not item.strip() for item in resource_types
+        ):
+            raise ValueError("resource_types must be a list of non-empty strings")
+        if not isinstance(extensions, list) or any(
+            not isinstance(item, str) or not item.strip() for item in extensions
+        ):
+            raise ValueError("extensions must be a list of non-empty strings")
+        self._validate_specification_transports(transports)
+        self._validate_json_object(constraints, "specification constraints")
+
+        desired = (capabilities, resource_types, transports, extensions, constraints)
+        existing = None
+        if latest is not None:
+            existing = (
+                json.loads(latest["capabilities"]),
+                json.loads(latest["resource_types"]),
+                json.loads(latest["transports"]),
+                json.loads(latest["extensions"]),
+                json.loads(latest["constraints"]),
+            )
+
+        if latest is None or existing != desired:
+            supersedes = latest["specification_id"] if latest else None
+            self.db.execute(
+                "INSERT INTO node_specifications("
+                "specification_id,node_id,visibility,capabilities,resource_types,"
+                "transports,extensions,constraints"
+                ") VALUES(?,?,?,?,?,?,?,?)",
+                (
+                    "spec:" + str(uuid.uuid4()),
+                    identity["node_id"],
+                    "public",
+                    self._json(capabilities),
+                    self._json(resource_types),
+                    self._json(transports),
+                    self._json(extensions),
+                    self._json(constraints),
+                ),
+            )
             self.db.commit()
-            latest=self.db.execute("SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1").fetchone()
-        return Specification(latest["specification_id"],latest["version"],latest["node_id"],latest["visibility"],json.loads(latest["capabilities"]),json.loads(latest["resource_types"]),json.loads(latest["transports"]),json.loads(latest["extensions"]),json.loads(latest["constraints"]),latest["issued_at"])
+            latest = self.db.execute(
+                "SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1"
+            ).fetchone()
+        else:
+            previous = self.db.execute(
+                "SELECT specification_id FROM node_specifications "
+                "WHERE version < ? ORDER BY version DESC LIMIT 1",
+                (latest["version"],),
+            ).fetchone()
+            supersedes = previous["specification_id"] if previous else None
+
+        return Specification(
+            id=latest["specification_id"],
+            version=latest["version"],
+            node_id=latest["node_id"],
+            visibility=latest["visibility"],
+            capabilities=json.loads(latest["capabilities"]),
+            resource_types=json.loads(latest["resource_types"]),
+            transports=json.loads(latest["transports"]),
+            extensions=json.loads(latest["extensions"]),
+            constraints=json.loads(latest["constraints"]),
+            issued_at=latest["issued_at"],
+            contract=dict(_SPECIFICATION_CONTRACT),
+            supersedes=supersedes,
+        )
 
     def specification_dict(self):
-        s=self.current_specification()
-        return {"id":s.id,"version":s.version,"node":{"id":s.node_id},"visibility":s.visibility,"capabilities":s.capabilities,"resources":s.resource_types,"transports":s.transports,"extensions":s.extensions,"constraints":s.constraints,"issued_at":s.issued_at}
+        spec = self.current_specification()
+        return {
+            "id": spec.id,
+            "version": spec.version,
+            "contract": spec.contract,
+            "supersedes": spec.supersedes,
+            "node": {"id": spec.node_id},
+            "visibility": spec.visibility,
+            "capabilities": spec.capabilities,
+            "resources": spec.resource_types,
+            "transports": spec.transports,
+            "extensions": spec.extensions,
+            "constraints": spec.constraints,
+            "issued_at": spec.issued_at,
+        }
 
     def _verify_home_json_columns(self, issues):
         """Check stored JSON-text columns using strict parsing and read-path shapes."""
@@ -1530,7 +1664,7 @@ class AIDB:
                 [
                     ("capabilities", "string-list"),
                     ("resource_types", "string-list"),
-                    ("transports", "string-list"),
+                    ("transports", "transport-list"),
                     ("extensions", "string-list"),
                     ("constraints", "object"),
                 ],
@@ -1582,6 +1716,13 @@ class AIDB:
                         issues.append(
                             f"invalid JSON shape in {label} for {id_column}={row[id_column]}: expected list of strings"
                         )
+                    elif shape == "transport-list":
+                        try:
+                            self._validate_specification_transports(value)
+                        except (ValueError, TypeError, RecursionError):
+                            issues.append(
+                                f"invalid transport descriptors in {label} for {id_column}={row[id_column]}"
+                            )
 
     def _verify_home_snapshots(self, issues):
         """Check snapshot format stamps, content hashes, IDs, and embedded envelopes."""
@@ -2301,17 +2442,24 @@ class AIDB:
                             "invalid node_identity id in home import row for table: node_identity"
                         )
                 if table == "node_specifications":
-                    for field in ("capabilities", "resource_types", "transports", "extensions"):
+                    for field in ("capabilities", "resource_types", "extensions"):
                         if field in row:
                             parsed = self._parse_strict_json_column(
                                 row[field], f"node_specifications {field}"
                             )
                             if not isinstance(parsed, list) or any(
-                                not isinstance(item, str) for item in parsed
+                                not isinstance(item, str) or not item.strip()
+                                for item in parsed
                             ):
                                 raise ValueError(
-                                    f"node_specifications {field} must be a JSON list of strings"
+                                    f"node_specifications {field} must be a JSON list of non-empty strings"
                                 )
+                    if "transports" in row:
+                        self._validate_specification_transports(
+                            self._parse_strict_json_column(
+                                row["transports"], "node_specifications transports"
+                            )
+                        )
                     if "constraints" in row:
                         self._validate_json_object(
                             self._parse_strict_json_column(
