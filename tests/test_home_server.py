@@ -235,11 +235,11 @@ def test_http_server_caps_active_workers_and_returns_503_when_full():
     first = socket.create_connection(server.server_address, timeout=2)
     second = None
     try:
-        first.sendall(b"GET / HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n")
+        first.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
         assert entered.wait(timeout=2)
 
         second = socket.create_connection(server.server_address, timeout=2)
-        second.sendall(b"GET / HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n")
+        second.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
         response = bytearray()
         while True:
             chunk = second.recv(4096)
