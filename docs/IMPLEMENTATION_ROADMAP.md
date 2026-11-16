@@ -18,6 +18,9 @@ This is the actionable companion to [the project context](PROJECT_CONTEXT.md) an
 - [x] Add regression tests for the exposed CLI command contract.
   - Merged in [PR #106](https://github.com/usamaizm/AIDB/pull/106), commit `721e20bb159a861570320d9cdadf3147b7dc0d59`; CI run [43862813272](https://github.com/usamaizm/AIDB/actions/runs/43862813272) passed Python 3.10/3.11/3.12.
 
+- [x] Validate resource and note creation/update inputs with strict JSON checks and regression coverage.
+  - Merged in [PR #109](https://github.com/usamaizm/AIDB/pull/109), commit `ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5`; CI run [43864558782](https://github.com/usamaizm/AIDB/actions/runs/43864558782) passed Python 3.10/3.11/3.12.
+
 ## P0 — Demonstrate the AI development loop
 
 - [ ] Define a repeatable agent task format with explicit scope, acceptance criteria, allowed tools, and risk level.
@@ -61,12 +64,15 @@ Acceptance evidence: reproducible scripts or workflow runs, test results, and a 
 
 ## Pull-request reconciliation (snapshot 2026-11-16)
 
-There are 47 open PRs. The following are priority review clusters, not merge instructions:
+There were 42 open PRs at the latest snapshot (including this documentation PR and the new consolidated validation work before it merged). The following are priority review clusters, not merge instructions:
 
 - [#106 — CLI contract tests](https://github.com/usamaizm/AIDB/pull/106): merged; all three CI matrix jobs passed in run [43862813272](https://github.com/usamaizm/AIDB/actions/runs/43862813272).
+- [#71 — snapshot-contract versioning](https://github.com/usamaizm/AIDB/pull/71): merged; new snapshot rows use a dedicated snapshot-format stamp while accepting the legacy v1 stamp.
+- [#109 — resource/note validation](https://github.com/usamaizm/AIDB/pull/109): merged; strict input checks and creation/update regression suites passed all three Python versions. Duplicate PRs #100 and #102 are closed.
+- [#73 — artifact import validation](https://github.com/usamaizm/AIDB/pull/73): still open; review its remaining delta against the import path on current main.
 - [#88 — HTTP safe 500 responses](https://github.com/usamaizm/AIDB/pull/88): review requested server-side exception logging; keep client error bodies sanitized.
 - [#90](https://github.com/usamaizm/AIDB/pull/90), [#92](https://github.com/usamaizm/AIDB/pull/92), [#98](https://github.com/usamaizm/AIDB/pull/98), [#104](https://github.com/usamaizm/AIDB/pull/104): overlapping `verify_home()` integrity lanes; consolidate before merge.
-- #70–#105: related validation, schema/versioning, export/import, portability, and documentation-claim work. Review implementation PRs with their paired claim PRs and ensure claims match what actually lands.
+- #70–#105: related artifact/import validation, schema/versioning, export/import, portability, and documentation-claim work. PR #71 has merged; #100/#102 have been consolidated into #109 and closed. Review the remaining implementation PRs with their paired claim PRs and ensure claims match what actually lands.
 - [#14](https://github.com/usamaizm/AIDB/pull/14), [#15](https://github.com/usamaizm/AIDB/pull/15), [#49](https://github.com/usamaizm/AIDB/pull/49), [#61](https://github.com/usamaizm/AIDB/pull/61): overlapping discovery, collaboration, and networking proposals; compare contracts and security boundaries as one family.
 - #8, #13, #16, #24, #25, #45, #50, #55, and #64: inspect for unique changes versus current main and newer PRs; do not merge stale branches wholesale.
 
