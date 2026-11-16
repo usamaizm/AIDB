@@ -48,7 +48,7 @@ Copy this template for each update:
 - **Summary:** Rebased the HTTPS verification work onto current main. The tests exercise the TLS-wrapped server, explicit certificate trust and hostname validation, rejection by an untrusted client, and bearer-token authorization on a TLS-protected write. Security documentation now covers chain and hostname validation, SAN requirements, TLS versions, and the external certificate-lifecycle boundary.
 - **Evidence:** Changed `tests/test_https_transport.py` and `docs/server-security.md`; branch `fix/https-transport-verification-release-v2`. CI run [43881517192](https://github.com/usamaizm/AIDB/actions/runs/43881517192) passed compileall, Ruff, and pytest on Python 3.10, 3.11, and 3.12. The hostname-mismatch regression was added afterward and is pending CI. OpenSSL is required to generate the ephemeral test certificate; tests skip when unavailable.
 - **Risks / limitations:** This covers inbound TLS and bearer-token write gating only; it does not implement mutual TLS, certificate lifecycle management, peer identity, or distributed networking.
-- **Next action:** Obtain independent review and rerun the CI matrix after the hostname-mismatch regression.
+- **Next action:** Obtain independent review before merge.
 
 ### 2026-11-16T14:01:26Z — HTTP request-safety replacement prepared on current main (agent-chatgpt)
 
