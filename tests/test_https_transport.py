@@ -4,8 +4,8 @@ import ssl
 import subprocess
 from pathlib import Path
 from threading import Thread
-from urllib.error import URLError
-from urllib.request import urlopen
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 import pytest
 
