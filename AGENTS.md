@@ -1,6 +1,6 @@
 # Agent Maintenance Notes
 
-**Fast bootstrap: read [.aidb/session-context.yml](.aidb/session-context.yml), then [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).** The YAML is the compact machine-readable map; the Markdown explains the reasoning and project state. Next follow this file and check live CI/PR state. Do not rely on chat history, old model memory, or design docs as proof that a feature is implemented.
+**Progressive onboarding: start with [docs/agent-onboarding.md](docs/agent-onboarding.md), then read [.aidb/session-context.yml](.aidb/session-context.yml) and this file.** The YAML is the compact machine-readable map; the Markdown explains the reasoning and project state. Next follow this file and check live CI/PR state. Do not rely on chat history, old model memory, or design docs as proof that a feature is implemented.
 
 This file is a durable handoff for human and AI contributors working on AIDB.
 
