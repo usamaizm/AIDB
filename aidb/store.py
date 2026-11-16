@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import codecs
 import hashlib
 import json
 import math
@@ -149,6 +150,110 @@ _EXPORT_COLUMNS = {
     ),
 }
 
+# Columns import_home accepts per table. This is the import-side contract:
+# a superset of _EXPORT_COLUMNS (it also accepts home_snapshots, which are
+# importable but never exported). Shared by import_home and the streaming
+# importer so both enforce exactly the same row contract.
+_IMPORT_COLUMNS = {
+    "node_identity": {
+        "id",
+        "node_id",
+        "owner",
+        "visibility",
+        "metadata",
+    },
+    "node_specifications": {
+        "version",
+        "specification_id",
+        "node_id",
+        "visibility",
+        "capabilities",
+        "resource_types",
+        "transports",
+        "extensions",
+        "constraints",
+        "issued_at",
+    },
+    "home_resources": {
+        "id",
+        "resource_type",
+        "content",
+        "owner",
+        "visibility",
+        "metadata",
+        "revision",
+        "created_at",
+        "updated_at",
+    },
+    "notes": {
+        "id",
+        "resource_id",
+        "title",
+        "content",
+        "owner",
+        "visibility",
+        "kind",
+        "metadata",
+        "revision",
+        "created_at",
+        "updated_at",
+    },
+    "resource_relations": {
+        "id",
+        "source_resource_id",
+        "target_resource_id",
+        "relation",
+        "metadata",
+        "created_at",
+    },
+    "home_changes": {
+        "id",
+        "change_id",
+        "resource_id",
+        "operation",
+        "actor",
+        "previous_revision",
+        "new_revision",
+        "payload",
+        "created_at",
+    },
+    "home_snapshots": {
+        "id",
+        "snapshot_id",
+        "home_format",
+        "content",
+        "content_hash",
+        "created_at",
+    },
+    "artifacts": {
+        "id",
+        "name",
+        "media_type",
+        "filename",
+        "size_bytes",
+        "checksum",
+        "checksum_algorithm",
+        "provenance",
+        "status",
+        "encoding",
+        "parent_artifact_id",
+        "transformation_history",
+        "metadata",
+        "created_at",
+    },
+    "artifact_blobs": {"artifact_id", "content", "created_at", "content_encoding"},
+    "agents": {
+        "id",
+        "name",
+        "description",
+        "model",
+        "role",
+        "permissions",
+        "capabilities",
+        "metadata",
+    },
+}
+
 
 _HEX_DIGITS = frozenset("0123456789abcdef")
 
@@ -251,6 +356,203 @@ def _validate_note_content(content: Any) -> None:
         return
     if not isinstance(content, str):
         raise ValueError("note content must be a string")
+
+
+class _HomeJsonScanner:
+    """Single-pass scanner over an iterator of aidb-home-v1 JSON chunks.
+
+    Feeds AIDB.import_home_stream: the document is consumed token by
+    token and each table row is handed to the caller as soon as its
+    closing brace arrives, so the parsed document is never fully
+    materialized. The internal buffer holds only the unconsumed tail of
+    the stream plus the raw text of the single value currently being
+    scanned; consumed prefixes are dropped at token boundaries.
+
+    Chunks may be str or UTF-8 bytes; byte chunks pass through an
+    incremental decoder so a multi-byte character split across a chunk
+    boundary is not corrupted.
+    """
+
+    def __init__(self, chunks, *, object_pairs_hook, parse_constant):
+        self._chunks = iter(chunks)
+        self._decoder = codecs.getincrementaldecoder("utf-8")()
+        self._buffer = ""
+        self._pos = 0
+        self._exhausted = False
+        self._object_pairs_hook = object_pairs_hook
+        self._parse_constant = parse_constant
+
+    # -- buffer management -------------------------------------------------
+    def _pull(self) -> bool:
+        """Append the next chunk to the buffer; False when the stream ended."""
+        if self._exhausted:
+            return False
+        try:
+            chunk = next(self._chunks)
+        except StopIteration:
+            self._exhausted = True
+            try:
+                tail = self._decoder.decode(b"", final=True)
+            except UnicodeDecodeError as exc:
+                raise ValueError("invalid home JSON") from exc
+            if tail:
+                self._buffer += tail
+            return False
+        if isinstance(chunk, bytes):
+            try:
+                chunk = self._decoder.decode(chunk)
+            except UnicodeDecodeError as exc:
+                raise ValueError("invalid home JSON") from exc
+        elif not isinstance(chunk, str):
+            raise ValueError("home JSON stream chunks must be text or bytes")
+        self._buffer += chunk
+        return True
+
+    def _char(self, index: int) -> str:
+        """Buffer character at an absolute index, pulling chunks as needed."""
+        while index >= len(self._buffer):
+            if not self._pull():
+                raise ValueError("invalid home JSON")
+        return self._buffer[index]
+
+    # -- token primitives ----------------------------------------------------
+    def skip_whitespace(self) -> None:
+        # Token boundary: the consumed prefix can be dropped here. No
+        # value scan is in progress at a boundary, so the absolute
+        # indices a scan holds stay valid.
+        if self._pos > 65536:
+            self._buffer = self._buffer[self._pos :]
+            self._pos = 0
+        while True:
+            index = self._pos
+            while index < len(self._buffer) and self._buffer[index] in " \t\r\n":
+                index += 1
+            self._pos = index
+            if index < len(self._buffer) or not self._pull():
+                return
+
+    def peek(self) -> str:
+        """Next significant character, or "" at end of stream."""
+        self.skip_whitespace()
+        if self._pos < len(self._buffer):
+            return self._buffer[self._pos]
+        return ""
+
+    def at_end(self) -> bool:
+        return self.peek() == ""
+
+    def expect(self, char: str, error: str = "invalid home JSON") -> None:
+        if self.peek() != char:
+            raise ValueError(error)
+        self._pos += 1
+
+    def read_string(self) -> str:
+        """Consume a JSON string token and return its decoded value."""
+        value = self._parse(self._scan_value(), strict=False)
+        if not isinstance(value, str):
+            raise ValueError("invalid home JSON")
+        return value
+
+    def read_strict_value(self):
+        """Consume one JSON value, decoded with import-strict hooks.
+
+        Duplicate object keys and non-JSON constants raise exactly as
+        they do for import_home_json's whole-document parse.
+        """
+        return self._parse(self._scan_value(), strict=True)
+
+    def _parse(self, text: str, *, strict: bool):
+        try:
+            if strict:
+                return json.loads(
+                    text,
+                    object_pairs_hook=self._object_pairs_hook,
+                    parse_constant=self._parse_constant,
+                )
+            return json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError("invalid home JSON") from exc
+
+    def _scan_value(self) -> str:
+        """Consume one complete JSON value and return its raw text."""
+        self.skip_whitespace()
+        start = self._pos
+        char = self._char(start)
+        if char == '"':
+            end = self._scan_string(start)
+        elif char in "{[":
+            end = self._scan_composite(start)
+        else:
+            end = self._scan_literal(start)
+        text = self._buffer[start:end]
+        self._pos = end
+        return text
+
+    def _scan_string(self, start: int) -> int:
+        index = start + 1
+        while True:
+            char = self._char(index)
+            if char == "\\":
+                index += 2
+            elif char == '"':
+                return index + 1
+            else:
+                index += 1
+
+    def _scan_composite(self, start: int) -> int:
+        depth = 0
+        index = start
+        while True:
+            char = self._char(index)
+            if char == '"':
+                index = self._scan_string(index)
+            elif char in "{[":
+                depth += 1
+                index += 1
+            elif char in "}]":
+                depth -= 1
+                index += 1
+                if depth == 0:
+                    return index
+            else:
+                index += 1
+
+    def _scan_literal(self, start: int) -> int:
+        index = start
+        while True:
+            if index >= len(self._buffer) and not self._pull():
+                return index
+            if self._buffer[index] in ",}] \t\r\n":
+                return index
+            index += 1
+
+
+def _stream_text_writer(fileobj):
+    """Adapt a text- or binary-mode file object to a str write callable."""
+
+    binary = False
+
+    def write(text: str) -> None:
+        nonlocal binary
+        if binary:
+            fileobj.write(text.encode("utf-8"))
+            return
+        try:
+            fileobj.write(text)
+        except TypeError:
+            binary = True
+            fileobj.write(text.encode("utf-8"))
+
+    return write
+
+
+def _encode_blob_export_row(row):
+    """Project a stored artifact_blobs row to its export shape."""
+    return {
+        **row,
+        "content": base64.b64encode(row["content"]).decode("ascii"),
+        "content_encoding": "base64",
+    }
 
 
 class AIDB:
@@ -1808,6 +2110,43 @@ class AIDB:
             raise ValueError(f"artifact {artifact_id} payload checksum verification failed")
         return content
 
+    def iter_artifact_content(self, artifact_id: int, chunk_size: int = 65536) -> Iterator[bytes]:
+        """Yield an artifact's stored payload in bounded slices.
+
+        Each slice is fetched with SQL substr, so the whole blob is
+        never loaded into memory; the slices reassemble into exactly
+        the stored bytes. Unlike get_artifact_bytes, no size/checksum
+        verification is performed — verifying would require a full
+        pass over the content. Callers that need integrity should
+        hash the chunks incrementally as they arrive, or use
+        get_artifact_bytes when the payload is small.
+
+        Raises ValueError for an unknown artifact, the store's usual
+        error style. A metadata-only artifact (no stored payload)
+        yields nothing.
+        """
+        if chunk_size < 1:
+            raise ValueError("chunk_size must be positive")
+        if self.get_artifact(artifact_id) is None:
+            raise ValueError(f"artifact {artifact_id} does not exist")
+        row = self.db.execute(
+            "SELECT length(content) AS size FROM artifact_blobs WHERE artifact_id = ?",
+            (artifact_id,),
+        ).fetchone()
+        if row is None:
+            return
+        total = row["size"]
+        offset = 1  # SQLite substr offsets are 1-based.
+        while offset <= total:
+            chunk = self.db.execute(
+                "SELECT substr(content, ?, ?) AS piece FROM artifact_blobs WHERE artifact_id = ?",
+                (offset, chunk_size, artifact_id),
+            ).fetchone()["piece"]
+            if not chunk:
+                break
+            yield bytes(chunk)
+            offset += len(chunk)
+
     def derive_artifact(
         self,
         parent_artifact_id: int,
@@ -2861,6 +3200,124 @@ class AIDB:
             payload["verification"] = {"ok": None, "issues": [], "scope": "filtered_public_export"}
         return payload
 
+    def _export_table_batches(self, table, include_private, batch_size):
+        """Yield one table's export rows in bounded batches.
+
+        Applies exactly the projection and privacy filtering
+        export_home applies to the table: the full column projection
+        for a private export, the public-only projection (with relation
+        endpoints and metadata handled as in the filtered export) for a
+        public one. Filtered-out tables yield no batches at all.
+        """
+        columns = ", ".join(_EXPORT_COLUMNS[table])
+        if include_private:
+            transform = None
+            if table == "artifact_blobs":
+                transform = _encode_blob_export_row
+            yield from self._iter_query_batches(
+                f"SELECT {columns} FROM {table}", batch_size, transform
+            )
+        elif table in (
+            "node_identity",
+            "node_specifications",
+            "home_resources",
+            "notes",
+        ):
+            yield from self._iter_query_batches(
+                f"SELECT {columns} FROM {table} WHERE visibility='public'",
+                batch_size,
+            )
+        elif table == "resource_relations":
+            relation_columns = ", ".join(f"rel.{column}" for column in _EXPORT_COLUMNS[table])
+            yield from self._iter_query_batches(
+                f"""
+                SELECT {relation_columns}
+                FROM resource_relations rel
+                JOIN home_resources src ON src.id=rel.source_resource_id
+                JOIN home_resources dst ON dst.id=rel.target_resource_id
+                WHERE src.visibility='public' AND dst.visibility='public'
+                """,
+                batch_size,
+                lambda row: {**row, "metadata": "{}"},
+            )
+
+    def _iter_query_batches(self, sql, batch_size, transform=None):
+        cursor = self.db.execute(sql)
+        while True:
+            rows = cursor.fetchmany(batch_size)
+            if not rows:
+                return
+            batch = [dict(row) for row in rows]
+            if transform is not None:
+                batch = [transform(row) for row in batch]
+            yield batch
+
+    def iter_export_home(self, include_private=True, batch_size=100):
+        """Yield (table, rows) batches covering exactly export_home's tables.
+
+        Streaming counterpart to export_home: tables arrive in the
+        same order, every table is yielded at least once (with an
+        empty batch when it has no rows), and each batch holds at most
+        batch_size rows, so the concatenation of the batches for a
+        table equals export_home's row list for that table without the
+        whole home ever being materialized.
+        """
+        if batch_size < 1:
+            raise ValueError("batch_size must be positive")
+        for table in portable_tables():
+            emitted = False
+            for batch in self._export_table_batches(table, include_private, batch_size):
+                emitted = True
+                yield table, batch
+            if not emitted:
+                yield table, []
+
+    def export_home_json_to(self, fileobj, include_private=True, batch_size=100):
+        """Write the aidb-home-v1 JSON envelope to a file-like object.
+
+        The envelope is serialized incrementally — header, then one
+        row at a time from iter_export_home, then the verification
+        block — so neither the payload dict nor the full JSON string
+        is ever built in memory. The output is byte-equivalent in
+        content to json.dumps(export_home(...)) and is accepted by
+        import_home / import_home_json. fileobj may be opened in text
+        or binary mode. Returns the verification mapping written into
+        the envelope, exactly as export_home computes it.
+        """
+        write = _stream_text_writer(fileobj)
+        write('{"format": "aidb-home-v1", "tables": {')
+        current_table = None
+        first_row = True
+        for table, batch in self.iter_export_home(
+            include_private=include_private, batch_size=batch_size
+        ):
+            if table != current_table:
+                if current_table is not None:
+                    write("], ")
+                write(json.dumps(table))
+                write(": [")
+                current_table = table
+                first_row = True
+            for row in batch:
+                if not first_row:
+                    write(", ")
+                write(json.dumps(row, ensure_ascii=False))
+                first_row = False
+        if current_table is not None:
+            write("]}")
+        write(', "verification": ')
+        if include_private:
+            verification = self.verify_home()
+        else:
+            verification = {
+                "ok": None,
+                "issues": [],
+                "scope": "filtered_public_export",
+            }
+        write(json.dumps(verification, ensure_ascii=False))
+        write("}")
+        return verification
+
     @staticmethod
     def _unique_json_object(pairs):
         result = {}
@@ -3016,6 +3473,215 @@ class AIDB:
             parsed = AIDB._parse_strict_json(metadata, "agent metadata")
             AIDB._validate_json_object(parsed, "agent metadata")
 
+    def _validate_import_row(self, table, row):
+        """Validate one home-import row exactly as import_home requires.
+
+        Returns the row to store: artifact_blobs rows are normalized to
+        raw bytes. Shared by import_home (which validates the whole
+        payload before writing) and import_home_stream (which validates
+        each row as it arrives, inside its import savepoint).
+        """
+        allowed_columns = _IMPORT_COLUMNS[table]
+        if not isinstance(row, dict) or not row:
+            raise ValueError(f"invalid home import row for table: {table}")
+        columns = list(row)
+        if any(column not in allowed_columns for column in columns):
+            raise ValueError(f"invalid column in home import row for table: {table}")
+        required_columns = {
+            "node_identity": ("node_id",),
+            "node_specifications": ("specification_id", "node_id"),
+            "home_resources": ("id", "resource_type"),
+            "notes": ("id", "resource_id", "title", "content"),
+            "resource_relations": ("source_resource_id", "target_resource_id", "relation"),
+            "home_changes": ("operation", "payload"),
+            "artifacts": ("name", "media_type", "checksum"),
+            "artifact_blobs": ("artifact_id", "content"),
+        }.get(table, ())
+        for column in required_columns:
+            if column not in row or row[column] is None:
+                raise ValueError(f"missing {column} in home import row for table: {table}")
+        if any(
+            not isinstance(value, (str, int, float, bytes, bool, type(None)))
+            for value in row.values()
+        ):
+            raise ValueError(f"invalid value in home import row for table: {table}")
+        if any(isinstance(value, float) and not math.isfinite(value) for value in row.values()):
+            raise ValueError(f"non-finite number in home import row for table: {table}")
+
+        string_fields = {
+            "node_identity": ("node_id",),
+            "node_specifications": ("specification_id", "node_id"),
+            "home_resources": ("id", "resource_type", "content", "metadata"),
+            "notes": ("id", "resource_id", "title", "content", "kind", "metadata"),
+            "resource_relations": (
+                "source_resource_id",
+                "target_resource_id",
+                "relation",
+                "metadata",
+            ),
+            "home_changes": ("change_id", "operation", "actor", "payload"),
+            "artifacts": (
+                "name",
+                "media_type",
+                "checksum",
+                "provenance",
+                "transformation_history",
+                "metadata",
+            ),
+            "home_snapshots": ("snapshot_id", "home_format", "content", "content_hash"),
+            "agents": (
+                "description",
+                "model",
+                "role",
+                "permissions",
+                "capabilities",
+                "metadata",
+            ),
+        }.get(table, ())
+        for field in string_fields:
+            if field in row and row[field] is not None and not isinstance(row[field], str):
+                raise ValueError(f"invalid {field} in home import row for table: {table}")
+        nonempty_fields = {
+            "node_identity": ("node_id",),
+            "node_specifications": ("specification_id", "node_id"),
+            "home_resources": ("id", "resource_type"),
+            "notes": ("id", "resource_id", "kind"),
+            "resource_relations": ("source_resource_id", "target_resource_id", "relation"),
+            "home_changes": ("change_id", "operation"),
+            "artifacts": ("name", "media_type", "checksum"),
+            "home_snapshots": ("snapshot_id", "home_format", "content", "content_hash"),
+            "agents": ("name", "role"),
+        }.get(table, ())
+        for field in nonempty_fields:
+            if field in row and (not isinstance(row[field], str) or not row[field].strip()):
+                raise ValueError(f"invalid {field} in home import row for table: {table}")
+        integer_fields = {
+            "node_identity": ("id",),
+            "node_specifications": ("version",),
+            "home_resources": ("revision",),
+            "notes": ("revision",),
+            "resource_relations": ("id",),
+            "home_changes": ("id", "previous_revision", "new_revision"),
+            "home_snapshots": ("id",),
+            "artifacts": ("id", "size_bytes"),
+            "artifact_blobs": ("artifact_id",),
+            "agents": ("id",),
+        }.get(table, ())
+        for field in integer_fields:
+            if (
+                field in row
+                and row[field] is not None
+                and (isinstance(row[field], bool) or not isinstance(row[field], int))
+            ):
+                raise ValueError(f"invalid integer {field} in home import row for table: {table}")
+        if table == "home_resources" and "id" in row and not isinstance(row["id"], str):
+            raise ValueError("resource IDs must be non-empty strings")
+        if table == "notes" and "id" in row and not isinstance(row["id"], str):
+            raise ValueError("note IDs must be non-empty strings")
+        if (
+            table == "home_changes"
+            and row.get("resource_id") is not None
+            and (not isinstance(row["resource_id"], str) or not row["resource_id"].strip())
+        ):
+            raise ValueError("change resource_id must be a non-empty string or null")
+        if table in {"home_resources", "notes", "node_identity", "node_specifications"}:
+            visibility = row.get("visibility")
+            if visibility is not None and visibility not in {"public", "private"}:
+                raise ValueError(f"invalid visibility in home import row for table: {table}")
+        if table == "home_snapshots":
+            content = row.get("content")
+            digest = row.get("content_hash")
+            if row.get("home_format") not in _ACCEPTED_SNAPSHOT_FORMATS:
+                raise ValueError("unsupported snapshot format: " + str(row.get("home_format")))
+            if (
+                not isinstance(content, str)
+                or not isinstance(digest, str)
+                or not re.fullmatch(r"[0-9a-f]{64}", digest)
+                or hashlib.sha256(content.encode("utf-8")).hexdigest() != digest
+                or row.get("snapshot_id") != "snap:" + digest
+            ):
+                raise ValueError("snapshot integrity check failed during import")
+        if table == "agents":
+            self._validate_agent_import_row(row)
+        if table == "artifact_blobs":
+            row = self._decode_artifact_blob_row(row)
+        if table == "artifacts":
+            self._validate_artifact_import_row(row)
+        if table == "home_resources":
+            if "content" in row:
+                self._parse_strict_json_column(row["content"], "home_resources content")
+            if "metadata" in row:
+                self._validate_json_object(
+                    self._parse_strict_json_column(row["metadata"], "home_resources metadata"),
+                    "home_resources metadata",
+                )
+            if "revision" in row and (
+                isinstance(row["revision"], bool)
+                or not isinstance(row["revision"], int)
+                or row["revision"] < 1
+            ):
+                raise ValueError("invalid revision in home import row for table: home_resources")
+        if table == "notes":
+            if "metadata" in row:
+                self._validate_json_object(
+                    self._parse_strict_json_column(row["metadata"], "notes metadata"),
+                    "notes metadata",
+                )
+            if "revision" in row and (
+                isinstance(row["revision"], bool)
+                or not isinstance(row["revision"], int)
+                or row["revision"] < 1
+            ):
+                raise ValueError("invalid revision in home import row for table: notes")
+            if "id" in row and "resource_id" in row and row["id"] != row["resource_id"]:
+                raise ValueError(
+                    "note id must equal its resource_id in home import row for table: notes"
+                )
+        if table == "resource_relations":
+            if "metadata" in row:
+                self._validate_json_object(
+                    self._parse_strict_json_column(row["metadata"], "resource_relations metadata"),
+                    "resource_relations metadata",
+                )
+            if (
+                "source_resource_id" in row
+                and "target_resource_id" in row
+                and row["source_resource_id"] == row["target_resource_id"]
+            ):
+                raise ValueError(
+                    "a resource cannot relate to itself in home import row for table: resource_relations"
+                )
+        if table == "node_identity":
+            if "metadata" in row:
+                self._validate_json_object(
+                    self._parse_strict_json_column(row["metadata"], "node_identity metadata"),
+                    "node_identity metadata",
+                )
+            if row.get("id") is not None and row["id"] != 1:
+                raise ValueError(
+                    "invalid node_identity id in home import row for table: node_identity"
+                )
+        if table == "node_specifications":
+            for field in ("capabilities", "resource_types", "transports", "extensions"):
+                if field in row:
+                    parsed = self._parse_strict_json_column(
+                        row[field], f"node_specifications {field}"
+                    )
+                    if not isinstance(parsed, list) or any(
+                        not isinstance(item, str) for item in parsed
+                    ):
+                        raise ValueError(
+                            f"node_specifications {field} must be a JSON list of strings"
+                        )
+            if "constraints" in row:
+                self._validate_json_object(
+                    self._parse_strict_json_column(
+                        row["constraints"], "node_specifications constraints"
+                    ),
+                    "node_specifications constraints",
+                )
+        return row
+
     def import_home_json(self, content: str | bytes):
         """Import a JSON wire payload while rejecting duplicate keys and NaN/Infinity."""
         if not isinstance(content, (str, bytes)):
@@ -3029,6 +3695,49 @@ class AIDB:
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise ValueError("invalid home JSON") from exc
         return self.import_home(payload)
+
+    def _insert_import_row(self, table, row):
+        """Insert one validated import row, ignoring an identical existing row.
+
+        A row that collides with an existing row on the table's primary
+        key but differs in content is a hard error, exactly as in
+        import_home's write phase. Returns the row's primary-key value
+        when the table has a single-column primary key (the new rowid
+        for an insert, the existing key for an ignored duplicate),
+        otherwise None. Callers must wrap calls in a savepoint or
+        transaction; this helper never commits.
+        """
+        columns = list(row)
+        placeholders = ",".join("?" for _ in columns)
+        cursor = self.db.execute(
+            "INSERT OR IGNORE INTO "
+            + table
+            + " ("
+            + ",".join(columns)
+            + ") VALUES ("
+            + placeholders
+            + ")",
+            [row[column] for column in columns],
+        )
+        if cursor.rowcount != 0:
+            return cursor.lastrowid
+        primary_keys = [
+            info["name"]
+            for info in self.db.execute("PRAGMA table_info(" + table + ")").fetchall()
+            if info["pk"]
+        ]
+        existing = None
+        if primary_keys and all(key in row for key in primary_keys):
+            where = " AND ".join(key + " = ?" for key in primary_keys)
+            existing = self.db.execute(
+                "SELECT * FROM " + table + " WHERE " + where,
+                [row[key] for key in primary_keys],
+            ).fetchone()
+        if existing is None or any(existing[key] != value for key, value in row.items()):
+            raise ValueError("conflicting existing row while importing table: " + table)
+        if len(primary_keys) == 1:
+            return existing[primary_keys[0]]
+        return None
 
     def import_home(self, payload):
         if not isinstance(payload, dict) or payload.get("format") != "aidb-home-v1":
@@ -3054,332 +3763,17 @@ class AIDB:
         if not isinstance(tables, dict):
             raise ValueError("invalid home tables")
 
-        columns_by_table = {
-            "node_identity": {
-                "id",
-                "node_id",
-                "owner",
-                "visibility",
-                "metadata",
-            },
-            "node_specifications": {
-                "version",
-                "specification_id",
-                "node_id",
-                "visibility",
-                "capabilities",
-                "resource_types",
-                "transports",
-                "extensions",
-                "constraints",
-                "issued_at",
-            },
-            "home_resources": {
-                "id",
-                "resource_type",
-                "content",
-                "owner",
-                "visibility",
-                "metadata",
-                "revision",
-                "created_at",
-                "updated_at",
-            },
-            "notes": {
-                "id",
-                "resource_id",
-                "title",
-                "content",
-                "owner",
-                "visibility",
-                "kind",
-                "metadata",
-                "revision",
-                "created_at",
-                "updated_at",
-            },
-            "resource_relations": {
-                "id",
-                "source_resource_id",
-                "target_resource_id",
-                "relation",
-                "metadata",
-                "created_at",
-            },
-            "home_changes": {
-                "id",
-                "change_id",
-                "resource_id",
-                "operation",
-                "actor",
-                "previous_revision",
-                "new_revision",
-                "payload",
-                "created_at",
-            },
-            "home_snapshots": {
-                "id",
-                "snapshot_id",
-                "home_format",
-                "content",
-                "content_hash",
-                "created_at",
-            },
-            "artifacts": {
-                "id",
-                "name",
-                "media_type",
-                "filename",
-                "size_bytes",
-                "checksum",
-                "checksum_algorithm",
-                "provenance",
-                "status",
-                "encoding",
-                "parent_artifact_id",
-                "transformation_history",
-                "metadata",
-                "created_at",
-            },
-            "artifact_blobs": {"artifact_id", "content", "created_at", "content_encoding"},
-            "agents": {
-                "id",
-                "name",
-                "description",
-                "model",
-                "role",
-                "permissions",
-                "capabilities",
-                "metadata",
-            },
-        }
-        unknown_tables = set(tables) - set(columns_by_table)
+        unknown_tables = set(tables) - set(_IMPORT_COLUMNS)
         if unknown_tables:
             raise ValueError("unknown home import table")
 
         # Validate the entire payload before touching durable state.
         validated_rows = {}
-        for table, allowed_columns in columns_by_table.items():
+        for table in _IMPORT_COLUMNS:
             rows = tables.get(table, [])
             if not isinstance(rows, list):
                 raise ValueError(f"invalid rows for table: {table}")
-            validated_rows[table] = []
-            for row in rows:
-                if not isinstance(row, dict) or not row:
-                    raise ValueError(f"invalid home import row for table: {table}")
-                columns = list(row)
-                if any(column not in allowed_columns for column in columns):
-                    raise ValueError(f"invalid column in home import row for table: {table}")
-                required_columns = {
-                    "node_identity": ("node_id",),
-                    "node_specifications": ("specification_id", "node_id"),
-                    "home_resources": ("id", "resource_type"),
-                    "notes": ("id", "resource_id", "title", "content"),
-                    "resource_relations": ("source_resource_id", "target_resource_id", "relation"),
-                    "home_changes": ("operation", "payload"),
-                    "artifacts": ("name", "media_type", "checksum"),
-                    "artifact_blobs": ("artifact_id", "content"),
-                }.get(table, ())
-                for column in required_columns:
-                    if column not in row or row[column] is None:
-                        raise ValueError(f"missing {column} in home import row for table: {table}")
-                if any(
-                    not isinstance(value, (str, int, float, bytes, bool, type(None)))
-                    for value in row.values()
-                ):
-                    raise ValueError(f"invalid value in home import row for table: {table}")
-                if any(
-                    isinstance(value, float) and not math.isfinite(value) for value in row.values()
-                ):
-                    raise ValueError(f"non-finite number in home import row for table: {table}")
-
-                string_fields = {
-                    "node_identity": ("node_id",),
-                    "node_specifications": ("specification_id", "node_id"),
-                    "home_resources": ("id", "resource_type", "content", "metadata"),
-                    "notes": ("id", "resource_id", "title", "content", "kind", "metadata"),
-                    "resource_relations": (
-                        "source_resource_id",
-                        "target_resource_id",
-                        "relation",
-                        "metadata",
-                    ),
-                    "home_changes": ("change_id", "operation", "actor", "payload"),
-                    "artifacts": (
-                        "name",
-                        "media_type",
-                        "checksum",
-                        "provenance",
-                        "transformation_history",
-                        "metadata",
-                    ),
-                    "home_snapshots": ("snapshot_id", "home_format", "content", "content_hash"),
-                    "agents": (
-                        "description",
-                        "model",
-                        "role",
-                        "permissions",
-                        "capabilities",
-                        "metadata",
-                    ),
-                }.get(table, ())
-                for field in string_fields:
-                    if field in row and row[field] is not None and not isinstance(row[field], str):
-                        raise ValueError(f"invalid {field} in home import row for table: {table}")
-                nonempty_fields = {
-                    "node_identity": ("node_id",),
-                    "node_specifications": ("specification_id", "node_id"),
-                    "home_resources": ("id", "resource_type"),
-                    "notes": ("id", "resource_id", "kind"),
-                    "resource_relations": ("source_resource_id", "target_resource_id", "relation"),
-                    "home_changes": ("change_id", "operation"),
-                    "artifacts": ("name", "media_type", "checksum"),
-                    "home_snapshots": ("snapshot_id", "home_format", "content", "content_hash"),
-                    "agents": ("name", "role"),
-                }.get(table, ())
-                for field in nonempty_fields:
-                    if field in row and (not isinstance(row[field], str) or not row[field].strip()):
-                        raise ValueError(f"invalid {field} in home import row for table: {table}")
-                integer_fields = {
-                    "node_identity": ("id",),
-                    "node_specifications": ("version",),
-                    "home_resources": ("revision",),
-                    "notes": ("revision",),
-                    "resource_relations": ("id",),
-                    "home_changes": ("id", "previous_revision", "new_revision"),
-                    "home_snapshots": ("id",),
-                    "artifacts": ("id", "size_bytes"),
-                    "artifact_blobs": ("artifact_id",),
-                    "agents": ("id",),
-                }.get(table, ())
-                for field in integer_fields:
-                    if (
-                        field in row
-                        and row[field] is not None
-                        and (isinstance(row[field], bool) or not isinstance(row[field], int))
-                    ):
-                        raise ValueError(
-                            f"invalid integer {field} in home import row for table: {table}"
-                        )
-                if table == "home_resources" and "id" in row and not isinstance(row["id"], str):
-                    raise ValueError("resource IDs must be non-empty strings")
-                if table == "notes" and "id" in row and not isinstance(row["id"], str):
-                    raise ValueError("note IDs must be non-empty strings")
-                if (
-                    table == "home_changes"
-                    and row.get("resource_id") is not None
-                    and (not isinstance(row["resource_id"], str) or not row["resource_id"].strip())
-                ):
-                    raise ValueError("change resource_id must be a non-empty string or null")
-                if table in {"home_resources", "notes", "node_identity", "node_specifications"}:
-                    visibility = row.get("visibility")
-                    if visibility is not None and visibility not in {"public", "private"}:
-                        raise ValueError(
-                            f"invalid visibility in home import row for table: {table}"
-                        )
-                if table == "home_snapshots":
-                    content = row.get("content")
-                    digest = row.get("content_hash")
-                    if row.get("home_format") not in _ACCEPTED_SNAPSHOT_FORMATS:
-                        raise ValueError(
-                            "unsupported snapshot format: " + str(row.get("home_format"))
-                        )
-                    if (
-                        not isinstance(content, str)
-                        or not isinstance(digest, str)
-                        or not re.fullmatch(r"[0-9a-f]{64}", digest)
-                        or hashlib.sha256(content.encode("utf-8")).hexdigest() != digest
-                        or row.get("snapshot_id") != "snap:" + digest
-                    ):
-                        raise ValueError("snapshot integrity check failed during import")
-                if table == "agents":
-                    self._validate_agent_import_row(row)
-                if table == "artifact_blobs":
-                    row = self._decode_artifact_blob_row(row)
-                if table == "artifacts":
-                    self._validate_artifact_import_row(row)
-                if table == "home_resources":
-                    if "content" in row:
-                        self._parse_strict_json_column(row["content"], "home_resources content")
-                    if "metadata" in row:
-                        self._validate_json_object(
-                            self._parse_strict_json_column(
-                                row["metadata"], "home_resources metadata"
-                            ),
-                            "home_resources metadata",
-                        )
-                    if "revision" in row and (
-                        isinstance(row["revision"], bool)
-                        or not isinstance(row["revision"], int)
-                        or row["revision"] < 1
-                    ):
-                        raise ValueError(
-                            "invalid revision in home import row for table: home_resources"
-                        )
-                if table == "notes":
-                    if "metadata" in row:
-                        self._validate_json_object(
-                            self._parse_strict_json_column(row["metadata"], "notes metadata"),
-                            "notes metadata",
-                        )
-                    if "revision" in row and (
-                        isinstance(row["revision"], bool)
-                        or not isinstance(row["revision"], int)
-                        or row["revision"] < 1
-                    ):
-                        raise ValueError("invalid revision in home import row for table: notes")
-                    if "id" in row and "resource_id" in row and row["id"] != row["resource_id"]:
-                        raise ValueError(
-                            "note id must equal its resource_id in home import row for table: notes"
-                        )
-                if table == "resource_relations":
-                    if "metadata" in row:
-                        self._validate_json_object(
-                            self._parse_strict_json_column(
-                                row["metadata"], "resource_relations metadata"
-                            ),
-                            "resource_relations metadata",
-                        )
-                    if (
-                        "source_resource_id" in row
-                        and "target_resource_id" in row
-                        and row["source_resource_id"] == row["target_resource_id"]
-                    ):
-                        raise ValueError(
-                            "a resource cannot relate to itself in home import row for table: resource_relations"
-                        )
-                if table == "node_identity":
-                    if "metadata" in row:
-                        self._validate_json_object(
-                            self._parse_strict_json_column(
-                                row["metadata"], "node_identity metadata"
-                            ),
-                            "node_identity metadata",
-                        )
-                    if row.get("id") is not None and row["id"] != 1:
-                        raise ValueError(
-                            "invalid node_identity id in home import row for table: node_identity"
-                        )
-                if table == "node_specifications":
-                    for field in ("capabilities", "resource_types", "transports", "extensions"):
-                        if field in row:
-                            parsed = self._parse_strict_json_column(
-                                row[field], f"node_specifications {field}"
-                            )
-                            if not isinstance(parsed, list) or any(
-                                not isinstance(item, str) for item in parsed
-                            ):
-                                raise ValueError(
-                                    f"node_specifications {field} must be a JSON list of strings"
-                                )
-                    if "constraints" in row:
-                        self._validate_json_object(
-                            self._parse_strict_json_column(
-                                row["constraints"], "node_specifications constraints"
-                            ),
-                            "node_specifications constraints",
-                        )
-                validated_rows[table].append(row)
+            validated_rows[table] = [self._validate_import_row(table, row) for row in rows]
 
         # Change rows have no schema-level FK, so validate their targets
         # against both incoming resources and resources already in this home.
@@ -3483,39 +3877,7 @@ class AIDB:
         try:
             for table, rows in validated_rows.items():
                 for row in rows:
-                    columns = list(row)
-                    placeholders = ",".join("?" for _ in columns)
-                    cursor = self.db.execute(
-                        "INSERT OR IGNORE INTO "
-                        + table
-                        + " ("
-                        + ",".join(columns)
-                        + ") VALUES ("
-                        + placeholders
-                        + ")",
-                        [row[column] for column in columns],
-                    )
-                    if cursor.rowcount == 0:
-                        primary_keys = [
-                            info["name"]
-                            for info in self.db.execute(
-                                "PRAGMA table_info(" + table + ")"
-                            ).fetchall()
-                            if info["pk"]
-                        ]
-                        existing = None
-                        if primary_keys and all(key in row for key in primary_keys):
-                            where = " AND ".join(key + " = ?" for key in primary_keys)
-                            existing = self.db.execute(
-                                "SELECT * FROM " + table + " WHERE " + where,
-                                [row[key] for key in primary_keys],
-                            ).fetchone()
-                        if existing is None or any(
-                            existing[key] != value for key, value in row.items()
-                        ):
-                            raise ValueError(
-                                "conflicting existing row while importing table: " + table
-                            )
+                    self._insert_import_row(table, row)
             for row in validated_rows["artifact_blobs"]:
                 if self.get_artifact_bytes(row["artifact_id"]) is None:
                     raise ValueError(
@@ -3529,6 +3891,289 @@ class AIDB:
             raise
 
         return self.current_specification()
+
+    def _assert_import_resource_exists(self, resource_id, message) -> None:
+        """Arrival-time reference check for import_home_stream.
+
+        import_home validates references against the union of existing
+        and imported rows before writing; the streaming importer checks
+        each reference as its row arrives, against existing rows plus
+        everything the stream has already inserted. For envelopes in
+        the exporter's dependency order (resources before the rows
+        that reference them — the order export_home writes and the
+        order import_home's write phase inserts in) the two are
+        equivalent, and a dangling reference raises import_home's
+        error rather than leaking a foreign-key IntegrityError.
+        """
+        if resource_id is None:
+            return
+        found = self.db.execute(
+            "SELECT 1 FROM home_resources WHERE id=?", (resource_id,)
+        ).fetchone()
+        if found is None:
+            raise ValueError(message)
+
+    def _assert_agent_import_compatible(self, row) -> None:
+        """Reject an agents import row that collides with a stored agent.
+
+        Streaming counterpart to import_home's fail-closed agent check,
+        evaluated against the database — which, inside the streaming
+        importer's savepoint, already holds this payload's earlier
+        agent rows, so intra-payload collisions are caught too. A row
+        whose id or name matches a stored agent with different content
+        is rejected; a row identical to the stored one is the
+        idempotent re-import case and passes.
+        """
+        full_row = {
+            "id": None,
+            "name": row["name"],
+            "description": None,
+            "model": None,
+            "role": "agent",
+            "permissions": "[]",
+            "capabilities": "[]",
+            "metadata": "{}",
+            **row,
+        }
+        candidates = []
+        if full_row["id"] is not None:
+            candidates.append(
+                self.db.execute("SELECT * FROM agents WHERE id=?", (full_row["id"],)).fetchone()
+            )
+        candidates.append(
+            self.db.execute("SELECT * FROM agents WHERE name=?", (full_row["name"],)).fetchone()
+        )
+        for existing in candidates:
+            if existing is not None and dict(existing) != full_row:
+                raise ValueError("imported agent collides with an existing agent")
+
+    def import_home_stream(self, chunks):
+        """Import an aidb-home-v1 JSON document from an iterator of chunks.
+
+        Streaming counterpart to import_home_json. The document is
+        parsed incrementally (see _HomeJsonScanner): each row is
+        validated with the same per-row contract import_home applies
+        and inserted as it arrives, inside one savepoint, and the
+        cross-row reference/payload checks run before the savepoint is
+        released. A malformed chunk, an invalid row, or a dangling
+        reference anywhere in the stream therefore aborts the import
+        with nothing persisted — the same outside guarantee as
+        import_home's validate-first design.
+
+        Memory stays bounded by the largest single row plus the
+        imported home_changes ids the deferred payload checks need;
+        the parsed document is never materialized. Honest boundaries:
+        the small top-level "verification" value is decoded whole (it
+        is metadata, not home data); when a document is invalid in
+        more than one place, which error is reported can differ from
+        import_home's (validation order follows the stream); and
+        references are checked as rows arrive, so tables must appear
+        in the exporter's dependency order — resources before the
+        notes, relations, and changes that reference them, artifacts
+        before their blobs — which is the order export_home writes
+        and import_home's write phase inserts in. import_home remains
+        the order-insensitive path for hand-built envelopes.
+
+        Returns current_specification(), like import_home.
+        """
+        scanner = _HomeJsonScanner(
+            chunks,
+            object_pairs_hook=self._unique_json_object,
+            parse_constant=self._reject_json_constant,
+        )
+        deferred = {
+            "change_ids": [],
+            "note_resource_ids": [],
+            "relation_endpoints": [],
+            "blob_artifact_ids": [],
+        }
+        self.db.execute("SAVEPOINT aidb_import_home_stream")
+        try:
+            self._consume_home_document(scanner, deferred)
+            self._validate_streamed_cross_references(deferred)
+            self.db.execute("RELEASE SAVEPOINT aidb_import_home_stream")
+        except Exception:
+            self.db.execute("ROLLBACK TO SAVEPOINT aidb_import_home_stream")
+            self.db.execute("RELEASE SAVEPOINT aidb_import_home_stream")
+            raise
+        return self.current_specification()
+
+    def _consume_home_document(self, scanner, deferred) -> None:
+        """Consume the top-level envelope object of a streamed import."""
+        if scanner.at_end():
+            raise ValueError("invalid home JSON")
+        scanner.expect("{", error="unsupported home format")
+        seen_fields = set()
+        if scanner.peek() == "}":
+            scanner.expect("}")
+        else:
+            while True:
+                key = scanner.read_string()
+                if key in seen_fields:
+                    raise ValueError("duplicate JSON object key: " + key)
+                seen_fields.add(key)
+                scanner.expect(":")
+                if key == "format":
+                    if scanner.read_strict_value() != "aidb-home-v1":
+                        raise ValueError("unsupported home format")
+                elif key == "tables":
+                    self._consume_home_tables(scanner, deferred)
+                elif key == "verification":
+                    if not isinstance(scanner.read_strict_value(), dict):
+                        raise ValueError("invalid home verification metadata")
+                elif key == "required_extensions":
+                    extensions = scanner.read_strict_value()
+                    if not isinstance(extensions, list) or any(
+                        not isinstance(item, str) for item in extensions
+                    ):
+                        raise ValueError("invalid required_extensions")
+                    if extensions:
+                        raise ValueError(
+                            "unsupported required home extension: " + ", ".join(extensions)
+                        )
+                else:
+                    raise ValueError("unknown home import field")
+                if scanner.peek() == ",":
+                    scanner.expect(",")
+                    continue
+                scanner.expect("}")
+                break
+        if "format" not in seen_fields:
+            raise ValueError("unsupported home format")
+        if not scanner.at_end():
+            raise ValueError("invalid home JSON")
+
+    def _consume_home_tables(self, scanner, deferred) -> None:
+        """Consume the "tables" object, validating and inserting rows live."""
+        if scanner.peek() != "{":
+            raise ValueError("invalid home tables")
+        scanner.expect("{")
+        seen_tables = set()
+        if scanner.peek() == "}":
+            scanner.expect("}")
+            return
+        while True:
+            table = scanner.read_string()
+            if table in seen_tables:
+                raise ValueError("duplicate JSON object key: " + table)
+            seen_tables.add(table)
+            if table not in _IMPORT_COLUMNS:
+                raise ValueError("unknown home import table")
+            scanner.expect(":")
+            if scanner.peek() != "[":
+                raise ValueError(f"invalid rows for table: {table}")
+            scanner.expect("[")
+            if scanner.peek() == "]":
+                scanner.expect("]")
+            else:
+                while True:
+                    row = self._validate_import_row(table, scanner.read_strict_value())
+                    if table == "agents":
+                        self._assert_agent_import_compatible(row)
+                    elif table == "notes":
+                        self._assert_import_resource_exists(
+                            row.get("resource_id"),
+                            "note references a missing resource",
+                        )
+                    elif table == "resource_relations":
+                        for key in ("source_resource_id", "target_resource_id"):
+                            self._assert_import_resource_exists(
+                                row.get(key),
+                                "resource relation references a missing resource",
+                            )
+                    elif table == "home_changes":
+                        self._assert_import_resource_exists(
+                            row.get("resource_id"),
+                            "home change references a missing resource",
+                        )
+                    elif table == "artifact_blobs":
+                        artifact = self.db.execute(
+                            "SELECT 1 FROM artifacts WHERE id=?",
+                            (row["artifact_id"],),
+                        ).fetchone()
+                        if artifact is None:
+                            raise ValueError(
+                                "imported artifact blob has no matching"
+                                " artifact: " + str(row["artifact_id"])
+                            )
+                    primary_key = self._insert_import_row(table, row)
+                    if table == "home_changes":
+                        deferred["change_ids"].append(primary_key)
+                    elif table == "notes":
+                        deferred["note_resource_ids"].append(row.get("resource_id"))
+                    elif table == "resource_relations":
+                        deferred["relation_endpoints"].append(
+                            (
+                                row.get("source_resource_id"),
+                                row.get("target_resource_id"),
+                            )
+                        )
+                    elif table == "artifact_blobs":
+                        deferred["blob_artifact_ids"].append(row["artifact_id"])
+                    if scanner.peek() == ",":
+                        scanner.expect(",")
+                        continue
+                    scanner.expect("]")
+                    break
+            if scanner.peek() == ",":
+                scanner.expect(",")
+                continue
+            scanner.expect("}")
+            return
+
+    def _validate_streamed_cross_references(self, deferred) -> None:
+        """Cross-row checks for import_home_stream, run inside its savepoint.
+
+        Mirrors import_home's post-validation phase against database
+        state, which at this point holds existing rows plus the rows
+        the stream just inserted — the same union import_home
+        validates against.
+        """
+        valid_resource_ids = {
+            row["id"] for row in self.db.execute("SELECT id FROM home_resources").fetchall()
+        }
+        change_ids = deferred["change_ids"]
+        change_rows = []
+        for start in range(0, len(change_ids), 500):
+            part = change_ids[start : start + 500]
+            placeholders = ",".join("?" for _ in part)
+            change_rows.extend(
+                dict(row)
+                for row in self.db.execute(
+                    f"SELECT * FROM home_changes WHERE id IN ({placeholders})",
+                    part,
+                ).fetchall()
+            )
+        for row in change_rows:
+            resource_id = row.get("resource_id")
+            if resource_id is not None and resource_id not in valid_resource_ids:
+                raise ValueError("home change references a missing resource")
+        for resource_id in deferred["note_resource_ids"]:
+            if resource_id is not None and resource_id not in valid_resource_ids:
+                raise ValueError("note references a missing resource")
+        for source_id, target_id in deferred["relation_endpoints"]:
+            for resource_id in (source_id, target_id):
+                if resource_id is not None and resource_id not in valid_resource_ids:
+                    raise ValueError("resource relation references a missing resource")
+        resource_types = {
+            row["id"]: row["resource_type"]
+            for row in self.db.execute("SELECT id, resource_type FROM home_resources").fetchall()
+        }
+        relation_keys = {
+            (row["source_resource_id"], row["target_resource_id"], row["relation"])
+            for row in self.db.execute(
+                "SELECT source_resource_id, target_resource_id, relation FROM resource_relations"
+            ).fetchall()
+        }
+        for row in change_rows:
+            self._validate_change_payload_row(
+                row, valid_resource_ids, resource_types, relation_keys
+            )
+        for artifact_id in deferred["blob_artifact_ids"]:
+            if self.get_artifact_bytes(artifact_id) is None:
+                raise ValueError(
+                    "imported artifact blob has no matching artifact: " + str(artifact_id)
+                )
 
     def relate_resources(self, source_resource_id, target_resource_id, relation, metadata=None):
         if source_resource_id == target_resource_id:
@@ -3714,6 +4359,105 @@ class AIDB:
             event["payload"] = self._json(safe_payload)
             visible.append(event)
         return visible[:limit]
+
+    def _public_change_rows(self, batch_size):
+        """Yield raw change rows for currently-public resources, id order.
+
+        The scan public_changes performs (public resources, 'relate'
+        operations excluded), keyset-paginated so each step reads at
+        most batch_size rows.
+        """
+        last_id = 0
+        while True:
+            rows = self.db.execute(
+                """
+                SELECT c.*
+                FROM home_changes c
+                JOIN home_resources source ON source.id = c.resource_id
+                WHERE source.visibility = 'public'
+                  AND c.operation != 'relate'
+                  AND c.id > ?
+                ORDER BY c.id ASC
+                LIMIT ?
+                """,
+                (last_id, batch_size),
+            ).fetchall()
+            if not rows:
+                return
+            yield from rows
+            last_id = rows[-1]["id"]
+
+    def _public_change_event(self, row):
+        """Project a raw change row to the safe public event shape.
+
+        The projection public_changes applies: the actor is hidden and
+        the payload is replaced by a safe structural summary.
+        """
+        safe_payload = {}
+        if row["operation"] == "create":
+            try:
+                original = json.loads(row["payload"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                original = {}
+            safe_payload = {
+                "resource_type": original.get("resource_type"),
+                "visibility": "public",
+            }
+        elif row["operation"] == "update":
+            try:
+                original = json.loads(row["payload"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                original = {}
+            safe_payload = {
+                "content_changed": bool(original.get("content_changed")),
+                "metadata_changed": bool(original.get("metadata_changed")),
+            }
+        event = dict(row)
+        event["actor"] = None
+        event["payload"] = self._json(safe_payload)
+        return event
+
+    def iter_public_changes(self, after_id=0, batch_size=100):
+        """Yield batches of public change events with id > after_id.
+
+        Streaming counterpart to public_changes: the events are
+        exactly those public_changes(after_id=after_id) returns — same
+        visibility rules, same safe projection — produced in bounded
+        batches so a consumer (the HTTP NDJSON change feed) never
+        materializes the whole feed. Two passes over the change
+        history are made, each keyset-paginated: the first computes
+        each resource's first public transition exactly as
+        public_changes does, the second emits the visible events in
+        id order.
+        """
+        if batch_size < 1:
+            raise ValueError("batch_size must be positive")
+        public_from = {}
+        for row in self._public_change_rows(batch_size):
+            if row["operation"] == "create":
+                try:
+                    event_payload = json.loads(row["payload"] or "{}")
+                except (TypeError, json.JSONDecodeError):
+                    continue
+                if event_payload.get("visibility") == "public":
+                    public_from[row["resource_id"]] = row["id"]
+            elif row["operation"] == "publish":
+                public_from.setdefault(row["resource_id"], row["id"])
+        batch = []
+        for row in self._public_change_rows(batch_size):
+            if (
+                row["id"] <= after_id
+                or row["resource_id"] not in public_from
+                or row["id"] < public_from[row["resource_id"]]
+                or row["operation"] not in {"create", "publish", "update"}
+            ):
+                continue
+            batch.append(self._public_change_event(row))
+            if len(batch) >= batch_size:
+                yield batch
+                batch = []
+        if batch:
+            yield batch
 
     def create_snapshot(self, include_private=True):
         payload = self.export_home(include_private=include_private)

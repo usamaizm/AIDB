@@ -81,6 +81,48 @@ def create_handler(
             self.end_headers()
             self.wfile.write(data)
 
+        def _send_change_stream(self, after_id: int, limit: int) -> None:
+            """Stream public changes as NDJSON with chunked transfer encoding.
+
+            The streaming mode of GET /v1/changes, selected with
+            ?stream=1 (or stream=true). One JSON object per line — the
+            same event objects the buffered response returns — written
+            incrementally as the store yields them, bounded by the same
+            limit semantics, and resumable: a client that disconnects
+            re-requests with after_id set to the last id it received
+            and continues with no duplicates and no gaps. Reads run
+            unlocked, exactly like the buffered GET path. Chunked
+            framing requires HTTP/1.1, so this response upgrades the
+            connection's protocol version for its duration.
+            """
+            self.protocol_version = "HTTP/1.1"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            remaining = limit
+            try:
+                for batch in db.iter_public_changes(after_id=after_id, batch_size=min(100, limit)):
+                    for event in batch:
+                        if remaining <= 0:
+                            break
+                        line = json.dumps(event, ensure_ascii=False).encode("utf-8") + b"\n"
+                        self.wfile.write(b"%x\r\n" % len(line) + line + b"\r\n")
+                        remaining -= 1
+                    if remaining <= 0:
+                        break
+                self.wfile.write(b"0\r\n\r\n")
+            except OSError:
+                # The client went away (or stalled past the socket
+                # timeout) mid-stream. The feed is cursor-resumable,
+                # so there is nothing to recover — just stop writing.
+                logger.debug(
+                    "change stream to %s ended early",
+                    self.client_address,
+                    exc_info=True,
+                )
+
         def _json_body(self):
             raw_length = self.headers.get("Content-Length", "0")
             try:
@@ -152,6 +194,8 @@ def create_handler(
                     after_id = int(query.get("after_id", ["0"])[0])
                     if after_id < 0:
                         raise ValueError("after_id must be non-negative")
+                    if query.get("stream", ["0"])[0] in {"1", "true"}:
+                        return self._send_change_stream(after_id, limit)
                     return self._send(200, db.public_changes(after_id=after_id, limit=limit))
                 return self._send(404, {"error": "not_found"})
             except (PermissionError, ValueError) as exc:
