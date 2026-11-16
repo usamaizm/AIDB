@@ -1426,7 +1426,11 @@ class AIDB:
                 "INSERT INTO session_participants(session_id, agent_id) VALUES (?, ?)",
                 (session_id, created_by),
             )
-        return self.get_session(session_id)
+            # Return from inside the lock (see update_resource): a
+            # get_session call after the atomic section would run on the
+            # shared :memory: connection while another thread may be
+            # mid-mutation.
+            return self._session_dict(self._require_session_row(session_id))
 
     def get_session(self, session_id):
         return self._session_dict(self._require_session_row(session_id))
@@ -1470,7 +1474,8 @@ class AIDB:
                 "INSERT INTO session_participants(session_id, agent_id) VALUES (?, ?)",
                 (session_id, agent_id),
             )
-        return self.get_session(session_id)
+            # Return from inside the lock (see update_resource).
+            return self._session_dict(self._require_session_row(session_id))
 
     def leave_session(self, session_id, agent_id):
         with self._atomic("leave_session"):
@@ -1481,7 +1486,8 @@ class AIDB:
             )
             if cur.rowcount == 0:
                 raise ValueError(f"agent {agent_id} is not a participant of session {session_id}")
-        return self.get_session(session_id)
+            # Return from inside the lock (see update_resource).
+            return self._session_dict(self._require_session_row(session_id))
 
     def close_session(self, session_id):
         """Close a session. Closed is terminal: no reopen, and a closed
@@ -1494,7 +1500,8 @@ class AIDB:
                 "UPDATE sessions SET status = 'closed' WHERE session_id = ?",
                 (session_id,),
             )
-        return self.get_session(session_id)
+            # Return from inside the lock (see update_resource).
+            return self._session_dict(self._require_session_row(session_id))
 
     def post_message(self, session_id, agent_id, role, content, metadata=None):
         """Append a message to an active session.
@@ -1524,8 +1531,11 @@ class AIDB:
                 (session_id, agent_id, role, content, self._json(metadata or {})),
             )
             message_id = cur.lastrowid
-        row = self.db.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
-        return self._message_dict(row)
+            # Fetch inside the lock (see update_resource): a SELECT after
+            # the atomic section would run on the shared :memory:
+            # connection while another thread may be mid-mutation.
+            row = self.db.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
+            return self._message_dict(row)
 
     def list_messages(self, session_id, limit=None):
         self._require_session_row(session_id)
@@ -2366,14 +2376,15 @@ class AIDB:
                     self._json({"resource_type": resource_type, "visibility": visibility}),
                 ),
             )
-        return self.get_resource(rid)
+            # Re-read inside the lock (see update_resource): a
+            # get_resource call after the atomic section would run on the
+            # shared :memory: connection while another thread may be
+            # mid-mutation.
+            row = self.db.execute("SELECT * FROM home_resources WHERE id=?", (rid,)).fetchone()
+            return self._resource_from_row(row)
 
-    def get_resource(self, resource_id, include_private=True):
-        row = self.db.execute("SELECT * FROM home_resources WHERE id=?", (resource_id,)).fetchone()
-        if row is None:
-            raise ValueError("resource does not exist")
-        if row["visibility"] == "private" and not include_private:
-            raise PermissionError("private resource")
+    @staticmethod
+    def _resource_from_row(row):
         return Resource(
             row["resource_type"],
             json.loads(row["content"]),
@@ -2385,6 +2396,14 @@ class AIDB:
             row["created_at"],
             row["updated_at"],
         )
+
+    def get_resource(self, resource_id, include_private=True):
+        row = self.db.execute("SELECT * FROM home_resources WHERE id=?", (resource_id,)).fetchone()
+        if row is None:
+            raise ValueError("resource does not exist")
+        if row["visibility"] == "private" and not include_private:
+            raise PermissionError("private resource")
+        return self._resource_from_row(row)
 
     def list_resources(
         self, resource_type=None, visibility=None, include_private=True, limit=None, offset=0
@@ -2569,7 +2588,14 @@ class AIDB:
                     self._json({}),
                 ),
             )
-        return self.get_resource(resource_id)
+            # Re-read inside the lock (see update_resource): a
+            # get_resource call after the atomic section would run on the
+            # shared :memory: connection while another thread may be
+            # mid-mutation.
+            updated = self.db.execute(
+                "SELECT * FROM home_resources WHERE id=?", (resource_id,)
+            ).fetchone()
+            return self._resource_from_row(updated)
 
     def current_specification(self):
         # This read can write: it lazily creates the node identity and
@@ -4178,13 +4204,17 @@ class AIDB:
     def relate_resources(self, source_resource_id, target_resource_id, relation, metadata=None):
         if source_resource_id == target_resource_id:
             raise ValueError("a resource cannot relate to itself")
-        for rid in (source_resource_id, target_resource_id):
-            if (
-                self.db.execute("SELECT 1 FROM home_resources WHERE id=?", (rid,)).fetchone()
-                is None
-            ):
-                raise ValueError("resource does not exist: " + rid)
+        # The existence checks run inside the atomic section with the
+        # writes: outside the lock they would execute concurrently with
+        # another thread's statements on the shared :memory: connection
+        # (see update_resource).
         with self._atomic("relate_resources"):
+            for rid in (source_resource_id, target_resource_id):
+                if (
+                    self.db.execute("SELECT 1 FROM home_resources WHERE id=?", (rid,)).fetchone()
+                    is None
+                ):
+                    raise ValueError("resource does not exist: " + rid)
             self.db.execute(
                 "INSERT OR IGNORE INTO resource_relations(source_resource_id,target_resource_id,relation,metadata) VALUES(?,?,?,?)",
                 (source_resource_id, target_resource_id, relation, self._json(metadata or {})),
@@ -4210,39 +4240,42 @@ class AIDB:
     def update_resource(
         self, resource_id, content=None, metadata=None, owner=None, expected_revision=None
     ):
-        row = self.db.execute("SELECT * FROM home_resources WHERE id=?", (resource_id,)).fetchone()
-        if row is None:
-            raise ValueError("resource does not exist")
-        if owner is not None and row["owner"] != owner:
-            raise PermissionError("owner mismatch")
-        if expected_revision is not None and row["revision"] != expected_revision:
-            raise ValueError("revision conflict")
-
-        # Validate before any write: None means "keep existing" and is not
-        # validated. Note rules need the notes row, so they run here too,
-        # before the atomic section.
-        if content is not None:
-            _validate_strict_json_value(content, "content")
-            note_row = self.db.execute(
-                "SELECT 1 FROM notes WHERE resource_id=?", (resource_id,)
-            ).fetchone()
-            if note_row is not None:
-                _validate_note_content(content)
-        _validate_metadata(metadata)
-
+        # Every database statement in this method runs inside the atomic
+        # section, which holds the store write lock: the existence/owner/
+        # revision checks, the note lookup for validation, the guarded
+        # UPDATE, and the final re-read. Statements outside the lock would
+        # execute concurrently with another thread's statements on the
+        # shared :memory: connection and raise sqlite3.InterfaceError
+        # ("bad parameter or other API misuse") — a race the guarded
+        # UPDATE alone cannot prevent. Validation raising inside the
+        # section rolls back to the savepoint with no writes made.
         with self._atomic("update_resource"):
-            # Re-read inside the atomic section and guard the UPDATE on the
-            # revision: the checks above observed the row outside the
-            # transaction, leaving a read-check-write window for concurrent
-            # writers. The guarded UPDATE + rowcount check closes it at the
-            # SQL level.
             row = self.db.execute(
                 "SELECT * FROM home_resources WHERE id=?", (resource_id,)
             ).fetchone()
             if row is None:
                 raise ValueError("resource does not exist")
+            if owner is not None and row["owner"] != owner:
+                raise PermissionError("owner mismatch")
             if expected_revision is not None and row["revision"] != expected_revision:
                 raise ValueError("revision conflict")
+
+            # Validate before any write: None means "keep existing" and is
+            # not validated. Note rules need the notes row, so that lookup
+            # runs here too.
+            if content is not None:
+                _validate_strict_json_value(content, "content")
+                note_row = self.db.execute(
+                    "SELECT 1 FROM notes WHERE resource_id=?", (resource_id,)
+                ).fetchone()
+                if note_row is not None:
+                    _validate_note_content(content)
+            _validate_metadata(metadata)
+
+            # Guard the UPDATE on the revision just read so a concurrent
+            # writer cannot be overwritten silently between the check and
+            # the write; the rowcount check closes the read-check-write
+            # window at the SQL level.
             old_revision = row["revision"]
             new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
             new_content = json.loads(row["content"]) if content is None else content
@@ -4294,7 +4327,13 @@ class AIDB:
                     ),
                 ),
             )
-        return self.get_resource(resource_id)
+            # Re-read inside the lock: a get_resource call after the
+            # atomic section would run on the shared :memory: connection
+            # while another thread may be mid-mutation.
+            updated = self.db.execute(
+                "SELECT * FROM home_resources WHERE id=?", (resource_id,)
+            ).fetchone()
+            return self._resource_from_row(updated)
 
     def public_changes(self, after_id=0, limit=100):
         if limit < 1:
