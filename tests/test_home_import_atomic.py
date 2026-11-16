@@ -1,7 +1,6 @@
 import base64
 import hashlib
 import json
-import sqlite3
 
 import pytest
 
@@ -52,7 +51,11 @@ def test_home_import_rolls_back_when_foreign_key_validation_fails():
         }
     )
 
-    with pytest.raises(sqlite3.IntegrityError):
+    # The dangling relation target is now caught in import_home()'s
+    # validate-everything-first pass with a ValueError, instead of
+    # surfacing at insert time as a raw sqlite IntegrityError. The
+    # invariant is unchanged: nothing is imported.
+    with pytest.raises(ValueError, match="missing resource"):
         db.import_home(payload)
 
     with pytest.raises(ValueError, match="resource does not exist"):
@@ -198,7 +201,10 @@ def test_import_rejects_invalid_resource_ids(resource_id):
             }]
         },
     }
-    with pytest.raises(ValueError, match="invalid id"):
+    # A null id is now reported as missing by the required-columns check;
+    # a non-string or empty id is still reported as invalid. Either way
+    # the row is rejected and nothing is imported.
+    with pytest.raises(ValueError, match="invalid id|missing id"):
         db.import_home(payload)
     assert db.list_resources() == []
 
