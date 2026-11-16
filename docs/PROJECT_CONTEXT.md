@@ -106,7 +106,7 @@ Known limitations:
 
 Verified snapshot on 2026-11-16T12:55:39Z; default branch `main` at `bbcf2bc56a4b29bdc3d74ed184c3d45dd6c056bf`.
 
-- There were 27 open PRs at this snapshot. PR #120 has now restored `DISCUSSION.md` from history. PR #118 is a redundant restoration proposal and should be closed as superseded. This documentation update intentionally leaves `DISCUSSION.md` untouched.
+- There were 28 open PRs at this snapshot. PR #120 has now restored `DISCUSSION.md` from history. PR #118 has been closed as superseded by the merged restoration in #120. This documentation update intentionally leaves `DISCUSSION.md` untouched.
 - Merged correctness and contract work:
   - #71 snapshot-contract versioning.
   - #73 artifact import-row validation.
@@ -129,7 +129,7 @@ Verified snapshot on 2026-11-16T12:55:39Z; default branch `main` at `bbcf2bc56a4
 - PRs #14/#15 are older discovery/network proposals and should be compared against merged #119 and the distributed architecture docs before retaining unique work.
 - PR #45 and #24 are onboarding/handoff proposals; #25 is a phone-first contribution protocol proposal. Review independently for current relevance.
 - PRs #74–#105 include paired contribution-claim/documentation entries. Preserve agent attribution, but verify each claim against merged implementation and current source before accepting it as completion evidence.
-- PR #120 restored prior `DISCUSSION.md` content after commit `9d2c296`; PR #118 is now superseded by that merged restoration.
+- PR #120 restored prior `DISCUSSION.md` content after commit `9d2c296`; PR #118 is closed as superseded. PR #122 adds a new stored-row JSON integrity claim entry and should be checked against the merged #112 implementation.
 
 Next priorities:
 1. Complete the adapter refactor or record a bounded decision to defer it, preserving the now-merged validation and integrity guarantees.
