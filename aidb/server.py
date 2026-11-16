@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import logging
 import json
 import secrets
 import ssl
@@ -8,6 +9,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from .store import AIDB
+
+logger = logging.getLogger(__name__)
 
 
 def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int = 1048576, max_page_size: int = 200):
@@ -78,9 +81,9 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
             except (PermissionError, ValueError) as exc:
                 return self._send(400, {"error": str(exc)})
             except Exception:
-                # Never let an unexpected store failure kill the handler
-                # thread and drop the connection: answer a stable 500
-                # without leaking exception internals to the client.
+                # Keep a traceback for operators while returning only a
+                # stable, non-sensitive error code to the remote client.
+                logger.exception("Unhandled error while serving GET %s", path)
                 return self._send(500, {"error": "internal_error"})
 
         def do_POST(self):
@@ -135,9 +138,9 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
             except (KeyError, ValueError, json.JSONDecodeError) as exc:
                 return self._send(400, {"error": str(exc)})
             except Exception:
-                # Never let an unexpected store failure kill the handler
-                # thread and drop the connection: answer a stable 500
-                # without leaking exception internals to the client.
+                # Keep a traceback for operators while returning only a
+                # stable, non-sensitive error code to the remote client.
+                logger.exception("Unhandled error while serving POST %s", path)
                 return self._send(500, {"error": "internal_error"})
 
         def log_message(self, *_args):
