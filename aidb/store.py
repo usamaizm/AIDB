@@ -88,6 +88,21 @@ def _canonical_checksum_algorithm(algorithm: Any) -> str | None:
     return canonical if canonical in _CHECKSUM_DIGEST_LENGTHS else None
 
 
+# Snapshot contract version, independent of the "aidb-home-v1" home
+# envelope format. New snapshots are stamped with SNAPSHOT_FORMAT in the
+# home_snapshots.home_format column; the embedded payload keeps the home
+# envelope's own "aidb-home-v1" format, which import_home gates on
+# separately, so either version can evolve without silently
+# reinterpreting the other. Rows stamped "aidb-home-v1" predate the
+# snapshot contract (the stamp was copied from the home envelope) and
+# are accepted as snapshot v1 under the accepted D2 v1 legacy policy.
+# Any other stamp is a snapshot format this code does not know and is
+# refused loudly, on restore and on import alike.
+SNAPSHOT_FORMAT = "aidb-snapshot-v1"
+_LEGACY_SNAPSHOT_FORMAT = "aidb-home-v1"
+_ACCEPTED_SNAPSHOT_FORMATS = frozenset({SNAPSHOT_FORMAT, _LEGACY_SNAPSHOT_FORMAT})
+
+
 class AIDB:
     """SQLite-backed state layer for AI agents, sessions, tasks, memory, tools, workflow events, and artifacts."""
 
@@ -1549,9 +1564,12 @@ class AIDB:
                 if table == "home_snapshots":
                     content = row.get("content")
                     digest = row.get("content_hash")
+                    if row.get("home_format") not in _ACCEPTED_SNAPSHOT_FORMATS:
+                        raise ValueError(
+                            "unsupported snapshot format: " + str(row.get("home_format"))
+                        )
                     if (
-                        row.get("home_format") != "aidb-home-v1"
-                        or not isinstance(content, str)
+                        not isinstance(content, str)
                         or not isinstance(digest, str)
                         or not re.fullmatch(r"[0-9a-f]{64}", digest)
                         or hashlib.sha256(content.encode("utf-8")).hexdigest() != digest
@@ -1763,14 +1781,16 @@ class AIDB:
         content=json.dumps(payload, sort_keys=True, separators=(",",":"), ensure_ascii=False)
         digest=hashlib.sha256(content.encode("utf-8")).hexdigest()
         snapshot_id="snap:"+digest
-        self.db.execute("INSERT OR IGNORE INTO home_snapshots(snapshot_id,home_format,content,content_hash) VALUES(?,?,?,?)", (snapshot_id,payload["format"],content,digest))
+        self.db.execute("INSERT OR IGNORE INTO home_snapshots(snapshot_id,home_format,content,content_hash) VALUES(?,?,?,?)", (snapshot_id,SNAPSHOT_FORMAT,content,digest))
         self.db.commit()
         return {"snapshot_id":snapshot_id,"content_hash":digest,"created_at":self.db.execute("SELECT created_at FROM home_snapshots WHERE snapshot_id=?",(snapshot_id,)).fetchone()["created_at"]}
 
     def restore_snapshot(self, snapshot_id):
-        row=self.db.execute("SELECT content,content_hash FROM home_snapshots WHERE snapshot_id=?", (snapshot_id,)).fetchone()
+        row=self.db.execute("SELECT home_format,content,content_hash FROM home_snapshots WHERE snapshot_id=?", (snapshot_id,)).fetchone()
         if row is None:
             raise ValueError("snapshot does not exist")
+        if row["home_format"] not in _ACCEPTED_SNAPSHOT_FORMATS:
+            raise ValueError("unsupported snapshot format: " + str(row["home_format"]))
         digest=hashlib.sha256(row["content"].encode("utf-8")).hexdigest()
         if digest != row["content_hash"]:
             raise ValueError("snapshot integrity check failed")
