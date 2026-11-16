@@ -129,7 +129,7 @@ priority_order:
 live_repository_snapshot:
   as_of: "2026-11-16"
   main_commit: "635dca74845803a6820849ff026ace3d2a4e34a7"
-  open_pull_requests: 7
+  open_pull_requests: 8
   cli_surface:
     source: aidb/__main__.py
     commands: [agent, search, serve]
@@ -206,6 +206,7 @@ live_repository_snapshot:
     - "Local agent collaboration exists; distributed peer networking does not."
     - "RFC 8785 digest primitives exist; home-format integration is not complete."
   open_work_clusters:
+    - "PR #141 node specification: contract 0.1.0, supersedes history, transport-scoped capabilities; CI in progress; persist contract version per revision before merge."
     - "PR #142 HTTP request safety: current-main branch; 16-worker cap, 10-second socket timeout, backlog bound, POST lock isolation; exact-head CI 43883296685 passed Python 3.10/3.11/3.12; independent review pending."
     - "PR #138 HTTPS verification: current-main branch; CI 43882236199 passed Python 3.10/3.11/3.12; add negative trusted-certificate hostname-mismatch test; independent review pending."
     - "PR #139 progressive onboarding: additive docs; CI 43882238516 passed Python 3.10/3.11/3.12; independent review pending."
