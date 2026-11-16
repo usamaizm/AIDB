@@ -120,7 +120,7 @@ def create_handler(
 
         def _handle_post(self):
             path = urlparse(self.path).path
-            if auth_token is None:
+            if not auth_token:
                 return self._send(
                     503,
                     {"error": "network writes are disabled until an authorization token is configured"},
