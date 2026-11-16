@@ -1552,14 +1552,18 @@ class AIDB:
         ).fetchall()
         for row in rows:
             snapshot_id = row["snapshot_id"]
-            if row["home_format"] not in _ACCEPTED_SNAPSHOT_FORMATS:
+            if not isinstance(row["home_format"], str) or row["home_format"] not in _ACCEPTED_SNAPSHOT_FORMATS:
                 issues.append("snapshot unknown format:" + str(snapshot_id))
             content = row["content"]
             content_hash = row["content_hash"]
             if not isinstance(content, str) or not isinstance(content_hash, str):
                 issues.append("snapshot checksum mismatch:" + str(snapshot_id))
                 continue
-            digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            try:
+                digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            except UnicodeEncodeError:
+                issues.append("snapshot checksum mismatch:" + str(snapshot_id))
+                continue
             if digest != content_hash or snapshot_id != "snap:" + digest:
                 issues.append("snapshot checksum mismatch:" + str(snapshot_id))
                 continue
@@ -1654,7 +1658,7 @@ class AIDB:
             if not payload_ok:
                 issues.append("invalid change payload:" + str(change_id))
 
-            if operation not in {"create", "update", "publish", "relate"}:
+            if not isinstance(operation, str) or operation not in {"create", "update", "publish", "relate"}:
                 issues.append("unknown change operation:" + str(change_id))
                 continue
             if not isinstance(resource_id, str) or not resource_id.strip():
@@ -1667,9 +1671,22 @@ class AIDB:
 
             previous = row["previous_revision"]
             new = row["new_revision"]
+            current_revision = resource["revision"]
+            if (
+                isinstance(current_revision, bool)
+                or not isinstance(current_revision, int)
+                or current_revision < 1
+            ):
+                issues.append("invalid resource revision:" + resource_id)
+                broken_revision.add(resource_id)
             if new is not None and (
-                isinstance(new, bool) or not isinstance(new, int)
-                or new > resource["revision"]
+                isinstance(new, bool)
+                or not isinstance(new, int)
+                or (
+                    isinstance(current_revision, int)
+                    and not isinstance(current_revision, bool)
+                    and new > current_revision
+                )
             ):
                 issues.append("future revision:" + str(change_id))
                 broken_revision.add(resource_id)
@@ -1723,10 +1740,11 @@ class AIDB:
                         issues.append("publish payload mismatch:" + str(change_id))
                     expected_visibility[resource_id] = "public"
             else:
+                if not payload_ok:
+                    continue
                 if (
                     previous is not None
                     or new is not None
-                    or not payload_ok
                     or set(payload) != {"target_resource_id", "relation"}
                 ):
                     issues.append("relate payload mismatch:" + str(change_id))
