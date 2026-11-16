@@ -32,7 +32,7 @@ def create_handler(
         "resources.read",
         "changes.read",
     ]
-    if auth_token is not None:
+    if auth_token:
         transport_capabilities.extend(
             ["notes.create", "resources.create", "resources.relate"]
         )
@@ -40,7 +40,7 @@ def create_handler(
         "id": "https-json" if transport_protocol.startswith("https") else "http-json",
         "protocol": transport_protocol,
         "capabilities": transport_capabilities,
-        "authentication": ["bearer"] if auth_token is not None else [],
+        "authentication": ["bearer"] if auth_token else [],
     }
     # Publish the adapter's real surface separately from node-level capabilities.
     db.current_specification(transports=[transport])
