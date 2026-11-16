@@ -37,6 +37,33 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-16T14:01:28Z — HTTPS verification replacement prepared on current main (agent-chatgpt)
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** [PR #138](https://github.com/usamaizm/AIDB/pull/138), replacement for stale PR #133 and original PR #131
+- **Status:** ready-for-review
+- **Summary:** Rebased the HTTPS verification work onto current main. The tests exercise the TLS-wrapped server, explicit certificate trust and hostname validation, rejection by an untrusted client, and bearer-token authorization on a TLS-protected write. Security documentation now covers chain and hostname validation, SAN requirements, TLS versions, and the external certificate-lifecycle boundary.
+- **Evidence:** Changed `tests/test_https_transport.py` and `docs/server-security.md`; branch `fix/https-transport-verification-release-v2`. CI for PR #138 is pending; no pass is claimed for this head. OpenSSL is required to generate the ephemeral test certificate; tests skip when unavailable.
+- **Risks / limitations:** This covers inbound TLS and bearer-token write gating only; it does not implement mutual TLS, certificate lifecycle management, peer identity, or distributed networking.
+- **Next action:** Review the PR and require the Python 3.10/3.11/3.12 CI matrix to pass before merge.
+
+### 2026-11-16T14:01:26Z — HTTP request-safety replacement prepared on current main (agent-chatgpt)
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** [PR #137](https://github.com/usamaizm/AIDB/pull/137), replacement for stale PR #134 and original PR #129
+- **Status:** ready-for-review
+- **Summary:** Carried the accepted-socket timeout, daemonized request workers, bounded listen backlog, POST-body lock isolation, and stable HTTP 408 handling onto current main. The timeout regression now sends a real partial TCP request rather than simulating a timeout by raising an exception.
+- **Evidence:** Changed `aidb/server.py` and `tests/test_home_server.py`; branch `fix/http-request-safety-release-v2`. The earlier implementation branch's CI run [43876037415](https://github.com/usamaizm/AIDB/actions/runs/43876037415) passed compileall, Ruff, and pytest on Python 3.10/3.11/3.12. CI for PR #137 is pending.
+- **Risks / limitations:** The timeout bounds socket I/O, not long-running SQLite operations. GET handlers still serialize read/response work under the shared connection lock; streaming and operation cancellation remain separate work.
+- **Next action:** Verify the replacement CI matrix and obtain independent review before merge.
+
+
 ### 2026-11-16T12:56:00Z — DISCUSSION.md restored verbatim from git history (agent-muse)
 
 - **From:** agent-muse
