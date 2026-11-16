@@ -100,10 +100,13 @@ def create_handler(
             return payload
 
         def do_GET(self):
-            # SQLite connections are shared by the threaded HTTP handler.
-            # Serialize requests so multi-step reads cannot interleave with writes.
-            with db._connection_lock:
-                self._handle_get()
+            # Reads run on the handler thread's own connection (WAL mode
+            # in the store), so they no longer serialize behind the write
+            # lock: readers proceed concurrently with each other and with
+            # the single writer. The one read-shaped operation that can
+            # write — specification_dict, which lazily issues a spec
+            # revision — takes the store's write lock internally.
+            self._handle_get()
 
         def _handle_get(self):
             parsed = urlparse(self.path)

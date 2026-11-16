@@ -6,6 +6,7 @@ import json
 import math
 import re
 import sqlite3
+import threading
 import uuid
 import warnings
 from contextlib import contextmanager
@@ -169,6 +170,14 @@ SCHEMA_VERSION = 1
 # the prerequisite the audit calls for, not a v2 schema.
 SCHEMA_MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {}
 
+# How long a connection waits for SQLite's single-writer lock before
+# raising "database is locked". Five seconds matches the default connect
+# timeout sqlite3 itself uses: long enough for the short write
+# transactions this store performs to drain under contention, short
+# enough that a genuinely stuck writer fails loudly instead of parking a
+# request thread forever.
+_BUSY_TIMEOUT_MS = 5000
+
 
 def _canonical_checksum_algorithm(algorithm: Any) -> str | None:
     """Return the canonical checksum algorithm name, or None if unsupported."""
@@ -245,16 +254,104 @@ def _validate_note_content(content: Any) -> None:
 
 
 class AIDB:
-    """SQLite-backed state layer for AI agents, sessions, tasks, memory, tools, workflow events, and artifacts."""
+    """SQLite-backed state layer for AI agents, sessions, tasks, memory, tools, workflow events, and artifacts.
+
+    Threading model: a file-backed home gives every thread its own
+    connection (created lazily, see the ``db`` property) and runs in WAL
+    mode, so concurrent readers never queue behind the single writer or
+    each other. Compound mutations hold ``_connection_lock`` — the store's
+    write lock — for their whole duration; single-transaction writes rely
+    on SQLite's own writer serialization plus ``busy_timeout``. SQLite
+    still allows only one writer at a time: this is concurrent reads with
+    serialized writes, not parallel writes. A ``:memory:`` home keeps one
+    shared connection for all threads, because separate connections would
+    each see a different empty database; on that shared connection a read
+    can observe another thread's in-flight transaction, so ``:memory:``
+    remains a single-process/ephemeral configuration.
+    """
 
     def __init__(self, path: str | Path = "aidb.sqlite3"):
         self.path = str(path)
         self._connection_lock = RLock()
-        self.db = sqlite3.connect(self.path, check_same_thread=False)
-        self.db.row_factory = sqlite3.Row
-        self.db.execute("PRAGMA foreign_keys = ON")
+        self._memory = self.path == ":memory:"
+        self._local = threading.local()
+        self._connections: dict[threading.Thread, sqlite3.Connection] = {}
+        self._connections_lock = threading.Lock()
+        self._closed = False
+        self._shared_db: sqlite3.Connection | None = None
+        primary = self._open_connection()
+        if self._memory:
+            self._shared_db = primary
+        else:
+            self._local.connection = primary
+            self._connections[threading.current_thread()] = primary
         self._create_schema()
         self._ensure_schema_version()
+
+    def _open_connection(self) -> sqlite3.Connection:
+        """Open one connection with this store's per-connection setup.
+
+        Schema creation and version stamping deliberately do NOT happen
+        here: they run once, on the primary connection, in __init__.
+        Lazily created per-thread connections attach to the already
+        initialized file.
+        """
+        conn = sqlite3.connect(
+            self.path,
+            check_same_thread=False,
+            timeout=_BUSY_TIMEOUT_MS / 1000,
+        )
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+        if not self._memory:
+            # WAL is persistent for the file once set, so re-asserting it
+            # on later connections is a no-op; it is what lets readers run
+            # concurrently with the single writer instead of blocking on
+            # its transaction.
+            conn.execute("PRAGMA journal_mode = WAL")
+        return conn
+
+    @property
+    def db(self) -> sqlite3.Connection:
+        """The calling thread's connection.
+
+        File-backed homes hand each thread its own connection, so a
+        method always runs on one connection for its whole call (which is
+        what keeps savepoints, explicit transactions, and row state
+        coherent) while different threads proceed concurrently.
+        :memory: homes return the one shared connection instead.
+        """
+        if self._shared_db is not None:
+            return self._shared_db
+        conn = getattr(self._local, "connection", None)
+        if conn is None:
+            if self._closed:
+                raise sqlite3.ProgrammingError("Cannot operate on a closed database.")
+            conn = self._open_connection()
+            self._local.connection = conn
+            self._register_connection(conn)
+        return conn
+
+    def _register_connection(self, conn: sqlite3.Connection) -> None:
+        with self._connections_lock:
+            # Prune connections whose owning thread has exited so a
+            # long-lived store does not accumulate one connection per
+            # request thread. Closing a dead thread's connection rolls
+            # back anything it left uncommitted, which no live code can
+            # still be relying on.
+            for owner in [t for t in self._connections if not t.is_alive()]:
+                self._close_connection(self._connections.pop(owner))
+            self._connections[threading.current_thread()] = conn
+
+    @staticmethod
+    def _close_connection(conn: sqlite3.Connection) -> None:
+        try:
+            conn.close()
+        except sqlite3.Error:
+            # Closing must not fail because a connection is already closed
+            # or was created by a thread that has since exited.
+            pass
 
     def _create_schema(self) -> None:
         self.db.executescript(
@@ -1659,16 +1756,20 @@ class AIDB:
     def initialize_home(self, node_id=None, owner=None, visibility="private", metadata=None):
         if visibility not in {"public", "private"}:
             raise ValueError("visibility must be public or private")
-        row = self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone()
-        if row:
-            return dict(row)
-        node_id = node_id or "node:" + str(uuid.uuid4())
-        self.db.execute(
-            "INSERT INTO node_identity(id,node_id,owner,visibility,metadata) VALUES(1,?,?,?,?)",
-            (node_id, owner, visibility, self._json(metadata or {})),
-        )
-        self.db.commit()
-        return dict(self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone())
+        # The check-then-insert below creates the singleton identity row;
+        # hold the write lock so two threads racing the first call cannot
+        # both insert (the loser would hit the PRIMARY KEY constraint).
+        with self._connection_lock:
+            row = self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone()
+            if row:
+                return dict(row)
+            node_id = node_id or "node:" + str(uuid.uuid4())
+            self.db.execute(
+                "INSERT INTO node_identity(id,node_id,owner,visibility,metadata) VALUES(1,?,?,?,?)",
+                (node_id, owner, visibility, self._json(metadata or {})),
+            )
+            self.db.commit()
+            return dict(self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone())
 
     def create_resource(
         self, resource_type, content=None, owner=None, visibility="private", metadata=None
@@ -1921,6 +2022,17 @@ class AIDB:
         return self.get_resource(resource_id)
 
     def current_specification(self):
+        # This read can write: it lazily creates the node identity and
+        # issues a new specification revision when the desired capability
+        # set has changed. Hold the write lock for the whole call so
+        # concurrent callers cannot duplicate either insert (the lock is
+        # re-entrant: initialize_home takes it too). This is the one
+        # read-shaped operation that serializes; plain reads stay
+        # lock-free.
+        with self._connection_lock:
+            return self._current_specification()
+
+    def _current_specification(self):
         identity = self.initialize_home()
         caps = [
             "resources",
@@ -3439,7 +3551,26 @@ class AIDB:
         return [dict(r) for r in rows]
 
     def close(self) -> None:
-        self.db.close()
+        """Close every connection this store opened, from any thread.
+
+        File-backed homes may have one connection per thread that touched
+        the store; all of them are closed, not just the caller's. Safe to
+        call more than once and from a different thread than the ones
+        that created the connections. Afterwards, using the store raises
+        sqlite3.ProgrammingError, as operating on a closed connection did
+        before per-thread connections.
+        """
+        with self._connections_lock:
+            if self._closed:
+                return
+            self._closed = True
+            connections = list(self._connections.values())
+            self._connections.clear()
+            shared = self._shared_db
+        for conn in connections:
+            self._close_connection(conn)
+        if shared is not None:
+            self._close_connection(shared)
 
     def __enter__(self) -> "AIDB":
         return self
