@@ -1,55 +1,56 @@
 # Repository Audit and Launch Readiness
 
-Audit snapshot: 2026-11-16. This is a point-in-time engineering triage, not a line-by-line security certification.
+Audit snapshot: 2026-11-16T12:56:54Z. This is a point-in-time engineering triage, not a security certification.
 
 ## Current verified baseline
 
-- Default branch: `main`, commit `ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5` at the time of this audit. The repository remains experimental.
-- Runtime: Python reference implementation backed by SQLite. `include/aidb/aidb.h` remains a draft; no stable compiled C ABI is implemented.
-- CLI source currently exposes only `agent`, `search`, and `serve` subcommands in `aidb/__main__.py`. The database path defaults to `aidb.sqlite3`; `serve` defaults to loopback/private visibility. `AIDB_AUTH_TOKEN` is used when `--auth-token` is not supplied, and an explicit CLI token takes precedence. Do not document unsupported session/message/task CLI commands.
-- CI workflow `.github/workflows/ci.yml` runs compileall, Ruff, and pytest on Python 3.10, 3.11, and 3.12.
-- PR [#106](https://github.com/usamaizm/AIDB/pull/106), head `66b87198d507238118db96010d49ed09b83742f3`, passed all three matrix jobs in [run 43862813272](https://github.com/usamaizm/AIDB/actions/runs/43862813272) and was merged as `721e20bb159a861570320d9cdadf3147b7dc0d59`. The merge includes the CLI contract tests.
-- The merged CLI-test change was verified on its PR head before merge; a separate push-triggered CI run for the resulting merge commit was not observed in this audit.
-- The open PR search returned 42 pull requests at the latest snapshot. This backlog includes overlapping correctness work and paired documentation claims; it must be reconciled by diff and evidence, not bulk-merged.
+- Default branch: `main`, commit `bbcf2bc56a4b29bdc3d74ed184c3d45dd6c056bf`.
+- Runtime: experimental Python reference implementation backed by SQLite. `include/aidb/aidb.h` remains a proposal; no stable compiled C ABI is implemented.
+- CLI source exposes `agent`, `search`, and `serve` only. The database path defaults to `aidb.sqlite3`; `serve` defaults to loopback/private visibility. `AIDB_AUTH_TOKEN` is the environment fallback for `--auth-token`, and an explicit CLI token takes precedence.
+- CI workflow `.github/workflows/ci.yml` runs compileall, Ruff, and pytest on Python 3.10, 3.11, and 3.12. The merged PRs below passed their own PR-head CI matrix; this is not a claim that a separate push-triggered workflow on the current main SHA was observed.
+- There were 28 open PRs at this snapshot. The queue includes competing journal-restoration proposals, paired contribution-claim PRs, a major adapter refactor, and broad overlapping remediation branches.
 
-## Implemented boundaries and known limitations
+## Merged implementation evidence
 
-- Main contains SQLite-backed persistence, core epistemic/provenance models, artifact lineage, agent-home resources/notes, relationships, revisions/change feeds/checkpoints, home export/import, node specification, discovery foundations, and an HTTP server. Inspect current source/tests for exact semantics of each operation.
-- Resource and note creation/update boundaries now reject invalid field types, non-strict JSON values, non-finite numbers, and invalid metadata before writing; regression coverage is in `tests/test_resource_creation_validation.py` and `tests/test_update_resource_validation.py`.
-- The current package is not a production-ready public agent platform. Public deployment still needs a complete reviewed policy for authentication/authorization, TLS termination, timeouts, rate limiting, operational logging, and lifecycle management.
-- The project does not yet establish universal file-format support, broad language bindings, a stable C ABI, autonomous self-evolution, distributed consensus/replication, sandboxed code execution, or petabyte/exabyte performance. Design documents are not implementation evidence.
-- The currently exposed CLI is intentionally small: `agent`, `search`, and `serve`. The CLI contract regression suite landed in PR #106.
+| PR | Merged scope | CI evidence |
+|---|---|---|
+| #71 | Snapshot contract versioning | Merged |
+| #73 | Artifact import-row validation | Merged |
+| #80 | Agents-table export/import | Merged |
+| #106 | Public CLI contract tests | [43862813272](https://github.com/usamaizm/AIDB/actions/runs/43862813272) |
+| #109 | Strict resource/note create and update validation | [43864558782](https://github.com/usamaizm/AIDB/actions/runs/43864558782) |
+| #111 | Strict home import row and change-payload validation | [43865913472](https://github.com/usamaizm/AIDB/actions/runs/43865913472) |
+| #112 | Read-only home integrity verification | [43866381773](https://github.com/usamaizm/AIDB/actions/runs/43866381773) |
+| #113 | Server-side diagnostics for sanitized HTTP 500 responses | [43866856432](https://github.com/usamaizm/AIDB/actions/runs/43866856432) |
+| #115 | Explicit v1 export projections and portability registry | [43867824641](https://github.com/usamaizm/AIDB/actions/runs/43867824641) |
+| #116 | RFC 8785/JCS canonical JSON and record-digest primitive | [43868111389](https://github.com/usamaizm/AIDB/actions/runs/43868111389) |
+| #117 | Restore historical `updated_at` fields in v1 projections | [43868719211](https://github.com/usamaizm/AIDB/actions/runs/43868719211) |
+| #119 | Local resource-backed agent discovery/collaboration | [43870081165](https://github.com/usamaizm/AIDB/actions/runs/43870081165) |
 
-## CI and quality gate
+All listed PR runs passed compileall, Ruff, and pytest on Python 3.10/3.11/3.12.
 
-The workflow installs `.[dev]`, compiles `aidb` and `tests`, runs Ruff, and executes pytest on Python 3.10/3.11/3.12. Ruff currently selects `E4`, `E9`, and `F`; it is a correctness-focused baseline, not a comprehensive style, type, or security scan. Always tie CI claims to the exact commit SHA and run URL.
+## Implemented boundaries and remaining limitations
 
-## High-priority open PR clusters
+- Home import validates required fields, JSON values, references, and change-payload semantics before writes; the savepoint/rollback path remains in place.
+- `verify_home()` is read-only and checks strict JSON shapes, snapshot format/hash/content, artifact blob existence/size/checksum, and change/revision/visibility history.
+- Resource and note creation/update reject malformed values and non-strict JSON before persistence.
+- HTTP unexpected GET/POST failures retain server-side tracebacks while returning a sanitized `internal_error` response. The server still lacks per-agent authorization scopes, multi-tenant isolation, rate limiting, and comprehensive request/operation timeouts.
+- Full/private exports include portable agents-table rows. Public-only exports omit agent rows until the table has an explicit visibility policy; public discovery uses visibility-aware agent-profile resources.
+- Export uses explicit per-table v1 projections; `updated_at` is preserved for resources and notes. `home_snapshots` remains storage-only and is not recursively exported.
+- `aidb/canonical.py` implements RFC 8785/JCS canonical JSON and per-record SHA-256 digests. This pure library is not yet integrated into a versioned home envelope, import/export digest validation, or `verify_home()`.
+- `aidb/network.py` implements local resource-backed agent profiles, offers, requests, collaboration requests, responses, and reviews. It is not peer-to-peer networking.
+- No stable C ABI, broad language bindings, autonomous self-evolution, sandboxed code execution, distributed consensus/replication, or extreme-scale performance guarantee is established. Design documents are not implementation evidence.
 
-There were 42 open PRs at audit time. Key clusters:
+## Open-work clusters
 
-- [#106 — CLI contract tests](https://github.com/usamaizm/AIDB/pull/106): merged after its three-version CI matrix passed.
-- [#71 — snapshot-contract versioning](https://github.com/usamaizm/AIDB/pull/71): merged; legacy snapshot stamps remain readable and new snapshots use `aidb-snapshot-v1`.
-- [#109 — resource/note validation](https://github.com/usamaizm/AIDB/pull/109): merged with all three CI jobs green; the older duplicate PRs #100 and #102 were closed.
-- [#73 — artifact import validation](https://github.com/usamaizm/AIDB/pull/73): remains open for review.
-- [#88 — HTTP safe 500 responses](https://github.com/usamaizm/AIDB/pull/88): unexpected handler errors return sanitized JSON 500. A review requested server-side exception logging (for example `logger.exception`) and a corresponding test; without diagnostics, the catch-all risks hiding operational failures.
-- [#90](https://github.com/usamaizm/AIDB/pull/90), [#92](https://github.com/usamaizm/AIDB/pull/92), [#98](https://github.com/usamaizm/AIDB/pull/98), [#104](https://github.com/usamaizm/AIDB/pull/104): overlapping `verify_home()` checks for artifact blobs, change payload/revision chains, snapshots, and stored-row JSON. Consolidate into one coherent function and test suite before merge; avoid four independent rewrites.
-- #70–#105: additional artifact registration/import validation, agents-table export/import, explicit export projections, portability registry, canonical JSON/digests, schema/versioning, dataclass consolidation, and paired documentation claims. PR #71 snapshot versioning is merged; PR #109 now covers resource/note validation and supersedes #100/#102. Validate each remaining PR against current main and its paired claim.
-- [#14](https://github.com/usamaizm/AIDB/pull/14), [#15](https://github.com/usamaizm/AIDB/pull/15), [#49](https://github.com/usamaizm/AIDB/pull/49), [#61](https://github.com/usamaizm/AIDB/pull/61): discovery, collaboration, and distributed networking overlap. Resolve identity, trust, authorization, canonicalization, compatibility, replication, and conflict semantics before implementation claims.
-- #8, #13, #16, #24, #25, #45, #50, #55, and #64: older service, import, context, workflow, runtime-spec, artifact, and modularity proposals; compare unique deltas to main and newer PRs.
-
-The discussion journal also records unpushed work claims. Check for branch/PR creation and respect claimed overlap before editing the same code.
-
-## Priority order
-
-1. Keep CI green on all supported Python versions and add regression coverage for actual defects.
-2. Consolidate and review import/export/snapshot verification, strict input validation, and artifact/provenance integrity.
-3. Fix HTTP error handling with both sanitized client responses and server-side diagnostics; verify authorization on every route before public exposure.
-4. Reconcile the overlapping PR families above; do not bulk-merge or close without diff review.
-5. Add Unicode/mixed-script preservation tests and measurable performance/storage benchmarks.
-6. Demonstrate a bounded AI development loop with actual discovery, implementation, failure repair, verification, and handoff evidence.
-7. Only then expand adapter, language-binding, distributed, and execution capabilities behind explicit contracts and isolation.
+- **Journal restoration:** PR #120 restored `DISCUSSION.md` after commit `9d2c296`. PR #118 has been closed as superseded. This audit and architecture PR do not modify the journal.
+- **Adapter refactor:** PR #64 extracts resource application and SQLite repository boundaries. Rebase/review it against current validation, import, verifier, and HTTP changes before merge.
+- **Broad remediation:** PR #55 combines many unrelated fixes and overlaps merged work. Extract only unique changes into bounded PRs.
+- **Distributed architecture:** PR #61 documents future node identity, authenticated peer transport, manifests, chunks, discovery, partial replication, and partition semantics. It remains proposed; no outbound peer client or replication engine exists.
+- **Older network proposals:** PRs #14/#15 overlap the now-merged local collaboration API (#119) and the distributed architecture proposal. Review for unique requirements rather than merging wholesale.
+- **Onboarding/protocol:** PRs #45/#24/#25 require separate review for current relevance.
+- **Contribution claims:** PRs #74–#105 and new PR #122 include agent-muse claim entries. Preserve provenance and disagreement, but verify claims against code and tests before treating them as completed work; compare #122 with #105 and merged #112 to avoid duplicate claims.
 
 ## Launch boundary
 
-AIDB should be described as an experimental local-first Python/SQLite reference implementation. Do not describe it as production-ready, universally format-compatible, distributed-consistent, a stable C ABI, a secure code-execution environment, or an extreme-scale database until those properties are implemented, tested, and independently reviewed.
+AIDB should be described as an experimental local-first Python/SQLite reference implementation with a tested local collaboration layer. Do not describe it as production-ready, distributed, universally format-compatible, a stable C ABI, a secure code-execution environment, or an extreme-scale database until those properties are implemented, tested, and independently reviewed.

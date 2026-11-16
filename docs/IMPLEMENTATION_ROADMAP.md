@@ -62,21 +62,35 @@ Acceptance evidence: reproducible scripts or workflow runs, test results, and a 
 - [ ] Implement reviewed self-improvement workflows with baselines, isolation, approvals, audit logs, rollback, and recovery before any autonomous structural changes.
 - [ ] Consider distributed storage only after local durability, replication semantics, access controls, and recovery have measurable tests.
 
-## Pull-request reconciliation (snapshot 2026-11-16)
+## Completed implementation tranches (2026-11-16)
 
-There were 42 open PRs at the latest snapshot (including this documentation PR and the new consolidated validation work before it merged). The following are priority review clusters, not merge instructions:
+- [x] CLI contract regression coverage (#106).
+- [x] Snapshot-contract versioning (#71).
+- [x] Artifact import-row validation (#73).
+- [x] Agents-table full/private export/import (#80).
+- [x] Strict resource/note create and update input validation (#109).
+- [x] Strict home import validation for portable rows and change payloads (#111).
+- [x] Read-only `verify_home()` checks for stored JSON, snapshots, artifact blobs, and revision/change history (#112).
+- [x] Sanitized HTTP 500 responses with server-side exception logging (#113).
+- [x] Explicit v1 export projections and per-table portability registry (#115), with historical `updated_at` columns restored in #117.
+- [x] RFC 8785/JCS canonical JSON and record-digest primitives (#116); integration into the home envelope/importer/verifier remains open.
+- [x] Local resource-backed agent discovery and collaboration (#119); peer networking remains open.
 
-- [#106 — CLI contract tests](https://github.com/usamaizm/AIDB/pull/106): merged; all three CI matrix jobs passed in run [43862813272](https://github.com/usamaizm/AIDB/actions/runs/43862813272).
-- [#71 — snapshot-contract versioning](https://github.com/usamaizm/AIDB/pull/71): merged; new snapshot rows use a dedicated snapshot-format stamp while accepting the legacy v1 stamp.
-- [#109 — resource/note validation](https://github.com/usamaizm/AIDB/pull/109): merged; strict input checks and creation/update regression suites passed all three Python versions. Duplicate PRs #100 and #102 are closed.
-- [#73 — artifact import validation](https://github.com/usamaizm/AIDB/pull/73): still open; review its remaining delta against the import path on current main.
-- [#88 — HTTP safe 500 responses](https://github.com/usamaizm/AIDB/pull/88): review requested server-side exception logging; keep client error bodies sanitized.
-- [#90](https://github.com/usamaizm/AIDB/pull/90), [#92](https://github.com/usamaizm/AIDB/pull/92), [#98](https://github.com/usamaizm/AIDB/pull/98), [#104](https://github.com/usamaizm/AIDB/pull/104): overlapping `verify_home()` integrity lanes; consolidate before merge.
-- #70–#105: related artifact/import validation, schema/versioning, export/import, portability, and documentation-claim work. PR #71 has merged; #100/#102 have been consolidated into #109 and closed. Review the remaining implementation PRs with their paired claim PRs and ensure claims match what actually lands.
-- [#14](https://github.com/usamaizm/AIDB/pull/14), [#15](https://github.com/usamaizm/AIDB/pull/15), [#49](https://github.com/usamaizm/AIDB/pull/49), [#61](https://github.com/usamaizm/AIDB/pull/61): overlapping discovery, collaboration, and networking proposals; compare contracts and security boundaries as one family.
-- #8, #13, #16, #24, #25, #45, #50, #55, and #64: inspect for unique changes versus current main and newer PRs; do not merge stale branches wholesale.
+## Pull-request reconciliation (snapshot 2026-11-16T12:56:54Z)
 
-Before acting on any PR, fetch its current diff, base/head SHAs, review threads, and latest CI. A green CI run on one PR does not validate main or another branch.
+There were 28 open PRs at snapshot time. This is a review queue, not a merge plan.
+
+- #120 has restored `DISCUSSION.md` from history. PR #118 has been closed as superseded by the merged restoration in #120. This PR intentionally leaves the journal unchanged.
+- #64 resource application and SQLite adapter extraction: next major refactor; rebase against current main and preserve strict input validation, import validation, integrity checks, and server logging.
+- #55 broad audit/remediation: overlaps several merged narrow fixes. Split or reconcile its unique changes before considering merge.
+- #61 distributed networking/evolution architecture: documentation proposal; this rebased companion preserves the architecture while excluding the conflicting journal edit.
+- #14/#15 older agent discovery/network proposals overlap local network implementation #119 and the proposed distributed design; retain only unique requirements.
+- #45/#24 onboarding proposals and #25 phone-first contribution protocol need independent relevance/compatibility review.
+- #74–#105 include paired agent-muse contribution-claim PRs. Preserve attribution, but verify every claim against the merged implementation and current source; claim documents are not implementation evidence.
+
+PR #122 adds another stored-row JSON integrity claim; compare it with #105 and merged #112 before accepting duplicate claim material.
+
+The current main is still an experimental Python/SQLite reference implementation. The local agent collaboration API does not establish peer federation, cryptographic node identity, distributed chunk transfer, replication, or production-grade multi-tenant authorization.
 
 ## Completion protocol
 
