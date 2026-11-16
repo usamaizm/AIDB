@@ -12,6 +12,8 @@ from threading import RLock
 from pathlib import Path
 from typing import Any, Callable
 
+from .portability import portable_tables
+
 from .core import (
     Agent,
     Artifact,
@@ -57,6 +59,42 @@ _CHECKSUM_ALGORITHM_ALIASES = {
 # register_artifact's default ("raw") and derive_artifact's default
 # ("derived").
 _ARTIFACT_STATUSES = {"raw", "derived"}
+
+# Explicit v1 export projection. Storage-only columns never enter the interchange payload.
+_EXPORT_COLUMNS = {
+    "node_identity": ("id", "node_id", "owner", "visibility", "metadata"),
+    "node_specifications": (
+        "version", "specification_id", "node_id", "visibility", "capabilities",
+        "resource_types", "transports", "extensions", "constraints", "issued_at",
+    ),
+    "home_resources": (
+        "id", "resource_type", "content", "owner", "visibility", "metadata",
+        "revision", "created_at", "updated_at",
+    ),
+    "notes": (
+        "id", "resource_id", "title", "content", "owner", "visibility", "kind",
+        "metadata", "revision", "created_at", "updated_at",
+    ),
+    "resource_relations": (
+        "id", "source_resource_id", "target_resource_id", "relation", "metadata",
+        "created_at",
+    ),
+    "home_changes": (
+        "id", "change_id", "resource_id", "operation", "actor", "previous_revision",
+        "new_revision", "payload", "created_at",
+    ),
+    "artifacts": (
+        "id", "name", "media_type", "filename", "size_bytes", "checksum",
+        "checksum_algorithm", "provenance", "status", "encoding",
+        "parent_artifact_id", "transformation_history", "metadata", "created_at",
+    ),
+    "artifact_blobs": ("artifact_id", "content", "created_at"),
+    "agents": (
+        "id", "name", "description", "model", "role", "permissions",
+        "capabilities", "metadata",
+    ),
+}
+
 
 _HEX_DIGITS = frozenset("0123456789abcdef")
 
@@ -1788,15 +1826,16 @@ class AIDB:
     def export_home(self, include_private=True):
         # Snapshot archives are deliberately excluded: embedding snapshots in
         # snapshots causes recursive growth and can re-export private history.
-        tables = [
-            "node_identity", "node_specifications", "home_resources", "notes",
-            "resource_relations", "home_changes", "artifacts", "artifact_blobs",
-            "agents",
-        ]
+        # The registry defines the table set; _EXPORT_COLUMNS defines the
+        # exact v1 row projection independently of SQLite's storage schema.
+        tables = portable_tables()
         payload = {"format": "aidb-home-v1", "tables": {}}
         if include_private:
             for table in tables:
-                rows = self.db.execute(f"SELECT * FROM {table}").fetchall()
+                columns = ", ".join(_EXPORT_COLUMNS[table])
+                rows = self.db.execute(
+                    f"SELECT {columns} FROM {table}"
+                ).fetchall()
                 payload["tables"][table] = [dict(row) for row in rows]
             payload["tables"]["artifact_blobs"] = [
                 {
@@ -1807,59 +1846,39 @@ class AIDB:
                 for row in payload["tables"]["artifact_blobs"]
             ]
         else:
-            payload["tables"]["node_identity"] = [
-                dict(row) for row in self.db.execute(
-                    "SELECT * FROM node_identity WHERE visibility='public'"
+            for table in ("node_identity", "node_specifications", "home_resources", "notes"):
+                columns = ", ".join(_EXPORT_COLUMNS[table])
+                rows = self.db.execute(
+                    f"SELECT {columns} FROM {table} WHERE visibility='public'"
                 ).fetchall()
-            ]
-            payload["tables"]["node_specifications"] = [
-                dict(row) for row in self.db.execute(
-                    "SELECT * FROM node_specifications WHERE visibility='public'"
-                ).fetchall()
-            ]
-            payload["tables"]["home_resources"] = [
-                dict(row) for row in self.db.execute(
-                    "SELECT * FROM home_resources WHERE visibility='public'"
-                ).fetchall()
-            ]
-            payload["tables"]["notes"] = [
-                dict(row) for row in self.db.execute(
-                    "SELECT * FROM notes WHERE visibility='public'"
-                ).fetchall()
-            ]
-            # Relation metadata is an opaque caller-controlled field and may
+                payload["tables"][table] = [dict(row) for row in rows]
+            # Relation metadata is opaque caller-controlled content and may
             # contain private annotations even when both endpoints are public.
+            relation_columns = ", ".join(
+                f"rel.{column}" for column in _EXPORT_COLUMNS["resource_relations"]
+            )
+            relations = self.db.execute(
+                f"""
+                SELECT {relation_columns}
+                FROM resource_relations rel
+                JOIN home_resources src ON src.id=rel.source_resource_id
+                JOIN home_resources dst ON dst.id=rel.target_resource_id
+                WHERE src.visibility='public' AND dst.visibility='public'
+                """
+            ).fetchall()
             payload["tables"]["resource_relations"] = [
-                {**dict(row), "metadata": "{}"}
-                for row in self.db.execute(
-                    """
-                    SELECT rel.* FROM resource_relations rel
-                    JOIN home_resources src ON src.id=rel.source_resource_id
-                    JOIN home_resources dst ON dst.id=rel.target_resource_id
-                    WHERE src.visibility='public' AND dst.visibility='public'
-                    """
-                ).fetchall()
+                {**dict(row), "metadata": "{}"} for row in relations
             ]
-            # Change payloads are historical snapshots of state. Current
-            # visibility cannot prove that an event was public when written;
-            # omit the history from filtered exports until events carry an
-            # independently enforced visibility classification.
+            # Historical events and artifacts have no independent visibility
+            # contract, so public-only exports omit them.
             payload["tables"]["home_changes"] = []
-            # Artifacts currently have no independent visibility/ownership
-            # contract. Exclude them from public-only exports until one exists.
             payload["tables"]["artifacts"] = []
             payload["tables"]["artifact_blobs"] = []
-            # Agents are identity/discovery records and the agents table has
-            # no visibility column, so they travel in public exports too.
-            # This follows PR #49's public-only discovery design, but it is
-            # a review point, not a settled contract: agent rows carry
-            # model/permissions/capabilities metadata, and whether that
-            # belongs in a public export is still an open question.
-            payload["tables"]["agents"] = [
-                dict(row) for row in self.db.execute(
-                    "SELECT * FROM agents"
-                ).fetchall()
-            ]
+            # Agent rows carry model, permissions, capabilities, and metadata
+            # but have no visibility field. Keep them in full/private exports
+            # only; public discovery should use visibility-aware agent_profile
+            # resources rather than leaking internal identity records.
+            payload["tables"]["agents"] = []
         if include_private:
             payload["verification"] = self.verify_home()
         else:
