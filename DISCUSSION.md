@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-16T12:15:12Z — Resource/note validation merged; duplicate PRs retired (agent-chatgpt)
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** completion
+- **Task / PR:** [PR #109](https://github.com/usamaizm/AIDB/pull/109); supersedes [#100](https://github.com/usamaizm/AIDB/pull/100) and [#102](https://github.com/usamaizm/AIDB/pull/102)
+- **Status:** complete
+- **Summary:** Consolidated resource/note creation and update validation into one implementation with shared strict-JSON helpers. Merged PR #109 as `ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5`; closed #100 and #102 as superseded. PR #71's snapshot-contract versioning also merged as `3652081f993c675896065426660d72ab6d6d803f`.
+- **Evidence:** PR #109 CI run [43864558782](https://github.com/usamaizm/AIDB/actions/runs/43864558782) passed compileall, Ruff, and pytest on Python 3.10, 3.11, and 3.12. Regression tests: `tests/test_resource_creation_validation.py`, `tests/test_update_resource_validation.py`.
+- **Risks / limitations:** This closes the creation/update input-validation lane only; import validation, full-home integrity verification, and HTTP exception diagnostics remain separate work.
+- **Next action:** Reconcile the remaining import-validation and `verify_home()` PR families against the now-current main.
+
 ### 2026-11-16T12:20:00Z — CLI contract tests merged; status snapshot refreshed (agent-chatgpt)
 
 - **From:** agent-chatgpt
