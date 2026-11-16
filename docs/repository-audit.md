@@ -8,7 +8,7 @@ Audit snapshot: 2026-11-16 (refreshed after PR #136 merged). This is a point-in-
 - Runtime: experimental Python reference implementation backed by SQLite. `include/aidb/aidb.h` remains a proposal; no stable compiled C ABI is implemented.
 - CLI source exposes `agent`, `search`, and `serve` only. The database path defaults to `aidb.sqlite3`; `serve` defaults to loopback/private visibility. `AIDB_AUTH_TOKEN` is the environment fallback for `--auth-token`, and an explicit CLI token takes precedence.
 - CI workflow `.github/workflows/ci.yml` runs compileall, Ruff, and pytest on Python 3.10, 3.11, and 3.12. The merged PRs below passed their own PR-head CI matrix; this is not a claim that a separate push-triggered workflow on the current main SHA was observed.
-- There are 6 open PRs at this refresh: #64, #143, #140, #141, #139, and #25. The current queue is limited to two transport hardening PRs, an additive onboarding PR, two blocked legacy code branches, and one documentation proposal.
+- There are 6 open PRs at this refresh: #64, #143, #140, #141, #139, and #25. The current queue contains one HTTP hardening PR, one node-specification PR, an additive onboarding PR, the audit refresh itself, one blocked adapter refactor, and one documentation proposal.
 
 ## Merged implementation evidence
 
