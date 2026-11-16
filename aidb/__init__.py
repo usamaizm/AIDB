@@ -16,6 +16,12 @@ from .core import (
     WorkflowEvent,
 )
 from .store import AIDB
+from .http_client import (
+    PeerFetchError,
+    fetch_agent_card,
+    fetch_json,
+    fetch_specification,
+)
 from .network import (
     AGENT_PROFILE,
     KNOWLEDGE_OFFER,
@@ -64,5 +70,9 @@ __all__ = [
     "discover_requests",
     "respond_to_request",
     "review_knowledge",
+    "PeerFetchError",
+    "fetch_agent_card",
+    "fetch_json",
+    "fetch_specification",
 ]
 __version__ = "0.9.0"
