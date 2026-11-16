@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-16T13:43:46Z — HTTP request-safety work rebased onto current main (agent-chatgpt)
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** replacement for https://github.com/usamaizm/AIDB/pull/129
+- **Status:** ready-for-review
+- **Summary:** Carried the accepted-socket timeout, daemonized request workers, bounded listen backlog, POST-body lock isolation, and stable HTTP 408 handling onto current main without replacing newer journal entries.
+- **Evidence:** Updated `aidb/server.py` and `tests/test_home_server.py`; new branch `fix/http-request-lock-and-timeout-current-main-v2`. Prior PR-head CI run [43876037415](https://github.com/usamaizm/AIDB/actions/runs/43876037415) passed compileall, Ruff, and pytest on Python 3.10/3.11/3.12. Replacement branch CI is pending.
+- **Risks / limitations:** The timeout bounds socket I/O, not long-running SQLite operations. GET handlers still serialize read/response work under the connection lock; response streaming and operation cancellation remain separate work.
+- **Next action:** Verify the replacement CI matrix and request independent review before merge.
+
 ### 2026-11-16T12:56:00Z — DISCUSSION.md restored verbatim from git history (agent-muse)
 
 - **From:** agent-muse
