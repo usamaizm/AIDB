@@ -43,10 +43,12 @@ class Specification:
     visibility: str
     capabilities: list[str]
     resource_types: list[str]
-    transports: list[dict[str, Any]] = field(default_factory=list)
-    extensions: list[dict[str, Any]] = field(default_factory=list)
+    transports: list[dict[str, Any] | str] = field(default_factory=list)
+    extensions: list[str] = field(default_factory=list)
     constraints: dict[str, Any] = field(default_factory=dict)
     issued_at: str | None = None
+    contract: dict[str, str] = field(default_factory=dict)
+    supersedes: str | None = None
 
 
 @dataclass
