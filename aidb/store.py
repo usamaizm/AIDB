@@ -103,6 +103,57 @@ _LEGACY_SNAPSHOT_FORMAT = "aidb-home-v1"
 _ACCEPTED_SNAPSHOT_FORMATS = frozenset({SNAPSHOT_FORMAT, _LEGACY_SNAPSHOT_FORMAT})
 
 
+
+def _validate_strict_json_value(value: Any, label: str) -> None:
+    """Reject values that are not strict JSON (no NaN/Infinity, no silent coercion)."""
+    if value is None or isinstance(value, (str, bool)):
+        return
+    if isinstance(value, int):
+        return
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"{label} must contain only finite numbers")
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str) or not key:
+                raise ValueError(f"{label} keys must be non-empty strings")
+            _validate_strict_json_value(item, label)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _validate_strict_json_value(item, label)
+        return
+    raise ValueError(f"{label} must be a JSON value")
+
+
+def _validate_metadata(metadata: Any, label: str = "metadata") -> None:
+    """Metadata must be absent or a JSON object of strict JSON values."""
+    if metadata is None:
+        return
+    if not isinstance(metadata, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    _validate_strict_json_value(metadata, label)
+
+
+def _validate_note_content(content: Any) -> None:
+    """Validate note-resource content while preserving the legacy scalar shorthand."""
+    if isinstance(content, dict):
+        if not {"title", "content"}.issubset(content):
+            raise ValueError("note resource content must include title and content")
+        if not isinstance(content["title"], str) or not content["title"].strip():
+            raise ValueError("note title must be a non-empty string")
+        if not isinstance(content["content"], str):
+            raise ValueError("note content must be a string")
+        if "kind" in content and (
+            not isinstance(content["kind"], str) or not content["kind"].strip()
+        ):
+            raise ValueError("note kind must be a non-empty string")
+        return
+    if not isinstance(content, str):
+        raise ValueError("note content must be a string")
+
+
 class AIDB:
     """SQLite-backed state layer for AI agents, sessions, tasks, memory, tools, workflow events, and artifacts."""
 
@@ -1195,6 +1246,12 @@ class AIDB:
 
     def create_resource(self, resource_type, content=None, owner=None, visibility="private", metadata=None):
         if visibility not in {"public", "private"}: raise ValueError("visibility must be public or private")
+        if not isinstance(resource_type, str) or not resource_type.strip():
+            raise ValueError("resource_type must be a non-empty string")
+        if owner is not None and not isinstance(owner, str):
+            raise ValueError("owner must be a string")
+        _validate_strict_json_value(content, "content")
+        _validate_metadata(metadata)
         rid = "res:" + str(uuid.uuid4())
         self.db.execute("INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)", (rid, resource_type, json.dumps(content), owner, visibility, self._json(metadata or {})))
         self._append_workflow_event("resource_created", "resource created", metadata={"resource_id": rid, "resource_type": resource_type, "owner": owner, "visibility": visibility})
@@ -1228,6 +1285,15 @@ class AIDB:
     def create_note(self, title, content, owner=None, visibility="private", kind="note", metadata=None):
         if visibility not in {"public", "private"}:
             raise ValueError("visibility must be public or private")
+        if not isinstance(title, str) or not title.strip():
+            raise ValueError("title must be a non-empty string")
+        if not isinstance(content, str):
+            raise ValueError("content must be a string")
+        if not isinstance(kind, str) or not kind.strip():
+            raise ValueError("kind must be a non-empty string")
+        if owner is not None and not isinstance(owner, str):
+            raise ValueError("owner must be a string")
+        _validate_metadata(metadata)
         resource_id = "res:" + str(uuid.uuid4())
         resource_content = {"title": title, "content": content, "kind": kind}
         try:
@@ -1663,6 +1729,18 @@ class AIDB:
             raise PermissionError("owner mismatch")
         if expected_revision is not None and row["revision"] != expected_revision:
             raise ValueError("revision conflict")
+
+        # Validate before any write: None means "keep existing" and is not
+        # validated. Note rules need the notes row, so they run here too,
+        # before BEGIN.
+        if content is not None:
+            _validate_strict_json_value(content, "content")
+            note_row = self.db.execute(
+                "SELECT 1 FROM notes WHERE resource_id=?", (resource_id,)
+            ).fetchone()
+            if note_row is not None:
+                _validate_note_content(content)
+        _validate_metadata(metadata)
 
         old_revision = row["revision"]
         new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
