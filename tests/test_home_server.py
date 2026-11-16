@@ -110,6 +110,7 @@ def test_create_server_sets_connection_timeout_and_bounded_worker_defaults():
         assert accepted.gettimeout() == 10.0
         assert server.daemon_threads is True
         assert server.request_queue_size == 32
+        assert server.max_workers == 16
     finally:
         if accepted is not None:
             accepted.close()
