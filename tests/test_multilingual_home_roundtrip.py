@@ -31,7 +31,9 @@ def test_multilingual_note_content_and_metadata_round_trip():
     restored = AIDB(":memory:")
     restored.import_home(exported)
 
-    restored_by_title = {note.title: note for note in restored.list_notes(include_private=True)}
+    restored_by_title = {
+        note.title: note for note in restored.list_notes(include_private=True)
+    }
 
     for key, value in MULTILINGUAL_CASES.items():
         note = restored_by_title[f"{key}-title"]
@@ -59,7 +61,10 @@ def test_multilingual_resource_payload_and_relation_round_trip():
         },
         owner="agent:one",
         visibility="public",
-        metadata={"script_mix": ["latin", "arabic", "han", "hiragana"], "sample": "ABC مرحبا بالعالم 123"},
+        metadata={
+            "script_mix": ["latin", "arabic", "han", "hiragana"],
+            "sample": "ABC مرحبا بالعالم 123",
+        },
     )
 
     right = source.create_resource(
@@ -74,16 +79,31 @@ def test_multilingual_resource_payload_and_relation_round_trip():
         metadata={"sample": "繁體中文 / 日本語 / العربية"},
     )
 
-    source.relate_resources(left.id, right.id, "references", metadata={"note": "ABC مرحبا بالعالم 123"})
+    source.relate_resources(
+        left.id,
+        right.id,
+        "references",
+        metadata={"note": "ABC مرحبا بالعالم 123"},
+    )
 
     exported = source.export_home(include_private=True)
 
     restored = AIDB(":memory:")
     restored.import_home(exported)
 
-    restored_resources = {resource.resource_type + ":" + str(resource.id): resource for resource in restored.list_resources(include_private=True)}
-    restored_left = next(resource for resource in restored.list_resources(include_private=True) if resource.resource_type == "document" and resource.metadata.get("script_mix") == ["latin", "arabic", "han", "hiragana"])
-    restored_right = next(resource for resource in restored.list_resources(include_private=True) if resource.metadata.get("sample") == "繁體中文 / 日本語 / العربية")
+    resources = restored.list_resources(include_private=True)
+    restored_left = next(
+        resource
+        for resource in resources
+        if resource.resource_type == "document"
+        and resource.metadata.get("script_mix")
+        == ["latin", "arabic", "han", "hiragana"]
+    )
+    restored_right = next(
+        resource
+        for resource in resources
+        if resource.metadata.get("sample") == "繁體中文 / 日本語 / العربية"
+    )
 
     assert restored_left.content["title"] == "ABC مرحبا بالعالم 123"
     assert restored_left.content["body"] == "你好，世界 — こんにちは — مرحبا"
