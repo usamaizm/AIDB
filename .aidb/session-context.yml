@@ -90,6 +90,8 @@ status:
       topic: "Living context and agent identity; compare remaining unique changes with the new main-branch handoff."
       url: "https://github.com/usamaizm/AIDB/pull/16"
 canonical_docs:
+  agent_onboarding: docs/agent-onboarding.md
+  handoff_template: .aidb/templates/agent-handoff.md
   project_context: docs/PROJECT_CONTEXT.md
   contributor_rules: AGENTS.md
   repository_audit: docs/repository-audit.md
