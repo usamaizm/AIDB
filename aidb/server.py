@@ -246,18 +246,24 @@ def create_server(
     auth_token: str | None = None,
     tls_certfile: str | None = None,
     tls_keyfile: str | None = None,
-) -> ThreadingHTTPServer:
+    max_workers: int = 16,
+) -> AIDBHTTPServer:
     validate_bind_security(host, auth_token, tls_certfile, tls_keyfile)
-    server = AIDBHTTPServer((host, port), create_handler(db, auth_token))
+    context = None
     if tls_certfile and tls_keyfile:
-        try:
-            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            context.minimum_version = ssl.TLSVersion.TLSv1_2
-            context.load_cert_chain(tls_certfile, tls_keyfile)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(tls_certfile, tls_keyfile)
+
+    server = AIDBHTTPServer(
+        (host, port), create_handler(db, auth_token), max_workers=max_workers
+    )
+    try:
+        if context is not None:
             server.socket = context.wrap_socket(server.socket, server_side=True)
-        except Exception:
-            server.server_close()
-            raise
+    except Exception:
+        server.server_close()
+        raise
     return server
 
 
