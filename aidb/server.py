@@ -4,7 +4,6 @@ import ipaddress
 import logging
 import json
 import secrets
-import socket
 import ssl
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
