@@ -11,6 +11,19 @@ from urllib.parse import parse_qs, urlparse
 from .store import AIDB
 
 logger = logging.getLogger(__name__)
+_REQUEST_TIMEOUT_SECONDS = 10.0
+
+
+class AIDBHTTPServer(ThreadingHTTPServer):
+    """Threaded server with bounded backlog and per-connection I/O timeout."""
+
+    daemon_threads = True
+    request_queue_size = 32
+
+    def get_request(self):
+        request, client_address = super().get_request()
+        request.settimeout(_REQUEST_TIMEOUT_SECONDS)
+        return request, client_address
 
 
 def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int = 1048576, max_page_size: int = 200):
@@ -87,8 +100,9 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
                 return self._send(500, {"error": "internal_error"})
 
         def do_POST(self):
-            with db._connection_lock:
-                self._handle_post()
+            # Read and parse untrusted request bytes before acquiring the
+            # shared SQLite lock. A slow client must not block other requests.
+            self._handle_post()
 
         def _handle_post(self):
             path = urlparse(self.path).path
@@ -105,36 +119,41 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
             try:
                 body = self._json_body()
                 if path == "/v1/notes":
-                    note = db.create_note(
-                        body["title"],
-                        body["content"],
-                        body.get("owner"),
-                        body.get("visibility", "private"),
-                        body.get("kind", "note"),
-                        body.get("metadata"),
-                    )
+                    with db._connection_lock:
+                        note = db.create_note(
+                            body["title"],
+                            body["content"],
+                            body.get("owner"),
+                            body.get("visibility", "private"),
+                            body.get("kind", "note"),
+                            body.get("metadata"),
+                        )
                     return self._send(201, note.__dict__)
                 if path == "/v1/resources":
-                    resource = db.create_resource(
-                        body["resource_type"],
-                        body.get("content"),
-                        body.get("owner"),
-                        body.get("visibility", "private"),
-                        body.get("metadata"),
-                    )
+                    with db._connection_lock:
+                        resource = db.create_resource(
+                            body["resource_type"],
+                            body.get("content"),
+                            body.get("owner"),
+                            body.get("visibility", "private"),
+                            body.get("metadata"),
+                        )
                     return self._send(201, resource.__dict__)
                 if path.startswith("/v1/resources/") and path.endswith("/relations"):
                     resource_id = path.split("/")[3]
-                    db.relate_resources(
-                        resource_id,
-                        body["target_resource_id"],
-                        body["relation"],
-                        body.get("metadata"),
-                    )
+                    with db._connection_lock:
+                        db.relate_resources(
+                            resource_id,
+                            body["target_resource_id"],
+                            body["relation"],
+                            body.get("metadata"),
+                        )
                     return self._send(201, {"ok": True})
                 return self._send(404, {"error": "not_found"})
             except OverflowError as exc:
                 return self._send(413, {"error": str(exc)})
+            except TimeoutError:
+                return self._send(408, {"error": "request_timeout"})
             except (KeyError, ValueError, json.JSONDecodeError) as exc:
                 return self._send(400, {"error": str(exc)})
             except Exception:
@@ -185,7 +204,7 @@ def create_server(
     tls_keyfile: str | None = None,
 ) -> ThreadingHTTPServer:
     validate_bind_security(host, auth_token, tls_certfile, tls_keyfile)
-    server = ThreadingHTTPServer((host, port), create_handler(db, auth_token))
+    server = AIDBHTTPServer((host, port), create_handler(db, auth_token))
     if tls_certfile and tls_keyfile:
         try:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
