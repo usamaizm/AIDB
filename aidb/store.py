@@ -1470,13 +1470,301 @@ class AIDB:
         s=self.current_specification()
         return {"id":s.id,"version":s.version,"node":{"id":s.node_id},"visibility":s.visibility,"capabilities":s.capabilities,"resources":s.resource_types,"transports":s.transports,"extensions":s.extensions,"constraints":s.constraints,"issued_at":s.issued_at}
 
+    def _verify_home_json_columns(self, issues):
+        """Check stored JSON-text columns using strict parsing and read-path shapes."""
+        json_columns = [
+            ("home_resources", "id", [("content", "any"), ("metadata", "object")]),
+            ("notes", "id", [("metadata", "object")]),
+            ("resource_relations", "id", [("metadata", "object")]),
+            (
+                "artifacts",
+                "id",
+                [
+                    ("provenance", "object"),
+                    ("metadata", "object"),
+                    ("transformation_history", "string-list"),
+                ],
+            ),
+            ("node_identity", "id", [("metadata", "object")]),
+            (
+                "node_specifications",
+                "version",
+                [
+                    ("capabilities", "string-list"),
+                    ("resource_types", "string-list"),
+                    ("transports", "string-list"),
+                    ("extensions", "string-list"),
+                    ("constraints", "object"),
+                ],
+            ),
+            (
+                "agents",
+                "id",
+                [
+                    ("permissions", "string-list"),
+                    ("capabilities", "string-list"),
+                    ("metadata", "object"),
+                ],
+            ),
+        ]
+        for table, id_column, columns in json_columns:
+            selected = ", ".join([id_column] + [name for name, _ in columns])
+            for row in self.db.execute(
+                f"SELECT {selected} FROM {table} ORDER BY {id_column}"
+            ).fetchall():
+                for column, shape in columns:
+                    label = f"{table}.{column}"
+                    try:
+                        value = json.loads(
+                            row[column],
+                            object_pairs_hook=self._unique_json_object,
+                            parse_constant=self._reject_json_constant,
+                        )
+                    except (json.JSONDecodeError, ValueError, TypeError, UnicodeDecodeError, RecursionError):
+                        issues.append(
+                            f"invalid JSON in {label} for {id_column}={row[id_column]}"
+                        )
+                        continue
+                    if shape == "object":
+                        if not isinstance(value, dict):
+                            issues.append(
+                                f"invalid JSON shape in {label} for {id_column}={row[id_column]}: expected object"
+                            )
+                            continue
+                        try:
+                            self._validate_json_object(value, label)
+                        except (ValueError, TypeError, RecursionError):
+                            issues.append(
+                                f"invalid JSON in {label} for {id_column}={row[id_column]}"
+                            )
+                    elif shape == "string-list" and (
+                        not isinstance(value, list)
+                        or any(not isinstance(item, str) for item in value)
+                    ):
+                        issues.append(
+                            f"invalid JSON shape in {label} for {id_column}={row[id_column]}: expected list of strings"
+                        )
+
+    def _verify_home_snapshots(self, issues):
+        """Check snapshot format stamps, content hashes, IDs, and embedded envelopes."""
+        rows = self.db.execute(
+            "SELECT snapshot_id,home_format,content,content_hash FROM home_snapshots ORDER BY id"
+        ).fetchall()
+        for row in rows:
+            snapshot_id = row["snapshot_id"]
+            if row["home_format"] not in _ACCEPTED_SNAPSHOT_FORMATS:
+                issues.append("snapshot unknown format:" + str(snapshot_id))
+            content = row["content"]
+            content_hash = row["content_hash"]
+            if not isinstance(content, str) or not isinstance(content_hash, str):
+                issues.append("snapshot checksum mismatch:" + str(snapshot_id))
+                continue
+            digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            if digest != content_hash or snapshot_id != "snap:" + digest:
+                issues.append("snapshot checksum mismatch:" + str(snapshot_id))
+                continue
+            try:
+                payload = json.loads(
+                    content,
+                    object_pairs_hook=self._unique_json_object,
+                    parse_constant=self._reject_json_constant,
+                )
+            except (json.JSONDecodeError, ValueError, TypeError, UnicodeDecodeError, RecursionError):
+                issues.append("snapshot invalid content:" + str(snapshot_id))
+                continue
+            if (
+                not isinstance(payload, dict)
+                or payload.get("format") != "aidb-home-v1"
+                or not isinstance(payload.get("tables"), dict)
+            ):
+                issues.append("snapshot invalid content:" + str(snapshot_id))
+
+    def _verify_home_artifact_blobs(self, issues):
+        """Check every stored blob against its artifact metadata without raising."""
+        blobs = self.db.execute(
+            "SELECT b.artifact_id, b.content, a.size_bytes, a.checksum, "
+            "a.checksum_algorithm FROM artifact_blobs b "
+            "LEFT JOIN artifacts a ON a.id = b.artifact_id "
+            "ORDER BY b.artifact_id"
+        ).fetchall()
+        for blob in blobs:
+            artifact_id = blob["artifact_id"]
+            if blob["size_bytes"] is None:
+                issues.append("orphan artifact blob:" + str(artifact_id))
+                continue
+            try:
+                content = bytes(blob["content"])
+            except (TypeError, ValueError):
+                issues.append("artifact payload size mismatch:" + str(artifact_id))
+                continue
+            if len(content) != blob["size_bytes"]:
+                issues.append("artifact payload size mismatch:" + str(artifact_id))
+                continue
+            try:
+                actual_checksum = self._checksum_bytes(
+                    content, blob["checksum_algorithm"]
+                )
+            except (TypeError, ValueError):
+                issues.append("artifact checksum algorithm unsupported:" + str(artifact_id))
+                continue
+            if actual_checksum != blob["checksum"]:
+                issues.append("artifact payload checksum mismatch:" + str(artifact_id))
+
+    def _verify_home_changes(self, issues):
+        """Replay resource history and verify its payloads, revisions, and relations."""
+        changes = self.db.execute(
+            "SELECT id,resource_id,operation,previous_revision,new_revision,payload "
+            "FROM home_changes ORDER BY id"
+        ).fetchall()
+        resources = {
+            row["id"]: dict(row)
+            for row in self.db.execute(
+                "SELECT id,resource_type,visibility,revision FROM home_resources"
+            ).fetchall()
+        }
+        relation_keys = {
+            (row["source_resource_id"], row["target_resource_id"], row["relation"])
+            for row in self.db.execute(
+                "SELECT source_resource_id,target_resource_id,relation FROM resource_relations"
+            ).fetchall()
+        }
+        expected_revision = {}
+        expected_visibility = {}
+        broken_revision = set()
+
+        def break_chain(resource_id, change_id, prefix="revision chain broken:"):
+            if resource_id not in broken_revision:
+                issues.append(prefix + str(change_id))
+                broken_revision.add(resource_id)
+
+        for row in changes:
+            change_id = row["id"]
+            operation = row["operation"]
+            resource_id = row["resource_id"]
+            try:
+                payload = json.loads(
+                    row["payload"],
+                    object_pairs_hook=self._unique_json_object,
+                    parse_constant=self._reject_json_constant,
+                )
+                payload_ok = isinstance(payload, dict)
+            except (json.JSONDecodeError, ValueError, TypeError, UnicodeDecodeError, RecursionError):
+                payload = None
+                payload_ok = False
+            if not payload_ok:
+                issues.append("invalid change payload:" + str(change_id))
+
+            if operation not in {"create", "update", "publish", "relate"}:
+                issues.append("unknown change operation:" + str(change_id))
+                continue
+            if not isinstance(resource_id, str) or not resource_id.strip():
+                issues.append("missing resource id:" + str(change_id))
+                continue
+            resource = resources.get(resource_id)
+            if resource is None:
+                issues.append("missing resource:" + resource_id)
+                continue
+
+            previous = row["previous_revision"]
+            new = row["new_revision"]
+            if new is not None and (
+                isinstance(new, bool) or not isinstance(new, int)
+                or new > resource["revision"]
+            ):
+                issues.append("future revision:" + str(change_id))
+                broken_revision.add(resource_id)
+
+            if operation == "create":
+                if resource_id in expected_revision:
+                    break_chain(resource_id, change_id)
+                elif previous is not None or new != 1:
+                    break_chain(resource_id, change_id)
+                else:
+                    expected_revision[resource_id] = 1
+                if payload_ok:
+                    if set(payload) != {"resource_type", "visibility"}:
+                        issues.append("create payload mismatch:" + str(change_id))
+                    else:
+                        visibility = payload["visibility"]
+                        if (
+                            payload["resource_type"] != resource["resource_type"]
+                            or not isinstance(visibility, str)
+                            or visibility not in {"public", "private"}
+                        ):
+                            issues.append("create payload mismatch:" + str(change_id))
+                        else:
+                            expected_visibility[resource_id] = visibility
+            elif operation in {"update", "publish"}:
+                if resource_id not in expected_revision:
+                    break_chain(resource_id, change_id, "unanchored revision:")
+                elif (
+                    previous is None
+                    or new is None
+                    or isinstance(previous, bool)
+                    or isinstance(new, bool)
+                    or not isinstance(previous, int)
+                    or not isinstance(new, int)
+                    or previous != expected_revision[resource_id]
+                    or new != previous + 1
+                ):
+                    break_chain(resource_id, change_id)
+                elif resource_id not in broken_revision:
+                    expected_revision[resource_id] = new
+
+                if payload_ok and operation == "update":
+                    if (
+                        set(payload) != {"content_changed", "metadata_changed"}
+                        or not isinstance(payload.get("content_changed"), bool)
+                        or not isinstance(payload.get("metadata_changed"), bool)
+                    ):
+                        issues.append("update payload mismatch:" + str(change_id))
+                if payload_ok and operation == "publish":
+                    if payload != {}:
+                        issues.append("publish payload mismatch:" + str(change_id))
+                    expected_visibility[resource_id] = "public"
+            else:
+                if (
+                    previous is not None
+                    or new is not None
+                    or not payload_ok
+                    or set(payload) != {"target_resource_id", "relation"}
+                ):
+                    issues.append("relate payload mismatch:" + str(change_id))
+                    continue
+                target = payload.get("target_resource_id")
+                relation = payload.get("relation")
+                if (
+                    not isinstance(target, str)
+                    or not target.strip()
+                    or not isinstance(relation, str)
+                    or not relation.strip()
+                    or target == resource_id
+                ):
+                    issues.append("relate payload mismatch:" + str(change_id))
+                elif target not in resources:
+                    issues.append("relate target missing:" + str(change_id))
+                elif (resource_id, target, relation) not in relation_keys:
+                    issues.append("relate payload mismatch:" + str(change_id))
+
+        for resource_id, revision in expected_revision.items():
+            resource = resources.get(resource_id)
+            if resource is None or resource_id in broken_revision:
+                continue
+            if resource["revision"] > revision:
+                issues.append("revision mismatch:" + resource_id)
+            if (
+                resource_id in expected_visibility
+                and resource["visibility"] != expected_visibility[resource_id]
+            ):
+                issues.append("visibility mismatch:" + resource_id)
+
     def verify_home(self):
-        issues=[]
-        for row in self.db.execute("SELECT id,resource_id,operation,previous_revision,new_revision FROM home_changes ORDER BY id").fetchall():
-            if row["operation"] in {"create","update","publish"} and row["resource_id"]:
-                resource=self.db.execute("SELECT revision FROM home_resources WHERE id=?", (row["resource_id"],)).fetchone()
-                if resource is None: issues.append("missing resource:"+row["resource_id"])
-                if row["new_revision"] is not None and resource is not None and row["new_revision"] > resource["revision"]: issues.append("future revision:"+str(row["id"]))
+        """Return a read-only integrity report for stored home state."""
+        issues = []
+        self._verify_home_json_columns(issues)
+        self._verify_home_snapshots(issues)
+        self._verify_home_artifact_blobs(issues)
+        self._verify_home_changes(issues)
         return {"ok": not issues, "issues": issues}
 
     def export_home(self, include_private=True):
