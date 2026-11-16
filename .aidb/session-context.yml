@@ -206,10 +206,10 @@ live_repository_snapshot:
     - "Local agent collaboration exists; distributed peer networking does not."
     - "RFC 8785 digest primitives exist; home-format integration is not complete."
   open_work_clusters:
-    - "PR #137 HTTP request safety: current-main branch; CI 43882228276 passed Python 3.10/3.11/3.12; independent review pending."
-    - "PR #138 HTTPS verification: current-main branch; CI 43882236199 passed Python 3.10/3.11/3.12; independent review pending."
+    - "PR #137 HTTP request safety: current-main branch; CI 43882228276 passed Python 3.10/3.11/3.12; active worker count remains unbounded because listen backlog is not a worker cap; independent review pending."
+    - "PR #138 HTTPS verification: current-main branch; CI 43882236199 passed Python 3.10/3.11/3.12; add negative trusted-certificate hostname-mismatch test; independent review pending."
     - "PR #139 progressive onboarding: additive docs; CI 43882238516 passed Python 3.10/3.11/3.12; independent review pending."
-    - "PR #140 refreshes this audit and session snapshot; docs-only, CI pending for current head."
+    - "PR #140 refreshes this audit and session snapshot; docs-only; CI run 43882777620 passed before the latest audit observations were added, so recheck the new head."
     - "PR #64 adapter refactor: dirty merge, 88 commits behind; bypasses strict resource validation and reintroduces POST body lock contention."
     - "PR #55 broad remediation: dirty merge, 92 commits behind; last reviewed head had Ruff F821 and two pytest failures; extract unique work only."
     - "PR #25 phone-first contribution protocol: docs proposal; workflow inventory and branch-protection review outstanding."
