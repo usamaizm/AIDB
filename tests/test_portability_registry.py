@@ -1,7 +1,7 @@
 """Portability-registry tests.
 
 The coupling audit (issue #29, section 1) found the interchange boundary
-was accidental: export_home happened to list 8 of the schema's tables,
+was accidental: export_home happened to list 9 of the schema's tables,
 with no recorded decision for the rest. aidb.portability makes that
 boundary explicit; these tests make it executable — a table cannot
 silently become portable or non-portable, and a schema table added
