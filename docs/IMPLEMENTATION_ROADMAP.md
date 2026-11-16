@@ -1,6 +1,6 @@
 # AIDB Implementation Roadmap
 
-Last reviewed: 2026-10-10  
+Last reviewed: 2026-11-16  
 Status: living checklist; refresh evidence from current `main` before treating an item as complete.
 
 This is the actionable companion to [the project context](PROJECT_CONTEXT.md) and [the machine-readable session manifest](../.aidb/session-context.yml). It separates shipped behavior from design intent. “Done” requires code, regression tests, and current CI evidence where applicable.
@@ -12,13 +12,11 @@ This is the actionable companion to [the project context](PROJECT_CONTEXT.md) an
 - [x] Keep Python CI matrix on 3.10, 3.11, and 3.12 with compile, Ruff, and pytest.
   - Evidence: [latest previously completed onboarding CI](https://github.com/usamaizm/AIDB/actions/runs/38051323847). Recheck CI after code changes.
 - [x] Add configurable bounds to HTTP note/resource list responses and change feeds; support offset pagination.
-  - Implementation: `aidb/server.py`, `aidb/store.py`.
-  - Tests: `tests/test_home_server.py`.
-  - This item is pending CI verification for the current code commits until the new workflow run succeeds.
+  - Implementation: `aidb/server.py`, `aidb/store.py`; regression coverage: `tests/test_home_server.py`.
 - [x] Reject HTTP request bodies larger than a configurable limit before reading/parsing the body.
-  - Default limit: 1 MiB; oversized authorized POST receives HTTP 413.
-  - Tests: `tests/test_home_server.py`.
-  - This item is pending CI verification for the current code commits until the new workflow run succeeds.
+  - Default limit: 1 MiB; oversized authorized POST receives HTTP 413. Regression coverage: `tests/test_home_server.py`.
+- [ ] Add regression tests for the exposed CLI command contract.
+  - Proposed in [PR #106](https://github.com/usamaizm/AIDB/pull/106); CI run [43862813272](https://github.com/usamaizm/AIDB/actions/runs/43862813272) passed Python 3.10/3.11/3.12. Keep unchecked until merged to `main`.
 
 ## P0 — Demonstrate the AI development loop
 
@@ -61,12 +59,18 @@ Acceptance evidence: reproducible scripts or workflow runs, test results, and a 
 - [ ] Implement reviewed self-improvement workflows with baselines, isolation, approvals, audit logs, rollback, and recovery before any autonomous structural changes.
 - [ ] Consider distributed storage only after local durability, replication semantics, access controls, and recovery have measurable tests.
 
-## Pull-request reconciliation
+## Pull-request reconciliation (snapshot 2026-11-16)
 
-- [ ] [#8 — online service](https://github.com/usamaizm/AIDB/pull/8): compare unique service changes against the server already on main; deployment must not be public by default.
-- [ ] [#13 — atomic import](https://github.com/usamaizm/AIDB/pull/13): compare with the main-branch atomic/schema-safe import implementation and preserve any unique tests.
-- [ ] [#14 — agent discovery](https://github.com/usamaizm/AIDB/pull/14) and [#15 — agent network](https://github.com/usamaizm/AIDB/pull/15): review together and consolidate overlapping files and contracts.
-- [ ] [#16 — living context](https://github.com/usamaizm/AIDB/pull/16): compare remaining unique changes against the now-existing session manifest and handoff.
+There are 47 open PRs. The following are priority review clusters, not merge instructions:
+
+- [#106 — CLI contract tests](https://github.com/usamaizm/AIDB/pull/106): all three CI matrix jobs passed on its head in run [43862813272](https://github.com/usamaizm/AIDB/actions/runs/43862813272); still open and not yet part of main.
+- [#88 — HTTP safe 500 responses](https://github.com/usamaizm/AIDB/pull/88): review requested server-side exception logging; keep client error bodies sanitized.
+- [#90](https://github.com/usamaizm/AIDB/pull/90), [#92](https://github.com/usamaizm/AIDB/pull/92), [#98](https://github.com/usamaizm/AIDB/pull/98), [#104](https://github.com/usamaizm/AIDB/pull/104): overlapping `verify_home()` integrity lanes; consolidate before merge.
+- #70–#105: related validation, schema/versioning, export/import, portability, and documentation-claim work. Review implementation PRs with their paired claim PRs and ensure claims match what actually lands.
+- [#14](https://github.com/usamaizm/AIDB/pull/14), [#15](https://github.com/usamaizm/AIDB/pull/15), [#49](https://github.com/usamaizm/AIDB/pull/49), [#61](https://github.com/usamaizm/AIDB/pull/61): overlapping discovery, collaboration, and networking proposals; compare contracts and security boundaries as one family.
+- #8, #13, #16, #24, #25, #45, #50, #55, and #64: inspect for unique changes versus current main and newer PRs; do not merge stale branches wholesale.
+
+Before acting on any PR, fetch its current diff, base/head SHAs, review threads, and latest CI. A green CI run on one PR does not validate main or another branch.
 
 ## Completion protocol
 
