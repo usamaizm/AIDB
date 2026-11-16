@@ -232,6 +232,123 @@ Copy this template for each update:
 - **Risks / limitations:** None for existing behavior — every request that previously got a well-formed response gets the same one; only previously-dropped connections now get a stable JSON 500. Overlap note: PR #55's review flagged the same missing catch-all as a blocker on #55's branch; this fixes main's server only and does not touch #55's branch.
 - **Next action:** agent-muse opens the PR from `fix/http-safe-500` for review; merge is the maintainer's decision.
 
+### 2026-11-15T16:44:00Z — Claim: portability-registry lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** Per-table portability registry — the coupling audit's "profile completeness" item (§1/§4); branch `fix/portability-registry` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the portability-registry lane. The coupling audit found the interchange boundary was accidental — `export_home` happens to list 8 of the schema's tables, with no recorded decision for the rest. I have added `aidb/portability.py`: `TABLE_PORTABILITY` records one status per table in the live schema (26 tables) — `"portable"` for the 8 exported today, `"storage-only"` for `home_snapshots` (deliberately excluded: snapshots embed whole-home payloads), and `"undecided"` for the other 17 (collaboration facade, epistemic pipeline, `agents`). `export_home` now derives its table list from the registry instead of a local literal, and `tests/test_portability_registry.py` (11 tests) fails if any schema table lacks a recorded decision. Deliberate scope boundary: no family's portability is decided here — `"undecided"` is a recorded non-decision, and `agents` stays undecided until PR #80 lands, at which point the flip is a one-line registry change. The registry covers the full profile's table set only; which rows enter the public profile stays a per-table visibility matter in `export_home`.
+- **Evidence:** local branch `fix/portability-registry`, commit `ade108d`; changed paths `aidb/portability.py` (new), `tests/test_portability_registry.py` (new), `aidb/store.py` (+5/−4), +251/−4 total. Full suite: 175 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions; +11 new); `ruff check` clean, `ruff format` applied to the new files. Negative controls: deleting the `agents` registry entry fails the completeness test; a scratch table without an entry is caught by the same check; the same populated home exported under old and new code is byte-identical in both modes.
+- **Risks / limitations:** None for existing behavior — the exported payload is byte-identical before and after. Rebase note: Q14 (PR #82) also touches `export_home`'s table list via `_EXPORT_COLUMNS`; if both land, the rebase is one list (registry stays the table set, `_EXPORT_COLUMNS` the column projection). Q13 (PR #80) flips `agents` to portable in the registry when it lands.
+- **Next action:** agent-muse opens the PR from `fix/portability-registry` for review; merge is the maintainer's decision.
+
+### 2026-11-15T16:27:00Z — Claim: N4b canonical-projection lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** N4b canonical projection — the reusable JCS/digest boundary for the v2 work (D1, accepted on issue #29); branch `fix/canonical-projection` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the N4b canonical-projection lane — the last unclaimed item from the D1–D4 slate's design side. On current main there is no canonicalization primitive at all (only checksum-algorithm naming and the F5 snapshot's plain `json.dumps`), and the N4b xfail is still the suite's only xfail. I have added `aidb/canonical.py`: `canonical_json` implementing RFC 8785 (JCS) over parsed JSON values — recursive UTF-16 code-unit sorting, §3.2.2.2 string escaping, ECMAScript `Number::toString` number serialization — plus per-table `canonical_projection` for `home_resources`, `notes`, `resource_relations`, `home_changes`, `artifacts` (all stored fields except `updated_at`; `revision` included so a digest pins a revision; JSON-text columns parsed to values first), and `record_digest` as SHA-256 over the domain-separated input. Deliberate scope boundary: pure function library only — no store, envelope, or API change, no digest storage, no key allowlist; the N4b xfail stays open until the v2 importer/verifier wires digests in, which is ChatGPT's assigned work. One design correction found while building: the design note's "reject non-NFC input" proposal cannot stand — RFC 8785 §3.1 preserves strings as-is and its own §3.2.3 test data contains U+FB33, which is not NFC — so non-NFC strings canonicalize as-is, pinned by test. Known limitation, stated in the module docstring: artifact rows are keyed by stored integer `id` until D4 stable IDs land; the digest still binds the row as stored.
+- **Evidence:** local branch `fix/canonical-projection`, commit `120e436`; changed paths `aidb/canonical.py`, `tests/test_canonical_projection.py` (both new, +911/−0, no modified files). Full suite: 244 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions, no existing test modified); `ruff check` clean. Negative controls: naive `json.dumps` gets Appendix B cases wrong (`295147905179352830000.0`, `0.000001`) and the §3.2.3 sort order wrong; with the module removed the new tests fail at collection. RFC vectors drawn from the RFC text (rfc-editor.org): §3.2.2 example, §3.2.3 sorting data, §3.2.4 byte dump, all 25 Appendix B number samples. Golden digest pinned for the N4b fixture resource row (`a5c0cef0…fd6e40`).
+- **Risks / limitations:** None for existing behavior — purely additive, no modified files. The forward-looking commitment is the digest construction itself, pinned by golden vectors so any revision changes loudly. The v2 importer may adopt or critique it; this PR does not settle the v2 shape.
+- **Next action:** agent-muse opens the PR from `fix/canonical-projection` for review; merge is the maintainer's decision.
+
+### 2026-11-15T15:47:00Z — Claim: export-projection lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** coupling audit §1 — export projection layer; branch `fix/export-projection-columns` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the export-projection lane — the first slice of the coupling audit's fused storage/interchange shape (§1). On current main, `export_home` emits raw `SELECT *` row dicts, so the `aidb-home-v1` payload is the SQLite schema verbatim and any schema change is silently a breaking format change; my probe on unmodified main confirmed it (a storage-only column added via `ALTER TABLE` leaks into the export and changes exported bytes). I have added an explicit `_EXPORT_COLUMNS` projection mapping (each of the 8 exported tables to its exact column list, in storage-definition order) and `export_home` now selects exactly those columns in both the full and filtered paths, including the filtered `resource_relations` join. Deliberate scope boundary: no change to the `aidb-home-v1` envelope or any payload value — the same populated home exports byte-identically under the old and new code in both modes — no new tables exported, no per-family portability decisions (§4, still a contract decision per family), no change to `import_home`, snapshots, or any other API. Coordination note: this is the N4b canonical projection in its v1 form; ChatGPT's v2 importer/verifier work (D1–D4 slate) can build on or replace it — this PR does not settle the v2 shape. Rebase note: Q13 (PR #80) adds a ninth exported table; once either lane lands, the other rebases by adding `agents` to `_EXPORT_COLUMNS` — a one-line conflict at most.
+- **Evidence:** local branch `fix/export-projection-columns`, commit `3f76c8d`; changed paths `aidb/store.py`, `tests/test_export_projection.py` (new). Full suite: 168 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions, no existing test modified); `ruff check` clean. Negative control: with the `aidb/store.py` change stashed, the old code changes exported bytes when a storage-only column is added. Byte-identity check: same home file exported under old and new code, full and filtered, byte-identical.
+- **Risks / limitations:** None known for existing data — exports are byte-identical. The only behavioral change is forward-looking: a future storage-only column will no longer leak into exports, which is the intended invariant.
+- **Next action:** agent-muse opens the PR from `fix/export-projection-columns` for review; merge is the maintainer's decision.
+
+### 2026-11-15T15:20:00Z — Claim: agents-table export/import lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** issue #22 (agent-home evaluation probes, P3 keystone gap) — agents-table export/import; branch `fix/agents-export-import` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the agents export/import lane — the P3 keystone gap from the agent-home evaluation probes. On current main, `export_home` never emits the `agents` table (exactly 8 tables in both `include_private` modes) and `import_home` rejects any payload containing one with `ValueError("unknown home import table")`, so agent identity does not travel between homes even though `register_agent` works. I have added `agents` to `export_home` in both modes (agents are identity/discovery records, the table has no visibility column — flagged in the PR body as a review point against PR #49's public-only discovery design, not a settled contract) and to `import_home`'s accepted tables inside the validate-everything-first pass: strict per-row validation (required non-empty name, non-negative integer id, permissions/capabilities strict-parsed as JSON lists of strings, metadata strict-parsed as a JSON object via the existing `_unique_json_object` / `_reject_json_constant` / `_validate_json_object` helpers) plus a fail-closed collision policy — any row whose id or name matches an existing agent with different content is rejected with `ValueError` before durable state is touched, with no id remapping. A byte-identical row is not a conflict, so snapshot restore stays idempotent. Deliberate scope boundary: no agent scoping, no revocation surface, no change to the integer-rowid identity model — exported integer ids are home-local and can collide across homes, which is exactly why import rejects on collision; stable external IDs are D4 territory, a separate contract-level decision. Coordination note: ChatGPT is assigned the v2 importer/verifier under the accepted D1–D4 slate; this lane is v1 export/import only, and the agents-row shape here is input for the v2 importer to accept or supersede — this PR does not settle the v2 shape.
+- **Evidence:** local branch `fix/agents-export-import`, commit `b7c5325`; changed paths `aidb/store.py`, `tests/test_agents_export_import.py` (new). Full suite: 186 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions, no existing test modified); `ruff check` clean. Negative control: with the `aidb/store.py` change stashed, all 22 new tests fail.
+- **Risks / limitations:** Imports whose agents rows collide by id or name with existing agents now raise `ValueError` instead of landing (previously the whole payload was rejected as an unknown table, so no previously-successful import changes behavior except through the newly accepted table). Merging two homes that registered different agents under the same id or name requires the operator to resolve the collision first. Public exports now include agent rows, including model/permissions/capabilities metadata — flagged as a review point.
+- **Next action:** agent-muse opens the PR from `fix/agents-export-import` for review; merge is the maintainer's decision.
+
+### 2026-11-15T14:45:00Z — Claim: epistemic dataclass consolidation lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** issue #22 (artifact identity/metadata review) — epistemic dataclass consolidation (Q12); branch `fix/epistemic-consolidation` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the epistemic-consolidation lane — the last open low-medium finding from my issue #22 artifact identity/metadata review. On current main, `aidb/epistemic.py` defined its own copies of the dataclasses `aidb/core.py` also defines, so the same concept had two divergent identity models (`aidb.epistemic.Artifact is not aidb.core.Artifact`); I re-verified this with a probe against unmodified `beda617`, which also showed the copies had already drifted (`ExtractionOutput.sequence` defaulted to `0` in epistemic vs `None` in core; `Memory.kind` was required in epistemic vs defaulting to `"fact"` in core), and confirmed the only importer of `aidb.epistemic` is `tests/test_epistemic_models.py` (`LegacyMemoryRecord` and `Memory` only). I have made `aidb/epistemic.py` a thin re-export shim over `aidb.core` so every shared name is the same object as in core, keeping `LegacyMemoryRecord` defined there (it has no core counterpart); `aidb/core.py` is untouched and no core class changes behavior, fields, defaults, or `to_dict` output. The two divergences resolve in favour of core — the version `aidb/__init__.py` already exports — and neither is reachable from any existing caller. Overlap stated honestly: draft PR #55 also consolidated `aidb/epistemic.py` onto `aidb.core`, but #55 is stalled with two reproduced blockers and is its author's branch; this is a small independent consolidation on current main, and #55's author can supersede it.
+- **Evidence:** local branch `fix/epistemic-consolidation`, commit `e1886f3`; changed paths `aidb/epistemic.py`, `tests/test_epistemic_consolidation.py` (new). Full suite: 170 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions, no existing test modified); `ruff check` clean. Negative control: with the `aidb/epistemic.py` change stashed, 5 of the 6 new tests fail and only the `LegacyMemoryRecord` valid-behavior test passes.
+- **Risks / limitations:** Code importing the duplicated classes from `aidb.epistemic` now gets core's classes; the only behavioral differences are the two resolved defaults above, neither reachable from any existing caller.
+- **Next action:** agent-muse opens the PR from `fix/epistemic-consolidation` for review; merge is the maintainer's decision.
+
+### 2026-11-15T14:45:00Z — Claim: artifact provenance/metadata strict-validation lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** issue #22 (artifact identity/metadata review), C2 — provenance/metadata free-form dict validation; branch `fix/artifact-provenance-metadata-validation` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the C2 lane as mine — the last open item from my issue #22 artifact review. On current main, `register_artifact()` validates the shape of `provenance`/`metadata` (dict, string keys, JSON-serializable, from PR #65) but not their contents. I re-verified this with a probe against unmodified `beda617`: NaN/Infinity floats are stored as non-strict-JSON literals that fail a strict JSON parse on read-back; nested int keys and tuple values are silently coerced (what is read back is not what was passed); empty-string keys and unbounded payloads (a 2 MB value, 200-deep nesting) are all accepted. I have tightened `_validate_json_object` into a strict-JSON validator — JSON-native values only, finite floats, non-empty string keys at every depth, nesting capped at 10, serialized size capped at 64 KiB — plus a new `tests/test_artifact_metadata_strict.py`. Deliberate scope boundary: no key allowlist, because no canonical provenance schema exists yet and inventing one would be a contract decision, not validation; that belongs with the D1–D4 work and ChatGPT's v2 importer/verifier. Known adjacent gap, not in scope: the import path does not run this validator.
+- **Evidence:** local branch `fix/artifact-provenance-metadata-validation`, commit `a14639b`; changed paths `aidb/store.py`, `tests/test_artifact_metadata_strict.py` (new). Full suite: 178 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions, no existing test modified); `ruff check` clean. Negative control: with the `store.py` change stashed, 11 of the 14 new tests fail and only the 3 valid-behavior tests pass.
+- **Risks / limitations:** Previously accepted invalid registrations now raise `ValueError`; valid-call behavior is unchanged. The 64 KiB / depth-10 caps are documented descriptor bounds; artifact bytes live in `artifact_blobs`, not in these dicts.
+- **Next action:** agent-muse opens the PR from `fix/artifact-provenance-metadata-validation` for review; merge is the maintainer's decision.
+
+### 2026-11-15T14:45:00Z — Claim: artifact import-path validation lane (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** issue #22 (artifact identity/metadata review) — import-path artifact validation; branch `fix/artifact-import-validation` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the import-hardening lane — the adjacent gap flagged in my Q8 claim. On current main, `import_home` accepts artifact rows `register_artifact` would refuse: I re-verified this with a probe against unmodified `beda617`, where all 9 invalid cases were accepted (NaN provenance, Infinity metadata, bogus status, unknown checksum algorithm, negative size_bytes, non-object provenance/metadata, non-list and non-string-entry transformation history). The stored `'{"a": NaN}'` provenance fails a strict JSON re-parse, and a re-exported home passes `import_home_json` again because the `NaN` hides inside a string value. I have added `_validate_artifact_import_row` to `aidb/store.py`, called from `import_home`'s validate-everything-first pass: the JSON-encoded provenance/metadata/transformation_history strings are parsed strictly (NaN/Infinity literals and duplicate keys rejected) and run through the existing `_validate_json_object`, status is checked against the known statuses, checksum_algorithm against the known algorithms (aliases accepted, matching the register path), and size_bytes must be a non-negative integer — plus a new `tests/test_artifact_import_validation.py`. Deliberate scope boundary: no key allowlist, because no canonical provenance schema exists yet and inventing one would be a contract decision, not validation; that belongs with the D1–D4 work and ChatGPT's v2 importer/verifier. Flagged honestly in the PR body: this makes the v1 importer reject rows it previously accepted (intended fail-closed hardening, but a D2 behavior change to weigh against the v2 importer work). Rebase point: once Q8 lands, this validator should delegate to Q8's tightened shared helper instead of its own strict parse.
+- **Evidence:** local branch `fix/artifact-import-validation`, commit `f37dcba`; changed paths `aidb/store.py`, `tests/test_artifact_import_validation.py` (new). Full suite: 189 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions, no existing test modified); `ruff check` clean. Negative control: with the `aidb/store.py` change stashed, 20 of the 25 new tests fail and only the 5 valid-behavior tests pass.
+- **Risks / limitations:** Previously accepted invalid artifact rows now raise `ValueError` on import; valid-home behavior is unchanged (export-then-import round-trip tested). Checksums are not cross-checked against artifact_blobs content, and checksum digest shape is not checked, matching the register path.
+- **Next action:** agent-muse opens the PR from `fix/artifact-import-validation` for review; merge is the maintainer's decision.
+
+### 2026-11-15T14:45:00Z — agent-muse: schema version + migration runner lane (Q9) built
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Status:** in-progress
+
+- **Summary:** Claimed the next defect lane after Q8 (C2): the schema-version/migration prerequisite from the coupling audit. Persisted storage had no version of its own, so it could not evolve through a migration path. Built locally on branch `fix/schema-version-migration` (commit 6206234, base main beda617): `SCHEMA_VERSION = 1` stamped via `PRAGMA user_version` on every open, pre-versioning files adopted as v1, newer files refused loudly, and a migration runner with an empty registry (steps in order, one transaction each, missing-step and failing-step rollback verified). Storage-side only — no change to the `aidb-home-v1` envelope, export/import, or snapshots.
+- **Verification:** New `tests/test_schema_version.py` (7 tests, all pass; all 7 fail with the change stashed). Full suite 171 passed, 3 skipped, 1 xfailed (baseline 164). Ruff clean.
+- **Next action:** PR + this claim to be pushed via the signed-in browser session by the main chat (same batch as Q8); merge is the owner's decision. Snapshot-contract independence is the next lane after this one.
+- **Links:** PR body draft: `hidden_files/dev-schema-version-pr-body-draft.md`.
+
+### 2026-11-15T14:45:00Z — agent-muse: snapshot-contract independence lane (Q10) built
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Status:** in-progress
+
+- **Summary:** Claimed the next defect lane after Q9 (schema version): snapshot-contract independence from the coupling audit. Snapshots were hard-bound to the home envelope — `create_snapshot` stamped the `home_snapshots.home_format` column with `"aidb-home-v1"`, `restore_snapshot` gated only on the embedded payload's home format, and the import snapshot gate required `home_format == "aidb-home-v1"`, with no snapshot-format marker of its own. Probed on unmodified main first (a hash-valid snapshot re-stamped to a v2 format is rejected on both paths with no snapshot version to consult), then built locally on branch `fix/snapshot-contract-version` (commit fdb5a1c, base main beda617): `SNAPSHOT_FORMAT = "aidb-snapshot-v1"` stamps new snapshots, legacy `"aidb-home-v1"`-stamped rows are accepted as snapshot v1 under the D2 v1 legacy policy, and any other stamp is refused loudly on restore and import alike. Home envelope unchanged; content-hash integrity checks unchanged.
+- **Verification:** New `tests/test_snapshot_contract.py` (9 tests, all pass; the change-detecting checks fail on old code for the right reasons, verified behaviorally with the change stashed). Full suite 173 passed, 3 skipped, 1 xfailed (baseline 164). Ruff clean.
+- **Next action:** PR + this claim to be pushed via the signed-in browser session by the main chat; merge is the owner's decision. Note the base: same beda617 base as the unmerged Q8 and Q9 branches, all three touching `aidb/store.py` in different regions — a rebase may be needed if Q8 or Q9 lands first.
+- **Links:** PR body draft: `hidden_files/dev-snapshot-contract-pr-body-draft.md`.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
