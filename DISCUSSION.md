@@ -154,6 +154,19 @@ Copy this template for each update:
 - **Risks / limitations:** None for homes that already verify — only previously-silent invalid creation inputs now raise `ValueError`, which the HTTP POST handlers already map to 400. Overlap note: Q6 (PR #65) fixed the same defect class for `register_artifact` and Q8 (PR #70) applies the same strictness to artifact provenance/metadata; when Q8 lands the two strictness helpers can converge, with no textual conflict expected. It does not touch the verify_home family (Q18/Q19/Q22) or the import-hardening family (Q11/Q20/Q21), and it does not touch #55's branch, and the blocker on #55 stays with its author.
 - **Next action:** agent-muse opens the PR from `fix/resource-creation-validation` for review; merge is the maintainer's decision.
 
+### 2026-11-15T19:54:00Z — Claim: verify_home snapshot coverage (agent-muse)
+
+- **From:** agent-muse
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** verify_home snapshot coverage (Q22); branch `fix/verify-home-snapshots` off main `beda617`, PR to follow
+- **Status:** in-progress
+- **Summary:** I am claiming the verify_home snapshot lane. The probe on unmodified main `beda617` confirmed the gap: `verify_home()` only walked `home_changes` rows, so a stored snapshot whose content no longer matched its `content_hash` still verified ok — a one-byte flip makes `restore_snapshot()` raise while `verify_home()` (and the full export's embedded `verification` block) still report `{"ok": true, "issues": []}`, as do a wrong `content_hash`, an unknown `home_format` stamp, and invalid-JSON content. I have extended `verify_home()` in `aidb/store.py` (+21/−0) to recompute the SHA-256 digest of every stored snapshot against its recorded `content_hash`, flag unknown `home_format` stamps, and flag content that does not parse as JSON when its hash still matches; the digest comparison mirrors `restore_snapshot()` exactly so the two paths can never disagree. Accepted stamps are `aidb-snapshot-v1` (Q10's snapshot-contract stamp, PR #71, unmerged) and legacy `aidb-home-v1` (what `create_snapshot()` still writes on main, per D2). `tests/test_verify_home_snapshots.py` (10 tests) proves each tamper is flagged, both known stamps verify ok, only the tampered snapshot of two is listed, and the export's verification block reflects the tamper. Deliberate scope boundary: only `verify_home()` changes — no schema, envelope, import, export, API, or read-path change, and no per-record digests (D1/N4b territory, PR #84's canonical projection is the boundary for that).
+- **Evidence:** local branch `fix/verify-home-snapshots`, commit `bdb4265`; changed paths `aidb/store.py` (+21/−0), `tests/test_verify_home_snapshots.py` (new, +164), +185/−0 total (the branch also holds a local-only `PROBE.md`, excluded from the push like Q21's probe files). Full suite: 174 passed, 3 skipped, 1 xfailed (baseline 164 passed, 3 skipped, 1 xfailed — no regressions; +10 new); `ruff check` clean, `ruff format` applied to the new test file. Negative control: with the `store.py` change stashed, 8 of the 10 new tests fail. Note: `aidb/store.py` was already unformatted on main before this change; the diff deliberately does not reformat it.
+- **Risks / limitations:** None for homes that already verify — only previously-silent snapshot tampering now reports `ok: false`. Overlap note: third lane in the verify_home coverage family after Q18 (PR #90) and Q19 (PR #92); compatible with Q10 (PR #71) in either merge order since both stamps are accepted; it does not touch #55's branch, and the blocker on #55 stays with its author.
+- **Next action:** agent-muse opens the PR from `fix/verify-home-snapshots` for review; merge is the maintainer's decision.
+
 ### 2026-11-15T10:15:00Z — Claim: agent-muse removes the broken WorkflowEngine from the public surface
 
 - **From:** agent-muse
