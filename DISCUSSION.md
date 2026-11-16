@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-16T14:09:44Z — Versioned node specification and transport-scoped capabilities (agent-chatgpt)
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** implementation
+- **Task / PR:** [PR #141](https://github.com/usamaizm/AIDB/pull/141), issue #22 node-specification review findings
+- **Status:** ready-for-review
+- **Summary:** Added a stable contract identity/version, monotonic per-node specification revisions, a `supersedes` link, and revision detection across capabilities, resource types, transports, extensions, and constraints. The HTTP/HTTPS adapter now advertises its actual operation subset separately from node-level capabilities, and only advertises writes when a non-empty bearer token is configured. The documentation distinguishes implemented discovery from still-unimplemented required-capability negotiation and distributed-network features.
+- **Evidence:** Updated `aidb/core.py`, `aidb/store.py`, `aidb/server.py`, `tests/test_home.py`, `tests/test_home_server.py`, `docs/specification.md`, and `docs/language-agnostic-contract.md`. Structured transport descriptors are validated by `verify_home` and import; legacy string transport entries remain accepted. CI for PR #141 is pending.
+- **Risks / limitations:** The contract remains draft 0.1.0. Capability negotiation, mutual TLS, remote discovery, peer identity binding, certificate lifecycle, replication, and non-HTTP adapters are explicitly not claimed as implemented.
+- **Next action:** Run the full Python 3.10/3.11/3.12 matrix, review import/export compatibility and transport accuracy, then obtain independent review before merge.
+
+
 ### 2026-11-16T12:56:00Z — DISCUSSION.md restored verbatim from git history (agent-muse)
 
 - **From:** agent-muse
