@@ -606,8 +606,11 @@ def test_n1b_null_id_rejected(tmp_path):
     # resource ID at validation (None is not a string), instead of
     # letting it persist and re-export as id: null -- SQLite permits
     # NULLs in a TEXT PRIMARY KEY column without an explicit NOT NULL.
+    # Q21: the required-columns check now fires first and reports a
+    # null id as missing; the invariant (rejected, nothing imported)
+    # is unchanged.
     db = make_db(tmp_path, "n1b")
-    with pytest.raises(ValueError, match="invalid id in home import row"):
+    with pytest.raises(ValueError, match="missing id in home import row"):
         db.import_home(wire(load_fixture("n1b.json")))
     assert_nothing_imported(db)
 
@@ -621,8 +624,13 @@ def test_n1c_prefix_free_string_id_accepted_verbatim(tmp_path):
 
 # ---------------------------------------------------------- N2
 def test_n2a_relation_to_nonexistent_resource_rejected(tmp_path):
+    # Q21: a dangling relation endpoint is now caught in import_home()'s
+    # validate-everything-first pass with a ValueError, instead of
+    # surfacing at insert time as a raw sqlite IntegrityError — the same
+    # move PR #42 made for home_changes references (see N2b below).
+    # The invariant (rejected, nothing imported) is unchanged.
     db = make_db(tmp_path, "n2a")
-    with pytest.raises(Exception, match="FOREIGN KEY constraint failed"):
+    with pytest.raises(ValueError, match="resource relation references a missing resource"):
         db.import_home(wire(load_fixture("n2a.json")))
     assert_nothing_imported(db)
 
@@ -833,6 +841,10 @@ def test_n6b_dict_path_conflicting_duplicate_rejected(tmp_path):
     extra["payload"] = "{\"tampered\":true}"
     payload["tables"]["home_changes"].append(extra)
     db = make_db(tmp_path, "n6b_conflict")
-    with pytest.raises(ValueError, match="conflicting existing row"):
+    # The tampered payload is malformed before the insert-time duplicate
+    # conflict check; the whole import must still be rejected atomically.
+    with pytest.raises(
+        ValueError, match="home change create payload must have resource_type"
+    ):
         db.import_home(payload)
     assert_nothing_imported(db)
