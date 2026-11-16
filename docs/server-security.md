@@ -42,7 +42,9 @@ export AIDB_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe
 python -m aidb serve --host 0.0.0.0 --port 8765 --tls-cert server.crt --tls-key server.key
 ```
 
-The certificate must be valid for the hostname clients use. Protect the private key and token as secrets. For deployments behind a reverse proxy, bind AIDB to loopback and enforce TLS, authentication, and request limits at the proxy; do not expose the backend port directly.
+The certificate must be valid for the hostname clients use. Protect the private key and token as secrets.
+
+With `--tls-client-ca <ca.pem>` the server additionally requires a client certificate chaining to that CA (mutual TLS). A client certificate authenticates the transport peer only; it does not grant authorization, and network writes still require the bearer token. For deployments behind a reverse proxy, bind AIDB to loopback and enforce TLS, authentication, and request limits at the proxy; do not expose the backend port directly.
 
 ## HTTPS client verification
 
@@ -82,8 +84,18 @@ a private test key in the repository.
 
 The adapter is intentionally minimal. It does not currently implement user-level authorization scopes, rate limiting, audit-grade identity, or multi-tenant isolation. A bearer token grants write access to the exposed write endpoints; it is not a substitute for per-agent authorization. Do not treat the service as production-ready for untrusted multi-tenant workloads.
 
+## Outbound connections
+
+The outbound client (`aidb.http_client`) fetches a peer's public specification and agent card (`fetch_specification`, `fetch_agent_card`, on top of the bounded `fetch_json`):
+
+- HTTPS is required for non-loopback peers; plaintext HTTP is accepted only for loopback hosts, mirroring the bind policy. No connection silently falls back to plaintext.
+- Certificates and hostnames are verified by default, with TLS 1.2 as the minimum. A deployment CA can be supplied (`ca_file`), and the client can present a certificate (`client_cert`/`client_key`) to a mutual-TLS server.
+- Requests have a bounded timeout and a bounded response size; non-200 responses and non-JSON payloads are rejected.
+
+A fetched document is untrusted data: fetching a peer's specification or agent card does not authenticate a stable node identity and grants the peer nothing.
+
 ## Distributed networking boundary
 
-The TLS configuration above protects inbound connections to this HTTP server when it is bound beyond loopback. It does not implement outbound peer connections, mutual peer authentication, stable cryptographic AIDB node identities, discovery, content-addressed chunk transfer, or replication. The current bearer token is a coarse write gate, not an agent identity or distributed authorization system.
+The TLS configuration above protects inbound connections to this HTTP server when it is bound beyond loopback, and the outbound client fetches peer documents over verified HTTPS, with mutual TLS available in both directions. It does not implement stable cryptographic AIDB node identities bound to transport peers, a peer handshake, a discovery protocol, content-addressed chunk transfer, or replication. The current bearer token is a coarse write gate, not an agent identity or distributed authorization system.
 
 The intended distributed design requires authenticated encryption across every machine/trust boundary, verified peer identity, operation-level authorization, content-integrity verification, and explicit replication policy. See [Distributed Networking Architecture](distributed-networking.md). Do not advertise the current server as a distributed node transport until those capabilities exist and are tested.

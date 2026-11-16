@@ -226,9 +226,12 @@ def validate_bind_security(
     auth_token: str | None,
     tls_certfile: str | None,
     tls_keyfile: str | None,
+    tls_client_ca: str | None = None,
 ) -> None:
     if bool(tls_certfile) != bool(tls_keyfile):
         raise ValueError("TLS certificate and key must be configured together")
+    if tls_client_ca and not (tls_certfile and tls_keyfile):
+        raise ValueError("TLS client CA requires TLS certificate and key")
     if _is_loopback_host(host):
         return
     if not auth_token:
@@ -246,14 +249,21 @@ def create_server(
     auth_token: str | None = None,
     tls_certfile: str | None = None,
     tls_keyfile: str | None = None,
+    tls_client_ca: str | None = None,
     max_workers: int = 16,
 ) -> AIDBHTTPServer:
-    validate_bind_security(host, auth_token, tls_certfile, tls_keyfile)
+    validate_bind_security(host, auth_token, tls_certfile, tls_keyfile, tls_client_ca)
     context = None
     if tls_certfile and tls_keyfile:
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.minimum_version = ssl.TLSVersion.TLSv1_2
         context.load_cert_chain(tls_certfile, tls_keyfile)
+        if tls_client_ca:
+            # Mutual TLS: require a client certificate chaining to
+            # this CA. A certificate authenticates the transport
+            # peer only; it grants no authorization by itself.
+            context.verify_mode = ssl.CERT_REQUIRED
+            context.load_verify_locations(cafile=tls_client_ca)
 
     server = AIDBHTTPServer(
         (host, port), create_handler(db, auth_token), max_workers=max_workers
@@ -275,12 +285,13 @@ def serve(
     visibility: str = "private",
     tls_certfile: str | None = None,
     tls_keyfile: str | None = None,
+    tls_client_ca: str | None = None,
 ) -> None:
     db = AIDB(db_path)
     server = None
     try:
         db.initialize_home(visibility=visibility)
-        server = create_server(db, host, port, auth_token, tls_certfile, tls_keyfile)
+        server = create_server(db, host, port, auth_token, tls_certfile, tls_keyfile, tls_client_ca=tls_client_ca)
         scheme = "https" if tls_certfile else "http"
         print(f"AIDB listening at {scheme}://{host}:{server.server_port}")
         server.serve_forever()

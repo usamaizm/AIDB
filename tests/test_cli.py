@@ -91,8 +91,31 @@ def test_serve_command_uses_environment_token_and_forwards_tls(monkeypatch):
             "public",
             "server.crt",
             "server.key",
+            None,
         )
     ]
+
+
+def test_serve_command_forwards_tls_client_ca(monkeypatch):
+    calls = []
+    monkeypatch.setattr(cli, "serve", lambda *args: calls.append(args))
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "aidb",
+            "serve",
+            "--tls-cert",
+            "server.crt",
+            "--tls-key",
+            "server.key",
+            "--tls-client-ca",
+            "client-ca.pem",
+        ],
+    )
+
+    cli.main()
+
+    assert calls[0][-1] == "client-ca.pem"
 
 
 def test_explicit_serve_token_overrides_environment(monkeypatch):
