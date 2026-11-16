@@ -162,3 +162,120 @@ def test_concurrent_updates_enforce_expected_revision():
     assert sorted(outcomes) == ["conflict", "updated"]
     assert db.get_resource(resource.id).revision == 2
     db.close()
+
+
+def test_concurrent_updates_enforce_expected_revision_repeatedly():
+    # Regression test for the Q34 defect: the single-shot race above
+    # passes ~93% of the time on the broken code, because the failure is
+    # a timing-dependent sqlite3.InterfaceError when two threads execute
+    # statements concurrently on the shared :memory: connection — the
+    # pre-check reads and the trailing re-read in update_resource ran
+    # outside the write lock. Repeating the race 25 times in one test
+    # fails the broken code almost every run (22 bad outcomes in 300
+    # direct trials) and passes on the fixed code. Each iteration uses a
+    # fresh database so no state leaks between races.
+    for _ in range(25):
+        db = AIDB(":memory:")
+        resource = db.create_resource("item", {"version": 1})
+        barrier = Barrier(3)
+        outcomes = []
+
+        def update(value: int) -> None:
+            barrier.wait()
+            try:
+                db.update_resource(
+                    resource.id,
+                    content={"version": value},
+                    expected_revision=1,
+                )
+                outcomes.append("updated")
+            except ValueError:
+                outcomes.append("conflict")
+            except Exception as exc:  # surfaced by the assertion below
+                outcomes.append(f"error:{type(exc).__name__}")
+
+        first = Thread(target=update, args=(2,))
+        second = Thread(target=update, args=(3,))
+        first.start()
+        second.start()
+        barrier.wait()
+        first.join(timeout=5)
+        second.join(timeout=5)
+
+        assert not first.is_alive()
+        assert not second.is_alive()
+        assert sorted(outcomes) == ["conflict", "updated"]
+        assert db.get_resource(resource.id).revision == 2
+        db.close()
+
+
+def _race_twice(fn):
+    """Run fn in two threads off one barrier; return both outcomes.
+
+    fn takes one int argument. Exceptions are captured as outcome
+    strings so a failure mode is visible in the assertion, not hidden
+    behind a thread traceback.
+    """
+    barrier = Barrier(3)
+    outcomes = []
+
+    def run(value: int) -> None:
+        barrier.wait()
+        try:
+            fn(value)
+            outcomes.append("ok")
+        except Exception as exc:  # surfaced by the assertion below
+            outcomes.append(f"error:{type(exc).__name__}")
+
+    first = Thread(target=run, args=(1,))
+    second = Thread(target=run, args=(2,))
+    first.start()
+    second.start()
+    barrier.wait()
+    first.join(timeout=5)
+    second.join(timeout=5)
+    assert not first.is_alive()
+    assert not second.is_alive()
+    return outcomes
+
+
+def test_concurrent_relate_resources_race_repeatedly():
+    # Q34: relate_resources checked resource existence with SELECTs
+    # outside the write lock, so two racing calls could raise
+    # sqlite3.InterfaceError on the shared :memory: connection. Repeat
+    # the race so the broken code fails reliably.
+    for _ in range(25):
+        db = AIDB(":memory:")
+        source = db.create_resource("item", {"v": 1})
+        target = db.create_resource("item", {"v": 2})
+        outcomes = _race_twice(lambda _v: db.relate_resources(source.id, target.id, "related"))
+        assert outcomes == ["ok", "ok"], outcomes
+        assert len(db.resource_relations(source.id)) == 1
+        db.close()
+
+
+def test_concurrent_create_resource_race_repeatedly():
+    # Q34: create_resource returned via a get_resource call after the
+    # atomic section, outside the write lock — the same shared-connection
+    # race as update_resource's trailing re-read.
+    for _ in range(25):
+        db = AIDB(":memory:")
+        outcomes = _race_twice(lambda v: db.create_resource("item", {"v": v}))
+        assert outcomes == ["ok", "ok"], outcomes
+        assert len(db.list_resources()) == 2
+        db.close()
+
+
+def test_concurrent_publish_resource_race_repeatedly():
+    # Q34: publish_resource had the same trailing get_resource outside
+    # the lock. Two threads publishing one private resource: exactly one
+    # performs the publish (revision 1 -> 2); the other observes the
+    # already-public row and returns it. Neither may raise.
+    for _ in range(25):
+        db = AIDB(":memory:")
+        resource = db.create_resource("item", {"v": 1})
+        outcomes = _race_twice(lambda _v: db.publish_resource(resource.id))
+        assert outcomes == ["ok", "ok"], outcomes
+        assert db.get_resource(resource.id).revision == 2
+        assert db.get_resource(resource.id).visibility == "public"
+        db.close()
