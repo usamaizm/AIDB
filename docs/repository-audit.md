@@ -26,6 +26,7 @@ Audit snapshot: 2026-11-16 (refreshed after PR #136 merged). This is a point-in-
 | #116 | RFC 8785/JCS canonical JSON and record-digest primitive | [43868111389](https://github.com/usamaizm/AIDB/actions/runs/43868111389) |
 | #117 | Restore historical `updated_at` fields in v1 projections | [43868719211](https://github.com/usamaizm/AIDB/actions/runs/43868719211) |
 | #119 | Local resource-backed agent discovery/collaboration | [43870081165](https://github.com/usamaizm/AIDB/actions/runs/43870081165) |
+| #136 | Consolidated nine Q8–Q16 contribution-claim records (documentation only) | Merged; no runtime code changed |
 
 All listed PR runs passed compileall, Ruff, and pytest on Python 3.10/3.11/3.12.
 
