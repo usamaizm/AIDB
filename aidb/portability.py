@@ -18,10 +18,11 @@ Statuses:
 - ``"undecided"`` — no contract decision yet. This is a recorded
   non-decision, not a default: flipping a table to ``"portable"`` is a
   contract change and must be deliberate, with its visibility and
-  identity consequences weighed (see D1-D4 on issue #29). In
-  particular, ``agents`` stays undecided here even though PR #80 would
-  make it portable — that PR is unmerged, so on main the agents table
-  still does not travel.
+  identity consequences weighed (see D1-D4 on issue #29).
+
+``agents`` is portable: the agents-table export/import landed in
+PR #80 (merged), and the registry below records it as such. If this
+docstring and the registry ever disagree, the registry is the truth.
 
 The registry is the single source of truth for the export table list:
 ``export_home`` derives its tables from :func:`portable_tables`, and
@@ -59,12 +60,16 @@ TABLE_PORTABILITY: dict[str, str] = {
     "artifact_blobs": PORTABLE,
     # Storage-only: deliberately excluded, see the module docstring.
     "home_snapshots": STORAGE_ONLY,
+    # Portable (continued): agents joined the portable set when the
+    # agents-table export/import landed (PR #80, merged). It sits in
+    # this position because portable_tables() preserves dict order as
+    # the export order; do not reorder entries casually.
+    "agents": PORTABLE,
     # Undecided: no contract decision yet. The collaboration facade
     # (sessions, messages, tasks, tools, workflow_events) and the
     # epistemic pipeline (knowledge, extractions, interpretations,
     # memories) cannot leave the file until a per-family decision
     # records them portable or storage-only.
-    "agents": PORTABLE,
     "epistemic_knowledge": UNDECIDED,
     "epistemic_knowledge_relations": UNDECIDED,
     "epistemic_memory": UNDECIDED,
