@@ -1498,10 +1498,12 @@ class AIDB:
         self.db.commit()
         return self.get_resource(resource_id)
 
-    def _validate_specification_transports(self, transports):
+    def _validate_specification_transports(
+        self, transports, label="node_specifications transports"
+    ):
         """Accept legacy transport names and structured, capability-scoped adapters."""
         if not isinstance(transports, list):
-            raise ValueError("transports must be a list")
+            raise ValueError(f"{label} must be a JSON list")
         for index, transport in enumerate(transports):
             label = f"specification transports[{index}]"
             if isinstance(transport, str):
@@ -1509,7 +1511,9 @@ class AIDB:
                     raise ValueError(f"{label} must be a non-empty string")
                 continue
             if not isinstance(transport, dict):
-                raise ValueError(f"{label} must be a string or object")
+                raise ValueError(
+                    f"{label}: expected list of strings or valid transport descriptors"
+                )
             for field in ("id", "protocol"):
                 if not isinstance(transport.get(field), str) or not transport[field].strip():
                     raise ValueError(f"{label}.{field} must be a non-empty string")
@@ -1566,7 +1570,9 @@ class AIDB:
             not isinstance(item, str) or not item.strip() for item in extensions
         ):
             raise ValueError("extensions must be a list of non-empty strings")
-        self._validate_specification_transports(transports)
+        self._validate_specification_transports(
+            transports, label="specification transports"
+        )
         self._validate_json_object(constraints, "specification constraints")
 
         desired = (capabilities, resource_types, transports, extensions, constraints)
@@ -1718,10 +1724,12 @@ class AIDB:
                         )
                     elif shape == "transport-list":
                         try:
-                            self._validate_specification_transports(value)
-                        except (ValueError, TypeError, RecursionError):
+                            self._validate_specification_transports(
+                                value, label=f"{label}"
+                            )
+                        except (ValueError, TypeError, RecursionError) as exc:
                             issues.append(
-                                f"invalid transport descriptors in {label} for {id_column}={row[id_column]}"
+                                f"invalid transport descriptors in {label} for {id_column}={row[id_column]}: {exc}"
                             )
 
     def _verify_home_snapshots(self, issues):
@@ -2458,7 +2466,8 @@ class AIDB:
                         self._validate_specification_transports(
                             self._parse_strict_json_column(
                                 row["transports"], "node_specifications transports"
-                            )
+                            ),
+                            label="node_specifications transports",
                         )
                     if "constraints" in row:
                         self._validate_json_object(
