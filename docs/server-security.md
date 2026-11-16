@@ -36,7 +36,7 @@ The adapter is intentionally minimal. It does not currently implement user-level
 
 
 
-The threaded server uses a bounded listen backlog, but it does not cap the number of active request threads. The per-socket timeout bounds individual socket I/O waits, not total operation duration or concurrent worker count. For deployments exposed beyond a trusted local network, place AIDB behind a reverse proxy or gateway that enforces connection/concurrency limits and rate limiting; do not treat the built-in server as a public multi-tenant gateway.
+The threaded server uses a bounded listen backlog of 32 and a semaphore-backed cap of 16 active request handlers by default. When all worker slots are occupied, it returns HTTP 503 with `Retry-After` and closes the connection instead of spawning another thread. The limit is configurable through `create_server(max_workers=...)`. The 10-second accepted-socket timeout bounds individual socket I/O waits, not total request duration or long-running SQLite operations. GET handlers still serialize reads and response writes under the shared connection lock. For deployments exposed beyond a trusted local network, use a reverse proxy or gateway for rate limiting, connection policy, and authentication scopes; do not treat the built-in server as a public multi-tenant gateway.
 
 ## Distributed networking boundary
 
