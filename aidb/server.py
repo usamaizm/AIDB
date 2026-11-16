@@ -7,10 +7,67 @@ import secrets
 import ssl
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
+from threading import BoundedSemaphore
 
 from .store import AIDB
 
 logger = logging.getLogger(__name__)
+_REQUEST_TIMEOUT_SECONDS = 10.0
+
+
+class AIDBHTTPServer(ThreadingHTTPServer):
+    """Threaded server with bounded workers, backlog, and per-connection I/O."""
+
+    daemon_threads = True
+    request_queue_size = 32
+
+    def __init__(
+        self,
+        server_address,
+        RequestHandlerClass,
+        bind_and_activate=True,
+        max_workers=16,
+    ):
+        if (
+            isinstance(max_workers, bool)
+            or not isinstance(max_workers, int)
+            or max_workers < 1
+        ):
+            raise ValueError("max_workers must be a positive integer")
+        self.max_workers = max_workers
+        self._worker_slots = BoundedSemaphore(max_workers)
+        super().__init__(server_address, RequestHandlerClass, bind_and_activate)
+
+    def get_request(self):
+        request, client_address = super().get_request()
+        request.settimeout(_REQUEST_TIMEOUT_SECONDS)
+        return request, client_address
+
+    def process_request(self, request, client_address):
+        if not self._worker_slots.acquire(blocking=False):
+            try:
+                request.sendall(
+                    b"HTTP/1.1 503 Service Unavailable\r\n"
+                    b"Connection: close\r\n"
+                    b"Content-Length: 0\r\n"
+                    b"Retry-After: 1\r\n\r\n"
+                )
+            except OSError:
+                pass
+            finally:
+                self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except Exception:
+            self._worker_slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._worker_slots.release()
 
 
 def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int = 1048576, max_page_size: int = 200):
@@ -87,8 +144,9 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
                 return self._send(500, {"error": "internal_error"})
 
         def do_POST(self):
-            with db._connection_lock:
-                self._handle_post()
+            # Read and parse untrusted request bytes before acquiring the
+            # shared SQLite lock. A slow client must not block other requests.
+            self._handle_post()
 
         def _handle_post(self):
             path = urlparse(self.path).path
@@ -105,36 +163,41 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
             try:
                 body = self._json_body()
                 if path == "/v1/notes":
-                    note = db.create_note(
-                        body["title"],
-                        body["content"],
-                        body.get("owner"),
-                        body.get("visibility", "private"),
-                        body.get("kind", "note"),
-                        body.get("metadata"),
-                    )
+                    with db._connection_lock:
+                        note = db.create_note(
+                            body["title"],
+                            body["content"],
+                            body.get("owner"),
+                            body.get("visibility", "private"),
+                            body.get("kind", "note"),
+                            body.get("metadata"),
+                        )
                     return self._send(201, note.__dict__)
                 if path == "/v1/resources":
-                    resource = db.create_resource(
-                        body["resource_type"],
-                        body.get("content"),
-                        body.get("owner"),
-                        body.get("visibility", "private"),
-                        body.get("metadata"),
-                    )
+                    with db._connection_lock:
+                        resource = db.create_resource(
+                            body["resource_type"],
+                            body.get("content"),
+                            body.get("owner"),
+                            body.get("visibility", "private"),
+                            body.get("metadata"),
+                        )
                     return self._send(201, resource.__dict__)
                 if path.startswith("/v1/resources/") and path.endswith("/relations"):
                     resource_id = path.split("/")[3]
-                    db.relate_resources(
-                        resource_id,
-                        body["target_resource_id"],
-                        body["relation"],
-                        body.get("metadata"),
-                    )
+                    with db._connection_lock:
+                        db.relate_resources(
+                            resource_id,
+                            body["target_resource_id"],
+                            body["relation"],
+                            body.get("metadata"),
+                        )
                     return self._send(201, {"ok": True})
                 return self._send(404, {"error": "not_found"})
             except OverflowError as exc:
                 return self._send(413, {"error": str(exc)})
+            except TimeoutError:
+                return self._send(408, {"error": "request_timeout"})
             except (KeyError, ValueError, json.JSONDecodeError) as exc:
                 return self._send(400, {"error": str(exc)})
             except Exception:
@@ -183,18 +246,24 @@ def create_server(
     auth_token: str | None = None,
     tls_certfile: str | None = None,
     tls_keyfile: str | None = None,
-) -> ThreadingHTTPServer:
+    max_workers: int = 16,
+) -> AIDBHTTPServer:
     validate_bind_security(host, auth_token, tls_certfile, tls_keyfile)
-    server = ThreadingHTTPServer((host, port), create_handler(db, auth_token))
+    context = None
     if tls_certfile and tls_keyfile:
-        try:
-            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            context.minimum_version = ssl.TLSVersion.TLSv1_2
-            context.load_cert_chain(tls_certfile, tls_keyfile)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(tls_certfile, tls_keyfile)
+
+    server = AIDBHTTPServer(
+        (host, port), create_handler(db, auth_token), max_workers=max_workers
+    )
+    try:
+        if context is not None:
             server.socket = context.wrap_socket(server.socket, server_side=True)
-        except Exception:
-            server.server_close()
-            raise
+    except Exception:
+        server.server_close()
+        raise
     return server
 
 
