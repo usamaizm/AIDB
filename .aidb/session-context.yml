@@ -96,6 +96,8 @@ canonical_docs:
   architecture:
     substrate: docs/one-stop-agent-substrate.md
     modularity: docs/modular-architecture.md
+    evolution_compatibility: docs/evolution-and-compatibility.md
+    distributed_networking: docs/distributed-networking.md
     self_evolution: docs/self-evolving-architecture.md
     performance_context_scale: docs/performance-context-and-scale.md
     storage_numeric_data: docs/storage-efficiency-and-numeric-data.md
@@ -125,41 +127,84 @@ priority_order:
 
 
 live_repository_snapshot:
-  as_of: "2026-11-16T12:04:48Z"
-  main_commit: "ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5"
-  open_pull_requests: 42
+  as_of: "2026-11-16T12:56:54Z"
+  main_commit: "bbcf2bc56a4b29bdc3d74ed184c3d45dd6c056bf"
+  open_pull_requests: 28
   cli_surface:
     source: aidb/__main__.py
     commands: [agent, search, serve]
     session_message_task_subcommands: not_exposed
-  ci_evidence:
-    pull_request: 106
-    head_commit: "66b87198d507238118db96010d49ed09b83742f3"
-    run_id: 43862813272
-    run_url: "https://github.com/usamaizm/AIDB/actions/runs/43862813272"
-    result: success
-    merged: true
-    merge_commit: "721e20bb159a861570320d9cdadf3147b7dc0d59"
-    matrix: ["3.10", "3.11", "3.12"]
-    scope_note: >-
-      PR #106 passed all matrix jobs and was merged to main as the recorded merge commit.
-  priority_pr_clusters:
-    - "PR #88: HTTP safe 500 handling; server-side diagnostic logging review remains."
-    - "PRs #90, #92, #98, #104: overlapping verify_home integrity changes."
-    - "PRs #70-#105: artifact/resource/import/export/schema validation and paired claim entries."
-    - "PRs #14, #15, #49, #61: overlapping discovery, collaboration, and networking proposals."
-  handoff: "Refresh current GitHub state before every new repository task; see docs/repository-audit.md."
-
-  latest_merged_work:
+  ci_matrix:
+    python: ["3.10", "3.11", "3.12"]
+    steps: [compileall, ruff, pytest]
+  merged_work:
     - pr: 71
-      title: "snapshot contract versioning"
+      topic: "snapshot contract versioning"
       merge_commit: "3652081f993c675896065426660d72ab6d6d803f"
+    - pr: 73
+      topic: "artifact import row validation"
+      merge_commit: "7457c415588ffade2352f96079a3174605f74061"
+    - pr: 80
+      topic: "agents table export/import"
+      merge_commit: "569b0d46b14649b5eeb142cd3ecc2e7884fdc17c"
+    - pr: 106
+      topic: "public CLI contract tests"
+      merge_commit: "721e20bb159a861570320d9cdadf3147b7dc0d59"
+      ci_run_id: 43862813272
+      ci_result: success
     - pr: 109
-      title: "resource and note input validation"
+      topic: "strict resource and note input validation"
       merge_commit: "ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5"
       ci_run_id: 43864558782
       ci_result: success
-      matrix: ["3.10", "3.11", "3.12"]
-  superseded_prs:
-    - 100
-    - 102
+    - pr: 111
+      topic: "strict home import row and change-payload validation"
+      merge_commit: "f7349f538f9a41f3924d3d9d2a3c9d8b71167796"
+      ci_run_id: 43865913472
+      ci_result: success
+    - pr: 112
+      topic: "read-only complete home integrity verification"
+      merge_commit: "443ad5b56612acc7566bd83bf629997cbbc7645b"
+      ci_run_id: 43866381773
+      ci_result: success
+    - pr: 113
+      topic: "server-side HTTP exception diagnostics"
+      merge_commit: "0a20ad268241698b58235e8960ff32836a3c31ac"
+      ci_run_id: 43866856432
+      ci_result: success
+    - pr: 115
+      topic: "explicit export projections and portability registry"
+      merge_commit: "fed26c1561326b07c404537fa7938e1cbcd7edf3"
+      ci_run_id: 43867824641
+      ci_result: success
+    - pr: 116
+      topic: "RFC 8785 canonical JSON and record digests"
+      merge_commit: "ebcfb94b97304f19b74d8e23a7085279bb75c1ef"
+      ci_run_id: 43868111389
+      ci_result: success
+    - pr: 117
+      topic: "restore updated_at in v1 home export projections"
+      merge_commit: "5ba25f5919abfa76f33a7b399b770a07357519ee"
+      ci_run_id: 43868719211
+      ci_result: success
+    - pr: 119
+      topic: "local resource-backed agent discovery and collaboration"
+      merge_commit: "bbcf2bc56a4b29bdc3d74ed184c3d45dd6c056bf"
+      ci_run_id: 43870081165
+      ci_result: success
+  verified_boundaries:
+    - "Import validates all portable rows before writes; failure remains atomic."
+    - "verify_home checks strict JSON, snapshots, artifact blobs, and change/revision history."
+    - "HTTP unexpected failures are logged server-side and sanitized to clients."
+    - "Full/private exports preserve agents; public-only exports omit agents until visibility policy exists."
+    - "Local agent collaboration exists; distributed peer networking does not."
+    - "RFC 8785 digest primitives exist; home-format integration is not complete."
+  open_work_clusters:
+    - "PRs #118 and #120 conflict over DISCUSSION.md restoration after commit 9d2c296; maintainer decision required."
+    - "PR #64 resource application/SQLite adapter refactor needs rebase and preservation of current validations."
+    - "PR #55 is broad and overlaps several merged fixes; split/reconcile unique changes before merge."
+    - "PR #61 distributed/evolution docs are proposed architecture only; companion rebased docs PR pending."
+    - "PRs #14 and #15 overlap the merged local agent-network work and proposed distributed architecture."
+    - "PRs #74-#105 contain paired agent-muse claim entries; preserve attribution and verify against merged code."
+  superseded_implementation_prs: [49, 50, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 114]
+  handoff: "Refresh live GitHub state before every new task; read docs/repository-audit.md and docs/PROJECT_CONTEXT.md."
