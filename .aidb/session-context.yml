@@ -25,17 +25,28 @@ development_model:
     - "Do not describe plans or model predictions as execution evidence."
 
 session_bootstrap:
+  budget: >-
+    The mandatory bootstrap set is this file plus docs/orientation.md and
+    docs/current-state.md. Keep the three files under 40,000 characters
+    total; everything else is loaded on demand via docs/repo-map.md.
   required_order:
     - path: .aidb/session-context.yml
       reason: "Machine-readable orientation, current verified boundaries, and canonical pointers."
-    - path: docs/PROJECT_CONTEXT.md
-      reason: "Human-readable project handoff, vision, decisions, priorities, and session closeout template."
+    - path: docs/orientation.md
+      reason: "What AIDB is; REAL/PLANNED/DEAD capability lists; concept-to-module-to-table map; working rules that bite."
+    - path: docs/current-state.md
+      reason: "Present-tense project status, landing lanes, and decisions awaiting the maintainer. This page supersedes older status snapshots elsewhere."
+  on_demand:
     - path: AGENTS.md
-      reason: "Mandatory contributor workflow, safety invariants, and repo-specific lessons."
+      reason: "Mandatory contributor workflow, safety invariants, and repo-specific lessons. Read before making changes."
+    - path: docs/repo-map.md
+      reason: "Index of every other doc and code area, with when to load each."
+    - path: docs/PROJECT_CONTEXT.md
+      reason: "Longer human-readable handoff and vision. A snapshot: for status, docs/current-state.md wins."
     - path: README.md
       reason: "Project overview and usage."
     - path: docs/repository-audit.md
-      reason: "Audit snapshot, known risks, CI evidence, launch blockers, and open PR triage."
+      reason: "Point-in-time audit snapshot and launch blockers. History, not current status."
   before_any_change:
     - "Fetch these files from current main; never rely on a remembered copy or chat transcript."
     - "Inspect git status, current source and tests relevant to the task."
@@ -60,36 +71,21 @@ status:
     persistence: SQLite
     ci_matrix: ["3.10", "3.11", "3.12"]
     c_abi: "draft header only; not implemented as a stable ABI"
-  last_verified_ci:
-    run_id: 38051116154
-    url: "https://github.com/usamaizm/AIDB/actions/runs/38051116154"
-    commit: "8e426af917c63f57efcc9399230f971c0a962003"
-    result: success
-    scope_note: >-
-      This successful run validates the documentation/audit commit above. A later
-      README onboarding commit triggered run 38051141963, which was still in
-      progress at the last check. Recheck CI for current main before claiming HEAD is green.
+  current_state_pointer: >-
+    docs/current-state.md is the single home for present-tense status
+    (suite counts, subsystem status, open work). Point-in-time snapshots
+    (CI runs, open PR lists, merged-work lists) are deliberately not kept
+    in this manifest: they go stale and then disagree with each other.
+    Refresh live GitHub state before making status claims.
   implementation_caveats:
-    - "Agent-home persistence, changes/checkpoints, export/import, provenance models, and HTTP server have source/tests; inspect exact operation semantics before relying on them."
-    - "Universal file-format support, broad language bindings, stable C ABI, autonomous self-evolution, distributed storage, and petabyte/exabyte performance are not established runtime capabilities."
+    - "Agent-home persistence, changes/snapshots, export/import, provenance models, sessions, streaming, and the HTTP server have source/tests; inspect exact operation semantics before relying on them."
+    - "Universal file-format support, broad language bindings, stable C ABI, autonomous self-evolution, distributed storage/networking, and petabyte/exabyte performance are not established runtime capabilities."
     - "Performance/context/storage documents specify goals and proposed designs; benchmark and implement incrementally."
-  open_pull_requests_at_last_audit:
-    - number: 8
-      topic: "Online agent service; compare branch with server already on main and review public deployment security."
-      url: "https://github.com/usamaizm/AIDB/pull/8"
-    - number: 13
-      topic: "Atomic/schema-safe home import; core fix is already on main, reconcile duplicate branch."
-      url: "https://github.com/usamaizm/AIDB/pull/13"
-    - number: 14
-      topic: "Agent discovery and contract-first evolution; review with PR 15."
-      url: "https://github.com/usamaizm/AIDB/pull/14"
-    - number: 15
-      topic: "Agent network loop; overlaps discovery work in PR 14."
-      url: "https://github.com/usamaizm/AIDB/pull/15"
-    - number: 16
-      topic: "Living context and agent identity; compare remaining unique changes with the new main-branch handoff."
-      url: "https://github.com/usamaizm/AIDB/pull/16"
 canonical_docs:
+  orientation: docs/orientation.md
+  current_state: docs/current-state.md
+  repo_map: docs/repo-map.md
+  decision_log: docs/decision-log.md
   project_context: docs/PROJECT_CONTEXT.md
   contributor_rules: AGENTS.md
   repository_audit: docs/repository-audit.md
@@ -118,97 +114,7 @@ canonical_docs:
   external_request_protocol: .aidb/protocol.yml
 priority_order:
   - "Recheck CI for current main and keep Python 3.10/3.11/3.12 green."
-  - "Review export/import and snapshot restore for atomicity, idempotency, privacy, and failure recovery."
-  - "Reconcile PRs 8, 13, 14, 15, and 16; do not blind-merge stale branches."
-  - "Harden HTTP boundary before public exposure: authorization, TLS deployment, request limits, timeouts, and rate limiting."
-  - "Implement bounded/paginated retrieval, streaming, resource budgets, and compact context assembly in tested increments."
-  - "Establish reproducible performance and storage benchmarks before scale claims."
+  - "Build the aidb-home-v2 importer/verifier under accepted decisions D1-D4 (docs/decision-log.md)."
+  - "Record per-family portability decisions for the undecided tables in aidb/portability.py."
+  - "Harden the HTTP boundary before public exposure: authorization scopes, rate limiting, and deployment review."
   - "Keep proposals clearly separate from shipped and tested capabilities."
-
-
-live_repository_snapshot:
-  as_of: "2026-11-16T12:56:54Z"
-  main_commit: "d10a706659aa15feeeeb4e50c9e6b735c2b19e08"
-  open_pull_requests: 28
-  cli_surface:
-    source: aidb/__main__.py
-    commands: [agent, search, serve]
-    session_message_task_subcommands: not_exposed
-  ci_matrix:
-    python: ["3.10", "3.11", "3.12"]
-    steps: [compileall, ruff, pytest]
-  merged_work:
-    - pr: 71
-      topic: "snapshot contract versioning"
-      merge_commit: "3652081f993c675896065426660d72ab6d6d803f"
-    - pr: 73
-      topic: "artifact import row validation"
-      merge_commit: "7457c415588ffade2352f96079a3174605f74061"
-    - pr: 80
-      topic: "agents table export/import"
-      merge_commit: "569b0d46b14649b5eeb142cd3ecc2e7884fdc17c"
-    - pr: 106
-      topic: "public CLI contract tests"
-      merge_commit: "721e20bb159a861570320d9cdadf3147b7dc0d59"
-      ci_run_id: 43862813272
-      ci_result: success
-    - pr: 109
-      topic: "strict resource and note input validation"
-      merge_commit: "ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5"
-      ci_run_id: 43864558782
-      ci_result: success
-    - pr: 111
-      topic: "strict home import row and change-payload validation"
-      merge_commit: "f7349f538f9a41f3924d3d9d2a3c9d8b71167796"
-      ci_run_id: 43865913472
-      ci_result: success
-    - pr: 112
-      topic: "read-only complete home integrity verification"
-      merge_commit: "443ad5b56612acc7566bd83bf629997cbbc7645b"
-      ci_run_id: 43866381773
-      ci_result: success
-    - pr: 113
-      topic: "server-side HTTP exception diagnostics"
-      merge_commit: "0a20ad268241698b58235e8960ff32836a3c31ac"
-      ci_run_id: 43866856432
-      ci_result: success
-    - pr: 115
-      topic: "explicit export projections and portability registry"
-      merge_commit: "fed26c1561326b07c404537fa7938e1cbcd7edf3"
-      ci_run_id: 43867824641
-      ci_result: success
-    - pr: 116
-      topic: "RFC 8785 canonical JSON and record digests"
-      merge_commit: "ebcfb94b97304f19b74d8e23a7085279bb75c1ef"
-      ci_run_id: 43868111389
-      ci_result: success
-    - pr: 117
-      topic: "restore updated_at in v1 home export projections"
-      merge_commit: "5ba25f5919abfa76f33a7b399b770a07357519ee"
-      ci_run_id: 43868719211
-      ci_result: success
-    - pr: 119
-      topic: "local resource-backed agent discovery and collaboration"
-      merge_commit: "bbcf2bc56a4b29bdc3d74ed184c3d45dd6c056bf"
-      ci_run_id: 43870081165
-      ci_result: success
-    - pr: 120
-      topic: "restore DISCUSSION.md journal from repository history"
-      merge_commit: "d10a706659aa15feeeeb4e50c9e6b735c2b19e08"
-  verified_boundaries:
-    - "Import validates all portable rows before writes; failure remains atomic."
-    - "verify_home checks strict JSON, snapshots, artifact blobs, and change/revision history."
-    - "HTTP unexpected failures are logged server-side and sanitized to clients."
-    - "Full/private exports preserve agents; public-only exports omit agents until visibility policy exists."
-    - "Local agent collaboration exists; distributed peer networking does not."
-    - "RFC 8785 digest primitives exist; home-format integration is not complete."
-  open_work_clusters:
-    - "PR #120 restored DISCUSSION.md; PR #118 is closed as superseded."
-    - "PR #122 adds a new verify_home stored-row JSON claim; compare it with #105 and merged #112 before accepting a duplicate claim."
-    - "PR #64 resource application/SQLite adapter refactor needs rebase and preservation of current validations."
-    - "PR #55 is broad and overlaps several merged fixes; split/reconcile unique changes before merge."
-    - "PR #61 distributed/evolution docs are proposed architecture only; companion rebased docs PR pending."
-    - "PRs #14 and #15 overlap the merged local agent-network work and proposed distributed architecture."
-    - "PRs #74-#105 contain paired agent-muse claim entries; preserve attribution and verify against merged code."
-  superseded_implementation_prs: [49, 50, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 114, 118]
-  handoff: "Refresh live GitHub state before every new task; read docs/repository-audit.md and docs/PROJECT_CONTEXT.md."

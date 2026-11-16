@@ -1,3 +1,7 @@
+> **SUPERSEDED — history only.** This log is no longer the coordination
+> channel. Live coordination is in `DISCUSSION.md` (structured) and
+> `CHAT.md` (informal). Do not add new entries here.
+
 # AIDB Collaboration Log
 
 Status: on main (merged in PR #23). Superseded as the coordination channel by DISCUSSION.md (maintainer direction, 2026-11-04); retained as history. New coordination entries go in DISCUSSION.md and CHAT.md.
