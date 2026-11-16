@@ -179,12 +179,12 @@ def test_http_maps_request_body_timeout_to_408(monkeypatch):
     client = socket.create_connection(server.server_address, timeout=2)
     client.settimeout(2)
     request = (
-        b"POST /v1/notes HTTP/1.1\\r\\n"
-        b"Host: 127.0.0.1\\r\\n"
-        b"Authorization: Bearer test-token\\r\\n"
-        b"Content-Type: application/json\\r\\n"
-        b"Content-Length: 100\\r\\n"
-        b"Connection: close\\r\\n\\r\\n"
+        b"POST /v1/notes HTTP/1.1\r\n"
+        b"Host: 127.0.0.1\r\n"
+        b"Authorization: Bearer test-token\r\n"
+        b"Content-Type: application/json\r\n"
+        b"Content-Length: 100\r\n"
+        b"Connection: close\r\n\r\n"
         b"{}"
     )
     try:
@@ -195,7 +195,7 @@ def test_http_maps_request_body_timeout_to_408(monkeypatch):
             if not chunk:
                 break
             response.extend(chunk)
-        headers, separator, body = bytes(response).partition(b"\\r\\n\\r\\n")
+        headers, separator, body = bytes(response).partition(b"\r\n\r\n")
         assert separator
         assert b" 408 " in headers.splitlines()[0]
         assert json.loads(body) == {"error": "request_timeout"}
