@@ -872,18 +872,40 @@ class AIDB:
         capabilities: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> Agent:
-        cur = self.db.execute(
-            "INSERT INTO agents(name, description, model, role, permissions, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (
-                name,
-                description,
-                model,
-                role,
-                self._json(permissions or []),
-                self._json(capabilities or []),
-                self._json(metadata or {}),
-            ),
-        )
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("agent name must be a non-empty string")
+        if not all(isinstance(value, str) for value in (description, model, role)):
+            raise ValueError("agent description, model, and role must be strings")
+        if not role.strip():
+            raise ValueError("agent role must be a non-empty string")
+        if permissions is not None and (
+            not isinstance(permissions, list)
+            or any(not isinstance(value, str) for value in permissions)
+        ):
+            raise ValueError("agent permissions must be a list of strings")
+        if capabilities is not None and (
+            not isinstance(capabilities, list)
+            or any(not isinstance(value, str) for value in capabilities)
+        ):
+            raise ValueError("agent capabilities must be a list of strings")
+        _validate_metadata(metadata, "agent metadata")
+        try:
+            cur = self.db.execute(
+                "INSERT INTO agents(name, description, model, role, permissions, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    name,
+                    description,
+                    model,
+                    role,
+                    self._json(permissions or []),
+                    self._json(capabilities or []),
+                    self._json(metadata or {}),
+                ),
+            )
+        except sqlite3.IntegrityError as exc:
+            if "UNIQUE constraint failed: agents.name" in str(exc):
+                raise ValueError(f"agent name already exists: {name}") from exc
+            raise
         self.db.commit()
         return Agent(name, description, model, role, permissions or [], capabilities or [], metadata or {}, cur.lastrowid)
 
@@ -896,6 +918,13 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> Extraction:
         self._require_confidence(confidence, "extraction")
+        if self.db.execute("SELECT 1 FROM artifacts WHERE id = ?", (input_artifact_id,)).fetchone() is None:
+            raise ValueError(f"input artifact {input_artifact_id} does not exist")
+        if not isinstance(method, str) or not method.strip():
+            raise ValueError("extraction method must be a non-empty string")
+        if not isinstance(status, str) or not status.strip():
+            raise ValueError("extraction status must be a non-empty string")
+        _validate_metadata(metadata, "extraction metadata")
         try:
             self.db.execute("BEGIN")
             cur = self.db.execute(
@@ -970,6 +999,13 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> Interpretation:
         self._require_confidence(confidence, "interpretation")
+        if self.db.execute("SELECT 1 FROM artifacts WHERE id = ?", (output_artifact_id,)).fetchone() is None:
+            raise ValueError(f"output artifact {output_artifact_id} does not exist")
+        if not isinstance(claim, str) or not claim.strip():
+            raise ValueError("interpretation claim must be a non-empty string")
+        if not isinstance(interpreter, str) or not interpreter.strip():
+            raise ValueError("interpreter must be a non-empty string")
+        _validate_metadata(metadata, "interpretation metadata")
         try:
             self.db.execute("BEGIN")
             cur = self.db.execute(
@@ -997,6 +1033,11 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> Knowledge:
         self._require_confidence(confidence, "knowledge")
+        if self.db.execute("SELECT 1 FROM interpretations WHERE id = ?", (interpretation_id,)).fetchone() is None:
+            raise ValueError(f"interpretation {interpretation_id} does not exist")
+        if not isinstance(status, str) or not status.strip():
+            raise ValueError("knowledge status must be a non-empty string")
+        _validate_metadata(metadata, "knowledge metadata")
         try:
             self.db.execute("BEGIN")
             cur = self.db.execute(
@@ -1027,6 +1068,18 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> KnowledgeRelation:
         self._require_confidence(confidence, "knowledge relation")
+        for knowledge_id in (source_knowledge_id, target_knowledge_id):
+            if self.db.execute("SELECT 1 FROM epistemic_knowledge WHERE id = ?", (knowledge_id,)).fetchone() is None:
+                raise ValueError(f"knowledge {knowledge_id} does not exist")
+        if evidence_artifact_id is not None and self.db.execute(
+            "SELECT 1 FROM artifacts WHERE id = ?", (evidence_artifact_id,)
+        ).fetchone() is None:
+            raise ValueError(f"evidence artifact {evidence_artifact_id} does not exist")
+        if not isinstance(relation, str) or not relation.strip():
+            raise ValueError("knowledge relation must be a non-empty string")
+        if created_by is not None and not isinstance(created_by, str):
+            raise ValueError("created_by must be a string or null")
+        _validate_metadata(metadata, "knowledge relation metadata")
         try:
             self.db.execute("BEGIN")
             cur = self.db.execute(
@@ -1062,6 +1115,16 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> Memory:
         self._require_confidence(confidence, "memory")
+        if self.db.execute("SELECT 1 FROM agents WHERE id = ?", (agent_id,)).fetchone() is None:
+            raise ValueError(f"agent {agent_id} does not exist")
+        if self.db.execute("SELECT 1 FROM epistemic_knowledge WHERE id = ?", (knowledge_id,)).fetchone() is None:
+            raise ValueError(f"knowledge {knowledge_id} does not exist")
+        if not isinstance(kind, str) or not kind.strip():
+            raise ValueError("memory kind must be a non-empty string")
+        if not isinstance(status, str) or not status.strip():
+            raise ValueError("memory status must be a non-empty string")
+        _validate_metadata(context, "memory context")
+        _validate_metadata(metadata, "memory metadata")
         try:
             self.db.execute("BEGIN")
             cur = self.db.execute(
@@ -1322,6 +1385,20 @@ class AIDB:
         session_id: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> WorkflowEvent:
+        if not isinstance(kind, str) or not kind.strip():
+            raise ValueError("event kind must be a non-empty string")
+        if not isinstance(message, str):
+            raise ValueError("event message must be a string")
+        _validate_metadata(metadata, "event metadata")
+        for table, column, value, label in (
+            ("agents", "id", agent_id, "agent"),
+            ("tasks", "id", task_id, "task"),
+            ("sessions", "session_id", session_id, "session"),
+        ):
+            if value is not None and self.db.execute(
+                f"SELECT 1 FROM {table} WHERE {column} = ?", (value,)
+            ).fetchone() is None:
+                raise ValueError(f"{label} {value} does not exist")
         return self._append_workflow_event(kind, message, agent_id, task_id, session_id, metadata)
 
     def list_artifacts(self, media_type: str | None = None, parent_artifact_id: int | None = None) -> list[Artifact]:
@@ -1357,6 +1434,15 @@ class AIDB:
             DeprecationWarning,
             stacklevel=2,
         )
+        if self.db.execute("SELECT 1 FROM agents WHERE id = ?", (agent_id,)).fetchone() is None:
+            raise ValueError(f"agent {agent_id} does not exist")
+        if not isinstance(content, str):
+            raise ValueError("legacy memory content must be a string")
+        if not isinstance(kind, str) or not kind.strip():
+            raise ValueError("legacy memory kind must be a non-empty string")
+        if isinstance(importance, bool) or not isinstance(importance, (int, float)) or not 0 <= importance <= 1:
+            raise ValueError("legacy memory importance must be between 0 and 1")
+        _validate_metadata(metadata, "legacy memory metadata")
         cur = self.db.execute(
             "INSERT INTO memories(agent_id, content, kind, importance, metadata) VALUES (?, ?, ?, ?, ?)",
             (agent_id, content, kind, importance, self._json(metadata or {})),
