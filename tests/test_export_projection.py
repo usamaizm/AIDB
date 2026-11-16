@@ -36,6 +36,7 @@ def make_populated_db() -> AIDB:
         checksum=PAYLOAD_SHA256,
         content=PAYLOAD,
     )
+    db.register_agent("projection-agent")
     return db
 
 
@@ -58,7 +59,7 @@ def test_full_export_row_keys_match_declared_projection() -> None:
     payload = db.export_home(include_private=True)
     _assert_keys_match_projection(payload)
     # Every exported table actually has rows in this fixture, so the
-    # key check above exercised all eight projections.
+    # key check above exercised all nine projections.
     for table in _EXPORT_COLUMNS:
         assert payload["tables"][table], table
 
