@@ -8,9 +8,10 @@ import re
 import sqlite3
 import uuid
 import warnings
+from contextlib import contextmanager
 from threading import RLock
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 from .portability import portable_tables
 
@@ -470,6 +471,29 @@ class AIDB:
             """
         )
         self.db.commit()
+
+    @contextmanager
+    def _atomic(self, operation: str) -> Iterator[None]:
+        """Run a compound mutation atomically, including inside an outer transaction.
+
+        A savepoint (rather than BEGIN) is what makes this composable:
+        releasing the outermost savepoint commits when no transaction is
+        open, while inside a caller's transaction the savepoint nests and
+        the caller keeps control of commit/rollback. On any exception the
+        mutation is rolled back to the savepoint, so a failure mid-way
+        leaves no partial writes; the original exception propagates.
+        """
+        savepoint = "aidb_" + operation + "_" + uuid.uuid4().hex
+        with self._connection_lock:
+            self.db.execute(f"SAVEPOINT {savepoint}")
+            try:
+                yield
+            except Exception:
+                self.db.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+                self.db.execute(f"RELEASE SAVEPOINT {savepoint}")
+                raise
+            else:
+                self.db.execute(f"RELEASE SAVEPOINT {savepoint}")
 
     @property
     def schema_version(self) -> int:
@@ -1389,10 +1413,10 @@ class AIDB:
         _validate_strict_json_value(content, "content")
         _validate_metadata(metadata)
         rid = "res:" + str(uuid.uuid4())
-        self.db.execute("INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)", (rid, resource_type, json.dumps(content), owner, visibility, self._json(metadata or {})))
-        self._append_workflow_event("resource_created", "resource created", metadata={"resource_id": rid, "resource_type": resource_type, "owner": owner, "visibility": visibility})
-        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,new_revision,payload) VALUES(?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), rid, "create", owner, 1, self._json({"resource_type":resource_type,"visibility":visibility})))
-        self.db.commit()
+        with self._atomic("create_resource"):
+            self.db.execute("INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)", (rid, resource_type, json.dumps(content), owner, visibility, self._json(metadata or {})))
+            self._append_workflow_event("resource_created", "resource created", metadata={"resource_id": rid, "resource_type": resource_type, "owner": owner, "visibility": visibility})
+            self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,new_revision,payload) VALUES(?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), rid, "create", owner, 1, self._json({"resource_type":resource_type,"visibility":visibility})))
         return self.get_resource(rid)
 
     def get_resource(self, resource_id, include_private=True):
@@ -1480,16 +1504,19 @@ class AIDB:
         return [self.get_note(r["id"]) for r in self.db.execute(sql,params)]
 
     def publish_resource(self, resource_id):
-        row=self.db.execute("SELECT revision,owner,visibility FROM home_resources WHERE id=?", (resource_id,)).fetchone()
-        if row is None: raise ValueError("resource does not exist")
-        if row["visibility"] == "public":
-            return self.get_resource(resource_id)
-        old_revision=row["revision"]
-        self.db.execute("UPDATE home_resources SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=?", (resource_id,))
-        self.db.execute("UPDATE notes SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE resource_id=?", (resource_id,))
-        self._append_workflow_event("resource_published", "resource published", metadata={"resource_id":resource_id})
-        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), resource_id, "publish", row["owner"], old_revision, old_revision+1, self._json({})))
-        self.db.commit()
+        with self._atomic("publish_resource"):
+            row=self.db.execute("SELECT revision,owner,visibility FROM home_resources WHERE id=?", (resource_id,)).fetchone()
+            if row is None: raise ValueError("resource does not exist")
+            if row["visibility"] == "public":
+                return self.get_resource(resource_id)
+            old_revision=row["revision"]
+            # Guard on the revision just read so a concurrent writer cannot
+            # be overwritten silently between the check and the write.
+            cursor=self.db.execute("UPDATE home_resources SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=? AND revision=? AND visibility='private'", (resource_id, old_revision))
+            if cursor.rowcount != 1: raise ValueError("revision conflict")
+            self.db.execute("UPDATE notes SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE resource_id=?", (resource_id,))
+            self._append_workflow_event("resource_published", "resource published", metadata={"resource_id":resource_id})
+            self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), resource_id, "publish", row["owner"], old_revision, old_revision+1, self._json({})))
         return self.get_resource(resource_id)
 
     def current_specification(self):
@@ -2613,9 +2640,9 @@ class AIDB:
         for rid in (source_resource_id, target_resource_id):
             if self.db.execute("SELECT 1 FROM home_resources WHERE id=?", (rid,)).fetchone() is None:
                 raise ValueError("resource does not exist: " + rid)
-        self.db.execute("INSERT OR IGNORE INTO resource_relations(source_resource_id,target_resource_id,relation,metadata) VALUES(?,?,?,?)", (source_resource_id,target_resource_id,relation,self._json(metadata or {})))
-        self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,payload) VALUES(?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),source_resource_id,"relate",None,self._json({"target_resource_id":target_resource_id,"relation":relation})))
-        self.db.commit()
+        with self._atomic("relate_resources"):
+            self.db.execute("INSERT OR IGNORE INTO resource_relations(source_resource_id,target_resource_id,relation,metadata) VALUES(?,?,?,?)", (source_resource_id,target_resource_id,relation,self._json(metadata or {})))
+            self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,payload) VALUES(?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),source_resource_id,"relate",None,self._json({"target_resource_id":target_resource_id,"relation":relation})))
 
     def resource_relations(self, resource_id):
         rows=self.db.execute("SELECT * FROM resource_relations WHERE source_resource_id=? OR target_resource_id=? ORDER BY id ASC", (resource_id,resource_id)).fetchall()
@@ -2634,7 +2661,7 @@ class AIDB:
 
         # Validate before any write: None means "keep existing" and is not
         # validated. Note rules need the notes row, so they run here too,
-        # before BEGIN.
+        # before the atomic section.
         if content is not None:
             _validate_strict_json_value(content, "content")
             note_row = self.db.execute(
@@ -2644,15 +2671,28 @@ class AIDB:
                 _validate_note_content(content)
         _validate_metadata(metadata)
 
-        old_revision = row["revision"]
-        new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
-        new_content = json.loads(row["content"]) if content is None else content
-        try:
-            self.db.execute("BEGIN")
-            self.db.execute(
-                "UPDATE home_resources SET content=?, metadata=?, revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=?",
-                (json.dumps(new_content), self._json(new_metadata), resource_id),
+        with self._atomic("update_resource"):
+            # Re-read inside the atomic section and guard the UPDATE on the
+            # revision: the checks above observed the row outside the
+            # transaction, leaving a read-check-write window for concurrent
+            # writers. The guarded UPDATE + rowcount check closes it at the
+            # SQL level.
+            row = self.db.execute(
+                "SELECT * FROM home_resources WHERE id=?", (resource_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError("resource does not exist")
+            if expected_revision is not None and row["revision"] != expected_revision:
+                raise ValueError("revision conflict")
+            old_revision = row["revision"]
+            new_metadata = json.loads(row["metadata"]) if metadata is None else metadata
+            new_content = json.loads(row["content"]) if content is None else content
+            cursor = self.db.execute(
+                "UPDATE home_resources SET content=?, metadata=?, revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=? AND revision=?",
+                (json.dumps(new_content), self._json(new_metadata), resource_id, old_revision),
             )
+            if cursor.rowcount != 1:
+                raise ValueError("revision conflict")
             note = self.db.execute(
                 "SELECT * FROM notes WHERE resource_id=?", (resource_id,)
             ).fetchone()
@@ -2686,10 +2726,6 @@ class AIDB:
                  old_revision, old_revision + 1,
                  self._json({"content_changed": content is not None, "metadata_changed": metadata is not None})),
             )
-            self.db.commit()
-        except Exception:
-            self.db.rollback()
-            raise
         return self.get_resource(resource_id)
 
     def public_changes(self, after_id=0, limit=100):
