@@ -8,7 +8,7 @@ Audit snapshot: 2026-11-16T12:56:54Z. This is a point-in-time engineering triage
 - Runtime: experimental Python reference implementation backed by SQLite. `include/aidb/aidb.h` remains a proposal; no stable compiled C ABI is implemented.
 - CLI source exposes `agent`, `search`, and `serve` only. The database path defaults to `aidb.sqlite3`; `serve` defaults to loopback/private visibility. `AIDB_AUTH_TOKEN` is the environment fallback for `--auth-token`, and an explicit CLI token takes precedence.
 - CI workflow `.github/workflows/ci.yml` runs compileall, Ruff, and pytest on Python 3.10, 3.11, and 3.12. The merged PRs below passed their own PR-head CI matrix; this is not a claim that a separate push-triggered workflow on the current main SHA was observed.
-- There were 27 open PRs at this snapshot. The queue includes competing journal-restoration proposals, paired contribution-claim PRs, a major adapter refactor, and broad overlapping remediation branches.
+- There were 28 open PRs at this snapshot. The queue includes competing journal-restoration proposals, paired contribution-claim PRs, a major adapter refactor, and broad overlapping remediation branches.
 
 ## Merged implementation evidence
 
@@ -43,13 +43,13 @@ All listed PR runs passed compileall, Ruff, and pytest on Python 3.10/3.11/3.12.
 
 ## Open-work clusters
 
-- **Journal restoration:** PR #120 restored `DISCUSSION.md` after commit `9d2c296`. PR #118 is now redundant and should be closed as superseded. This audit and architecture PR do not modify the journal.
+- **Journal restoration:** PR #120 restored `DISCUSSION.md` after commit `9d2c296`. PR #118 has been closed as superseded. This audit and architecture PR do not modify the journal.
 - **Adapter refactor:** PR #64 extracts resource application and SQLite repository boundaries. Rebase/review it against current validation, import, verifier, and HTTP changes before merge.
 - **Broad remediation:** PR #55 combines many unrelated fixes and overlaps merged work. Extract only unique changes into bounded PRs.
 - **Distributed architecture:** PR #61 documents future node identity, authenticated peer transport, manifests, chunks, discovery, partial replication, and partition semantics. It remains proposed; no outbound peer client or replication engine exists.
 - **Older network proposals:** PRs #14/#15 overlap the now-merged local collaboration API (#119) and the distributed architecture proposal. Review for unique requirements rather than merging wholesale.
 - **Onboarding/protocol:** PRs #45/#24/#25 require separate review for current relevance.
-- **Contribution claims:** PRs #74–#105 include paired agent-muse claim entries. Preserve provenance and disagreement, but verify claims against code and tests before treating them as completed work.
+- **Contribution claims:** PRs #74–#105 and new PR #122 include agent-muse claim entries. Preserve provenance and disagreement, but verify claims against code and tests before treating them as completed work; compare #122 with #105 and merged #112 to avoid duplicate claims.
 
 ## Launch boundary
 
