@@ -7,6 +7,7 @@ import secrets
 import ssl
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
+from threading import BoundedSemaphore
 
 from .store import AIDB
 
@@ -15,15 +16,58 @@ _REQUEST_TIMEOUT_SECONDS = 10.0
 
 
 class AIDBHTTPServer(ThreadingHTTPServer):
-    """Threaded server with bounded backlog and per-connection I/O timeout."""
+    """Threaded server with bounded workers, backlog, and per-connection I/O."""
 
     daemon_threads = True
     request_queue_size = 32
+
+    def __init__(
+        self,
+        server_address,
+        RequestHandlerClass,
+        bind_and_activate=True,
+        max_workers=16,
+    ):
+        if (
+            isinstance(max_workers, bool)
+            or not isinstance(max_workers, int)
+            or max_workers < 1
+        ):
+            raise ValueError("max_workers must be a positive integer")
+        self.max_workers = max_workers
+        self._worker_slots = BoundedSemaphore(max_workers)
+        super().__init__(server_address, RequestHandlerClass, bind_and_activate)
 
     def get_request(self):
         request, client_address = super().get_request()
         request.settimeout(_REQUEST_TIMEOUT_SECONDS)
         return request, client_address
+
+    def process_request(self, request, client_address):
+        if not self._worker_slots.acquire(blocking=False):
+            try:
+                request.sendall(
+                    b"HTTP/1.1 503 Service Unavailable\\r\\n"
+                    b"Connection: close\\r\\n"
+                    b"Content-Length: 0\\r\\n"
+                    b"Retry-After: 1\\r\\n\\r\\n"
+                )
+            except OSError:
+                pass
+            finally:
+                self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except Exception:
+            self._worker_slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._worker_slots.release()
 
 
 def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int = 1048576, max_page_size: int = 200):
