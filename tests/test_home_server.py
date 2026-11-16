@@ -168,3 +168,33 @@ def test_slow_post_body_does_not_hold_shared_database_lock():
         server.shutdown()
         server.server_close()
         db.close()
+
+
+def test_http_maps_request_body_timeout_to_408():
+    db = AIDB(":memory:")
+    server = create_server(db, port=0, auth_token="test-token")
+
+    def timeout_body(_handler):
+        raise TimeoutError
+
+    server.RequestHandlerClass._json_body = timeout_body
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    base = "http://127.0.0.1:" + str(server.server_port)
+    request = Request(
+        base + "/v1/notes",
+        data=b"{}",
+        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        try:
+            urlopen(request)
+            raise AssertionError("expected HTTP 408")
+        except Exception as exc:
+            assert getattr(exc, "code", None) == 408
+            assert json.load(exc) == {"error": "request_timeout"}
+    finally:
+        server.shutdown()
+        server.server_close()
+        db.close()
