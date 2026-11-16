@@ -9,10 +9,10 @@ This file is a durable handoff for human and AI contributors working on AIDB.
 - AIDB has a Python reference implementation with SQLite-backed durable state.
 - The epistemic model tracks artifact, extraction, interpretation, knowledge, and memory provenance.
 - Artifact lineage and extraction-output provenance are validated rather than inferred silently.
-- The agent-home foundation provides resources/notes, ownership and visibility, relationships, optimistic concurrency, durable cursorable changes, checkpoints, portable export/import, runtime specification, discovery, and explicit authorization for network writes.
+- The agent-home foundation provides resources/notes, ownership and visibility, relationships, optimistic concurrency, durable cursorable changes, in-place snapshots, portable export/import, runtime specification, discovery, and explicit authorization for network writes.
 - The architecture is intentionally language-, model-, transport-, network-, cloud-, and database-engine agnostic at the contract level.
 - Node specifications are versioned runtime data rather than mutable history.
-- Home export/import preserves relationships, change history, and snapshots.
+- Home export/import preserves relationships and change history for the portable tables (see `aidb/portability.py`). Snapshots are whole-home checkpoints that live only inside one database: `home_snapshots` is storage-only and is never exported.
 
 ## What has caused problems
 
@@ -55,7 +55,7 @@ An autonomy capability is described as implemented only when repeatable evidence
 
 ## Known status
 
-As of October 4, 2026, PRs #11 and #12 are merged into main. PR #13 contains the atomic, schema-safe home-import hardening pass. The repository remains experimental; treat architecture and protocol details as evolving unless explicitly frozen.
+Live project status is maintained in [docs/current-state.md](docs/current-state.md) — read it there rather than here, and re-verify against current main and CI before quoting any of it. The repository remains experimental; treat architecture and protocol details as evolving unless explicitly frozen.
 ## Agent and file-format compatibility
 
 - Keep `AGENTS.md` as repository-level contributor instructions; keep `README.md` human-facing and `docs/` authoritative for architecture and contracts.
@@ -130,8 +130,8 @@ Before opening or updating a pull request:
 1. Use the repository's `.github/pull_request_template.md` and complete every field in its **AIDB contribution attribution** section.
 2. Set `agent_id` to the stable declared contributor ID (for example, `agent-chatgpt`, `agent-muse`, `agent-grok`, or `human-owner`). Do not invent an identity for another contributor.
 3. Set `github_actor` to the actual GitHub account that authenticated and opened the PR. This is the GitHub actor, not the agent's display name.
-4. Set `attribution_status` honestly: `self_declared` for an agent's own unverified claim, `user_confirmed` only when the project owner has confirmed the attribution, or `independently_verified` only when an independent mechanism genuinely verifies it.
-5. Set `contribution_role` to the work actually performed (such as `implementation`, `testing`, `review`, `documentation`, or `design`).
+4. Set `attribution_status` to one of the values the attribution checker accepts: `self_declared` for an agent's own unverified claim, `user_confirmed` only when the project owner has confirmed the attribution, `maintainer_verified` only when a maintainer has verified it through an independent mechanism, or `unknown` when the status cannot be established. The enforced list lives in `scripts/check_pr_attribution.py`; if this prose and the checker ever disagree, the checker wins.
+5. Set `contribution_role` to the work actually performed, using the checker's values: `primary` for the main author of the change, `co_author` for a substantial secondary author, `reviewer` for review-only contributions, or `maintainer_assisted` for work done under direct maintainer assistance.
 6. List exact checks run and their observed results. Never claim tests, reviews, or security checks passed unless they were actually performed.
 7. Disclose relevant privacy, security, authorization, provenance, compatibility, and migration implications. Never include secrets, credentials, private user data, or private identifiers in PR descriptions, commits, logs, or examples.
 
