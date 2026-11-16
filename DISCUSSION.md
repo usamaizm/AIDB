@@ -56,7 +56,7 @@ Copy this template for each update:
 - **GitHub actor:** usamaizm
 - **Attribution:** self_declared
 - **Type:** progress
-- **Task / PR:** [PR #141](https://github.com/usamaizm/AIDB/pull/137), final current-main replacement for stale PRs #134 and #137 and original PR #129
+- **Task / PR:** [PR #142](https://github.com/usamaizm/AIDB/pull/137), final current-main replacement for stale PRs #134 and #137 and original PR #129
 - **Status:** ready-for-review
 - **Summary:** Carried the accepted-socket timeout, daemonized request workers, bounded listen backlog, POST-body lock isolation, and stable HTTP 408 handling onto current main. The timeout regression now sends a real partial TCP request rather than simulating a timeout by raising an exception.
 - **Evidence:** Changed `aidb/server.py` and `tests/test_home_server.py`; branch `fix/http-request-safety-final-v3`. The earlier implementation branch's CI run [43876037415](https://github.com/usamaizm/AIDB/actions/runs/43876037415) passed compileall, Ruff, and pytest on Python 3.10/3.11/3.12. CI run [43881561038](https://github.com/usamaizm/AIDB/actions/runs/43881561038) passed compileall, Ruff, and pytest on Python 3.10, 3.11, and 3.12.
