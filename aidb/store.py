@@ -1814,6 +1814,144 @@ class AIDB:
             ):
                 issues.append("visibility mismatch:" + resource_id)
 
+    def _verify_home_notes(self, issues):
+        """Check that every note row still agrees with its note resource.
+
+        A note is stored twice — as a notes row and as a home_resources row
+        whose content carries the same title/content/kind — and the write
+        paths keep the two in sync. Nothing in the change replay compares
+        them, so direct divergence (or a note whose resource is gone) would
+        otherwise verify clean.
+        """
+        resources = {
+            row["id"]: row
+            for row in self.db.execute("SELECT * FROM home_resources").fetchall()
+        }
+        for note in self.db.execute("SELECT * FROM notes ORDER BY id").fetchall():
+            resource = resources.get(note["resource_id"])
+            if resource is None:
+                issues.append("orphan note:" + str(note["id"]))
+                continue
+            if resource["resource_type"] != "note":
+                issues.append("note resource type mismatch:" + str(note["id"]))
+            try:
+                content = json.loads(resource["content"])
+            except (TypeError, ValueError):
+                # Already reported by _verify_home_json_columns.
+                content = None
+            else:
+                if not isinstance(content, dict) or any(
+                    content.get(key) != note[key] for key in ("title", "content", "kind")
+                ):
+                    issues.append("note content mismatch:" + str(note["id"]))
+            diverged = (
+                resource["visibility"] != note["visibility"]
+                or resource["revision"] != note["revision"]
+                or resource["owner"] != note["owner"]
+            )
+            if not diverged:
+                try:
+                    note_metadata = json.loads(note["metadata"] or "{}")
+                    resource_metadata = json.loads(resource["metadata"] or "{}")
+                except (TypeError, ValueError):
+                    # Already reported by _verify_home_json_columns.
+                    pass
+                else:
+                    diverged = note_metadata != resource_metadata
+            if diverged:
+                issues.append("note resource metadata mismatch:" + str(note["id"]))
+
+    def _verify_home_relations(self, issues):
+        """Check that every stored relation row points at existing resources.
+
+        The change replay validates relate *payloads*; a relation row whose
+        endpoint is missing — deleted outside the API or stored directly —
+        is only visible by checking the rows themselves.
+        """
+        resource_ids = {
+            row["id"]
+            for row in self.db.execute("SELECT id FROM home_resources").fetchall()
+        }
+        for relation in self.db.execute(
+            "SELECT id,source_resource_id,target_resource_id "
+            "FROM resource_relations ORDER BY id"
+        ).fetchall():
+            if relation["source_resource_id"] not in resource_ids:
+                issues.append("missing relation source:" + str(relation["id"]))
+            if relation["target_resource_id"] not in resource_ids:
+                issues.append("missing relation target:" + str(relation["id"]))
+
+    def _verify_home_artifact_metadata(self, issues):
+        """Check artifact row fields that the blob check cannot see.
+
+        _verify_home_artifact_blobs covers artifacts carrying payload bytes.
+        These field checks cover every artifact row — most importantly
+        blob-less (metadata-only) artifacts, whose size/status/algorithm/
+        checksum fields nothing else validates. The checksum *shape* is
+        deliberately not checked for blob-less artifacts: metadata-only
+        registrations may record opaque externally computed checksums (see
+        _validate_artifact_registration). For artifacts with blobs, the
+        algorithm is already exercised by the blob check.
+        """
+        blob_ids = {
+            row["artifact_id"]
+            for row in self.db.execute("SELECT artifact_id FROM artifact_blobs").fetchall()
+        }
+        for artifact in self.db.execute(
+            "SELECT id,size_bytes,checksum,checksum_algorithm,status "
+            "FROM artifacts ORDER BY id"
+        ).fetchall():
+            invalid = (
+                isinstance(artifact["size_bytes"], bool)
+                or not isinstance(artifact["size_bytes"], int)
+                or artifact["size_bytes"] < 0
+                or artifact["status"] not in _ARTIFACT_STATUSES
+                or not isinstance(artifact["checksum"], str)
+                or not artifact["checksum"]
+            )
+            if not invalid and artifact["id"] not in blob_ids:
+                invalid = (
+                    _canonical_checksum_algorithm(artifact["checksum_algorithm"])
+                    is None
+                )
+            if invalid:
+                issues.append("invalid artifact metadata:" + str(artifact["id"]))
+
+    def _verify_home_changeless_resources(self, issues):
+        """Check structural sanity of resources that have no change rows.
+
+        _verify_home_changes validates revision/visibility/type only for
+        resources anchored in the change log; a resource row with no
+        changes (directly stored or legacy state) would otherwise pass
+        with an empty type or a non-positive revision.
+        """
+        changed_ids = {
+            row["resource_id"]
+            for row in self.db.execute(
+                "SELECT DISTINCT resource_id FROM home_changes"
+            ).fetchall()
+        }
+        for resource in self.db.execute(
+            "SELECT id,resource_type,visibility,revision "
+            "FROM home_resources ORDER BY id"
+        ).fetchall():
+            if resource["id"] in changed_ids:
+                continue
+            if not isinstance(resource["id"], str) or not resource["id"].strip():
+                issues.append("invalid resource id")
+            if not isinstance(resource["resource_type"], str) or not resource[
+                "resource_type"
+            ].strip():
+                issues.append("invalid resource type:" + str(resource["id"]))
+            if resource["visibility"] not in {"public", "private"}:
+                issues.append("invalid resource visibility:" + str(resource["id"]))
+            if (
+                isinstance(resource["revision"], bool)
+                or not isinstance(resource["revision"], int)
+                or resource["revision"] < 1
+            ):
+                issues.append("invalid resource revision:" + str(resource["id"]))
+
     def verify_home(self):
         """Return a read-only integrity report for stored home state."""
         issues = []
@@ -1821,6 +1959,10 @@ class AIDB:
         self._verify_home_snapshots(issues)
         self._verify_home_artifact_blobs(issues)
         self._verify_home_changes(issues)
+        self._verify_home_notes(issues)
+        self._verify_home_relations(issues)
+        self._verify_home_artifact_metadata(issues)
+        self._verify_home_changeless_resources(issues)
         return {"ok": not issues, "issues": issues}
 
     def export_home(self, include_private=True):
