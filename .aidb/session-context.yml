@@ -129,7 +129,7 @@ priority_order:
 live_repository_snapshot:
   as_of: "2026-11-16T12:56:54Z"
   main_commit: "d10a706659aa15feeeeb4e50c9e6b735c2b19e08"
-  open_pull_requests: 27
+  open_pull_requests: 28
   cli_surface:
     source: aidb/__main__.py
     commands: [agent, search, serve]
@@ -203,7 +203,8 @@ live_repository_snapshot:
     - "Local agent collaboration exists; distributed peer networking does not."
     - "RFC 8785 digest primitives exist; home-format integration is not complete."
   open_work_clusters:
-    - "PR #120 restored DISCUSSION.md; PR #118 is superseded and should be closed."
+    - "PR #120 restored DISCUSSION.md; PR #118 is closed as superseded."
+    - "PR #122 adds a new verify_home stored-row JSON claim; compare it with #105 and merged #112 before accepting a duplicate claim."
     - "PR #64 resource application/SQLite adapter refactor needs rebase and preservation of current validations."
     - "PR #55 is broad and overlaps several merged fixes; split/reconcile unique changes before merge."
     - "PR #61 distributed/evolution docs are proposed architecture only; companion rebased docs PR pending."
