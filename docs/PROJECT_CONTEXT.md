@@ -1,6 +1,6 @@
 # AIDB Project Context and Agent Handoff
 
-Last reconciled: 2026-10-10
+Last reconciled: 2026-11-16
 Status: living handoff; experimental project; update this file when material decisions, implementation status, or priorities change.
 
 ## Read this first
@@ -99,18 +99,28 @@ Known limitations:
 
 ## Current work queue
 
-Use the live GitHub issue/PR state and `docs/repository-audit.md` to refresh this list before acting. As last checked on 2026-10-10, PRs #8, #13, #14, #15, and #16 remained open and require reconciliation, not blind merging:
-- #8: compare online-service changes against the server/CLI already on main; review public deployment security before exposure.
-- #13: compare against the atomic/schema-safe import fix already on main; close or reconcile only after checking the actual diff.
-- #14 and #15: review together because agent discovery and network-loop work overlaps.
-- #16: living context and agent identity proposal; this handoff now provides a versioned-in-repository starting point, but compare its remaining unique changes before deciding.
-- Keep CI green; refresh the audit from current run results.
-- Follow [the implementation roadmap](IMPLEMENTATION_ROADMAP.md) as the canonical actionable backlog; mark work complete only with source, tests, and CI evidence.
-- Add benchmark baselines before making performance claims.
-- Implement context-budgeted retrieval, bounded/paginated APIs, streaming, resource controls, and storage improvements in small tested increments.
-- Continue verifying import/export/snapshot restore, provenance invariants, HTTP authorization and deployment boundaries.
+Verified snapshot on 2026-11-16:
 
-This list is not permission to merge PRs, change repository settings, expose a public service, or execute untrusted artifacts.
+- Default branch: `main`, commit `ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5`.
+- Open pull requests: 42. This is a live queue, not a merge plan; inspect each current diff, base/head SHA, review, and CI before taking action.
+- PR [#106](https://github.com/usamaizm/AIDB/pull/106) adds CLI contract tests and was merged to `main` after all three CI jobs passed (Python 3.10, 3.11, 3.12), including compileall, Ruff, and pytest in run [43862813272](https://github.com/usamaizm/AIDB/actions/runs/43862813272). Merge commit: `721e20bb159a861570320d9cdadf3147b7dc0d59`.
+- PR [#71](https://github.com/usamaizm/AIDB/pull/71) — snapshot-contract versioning — has merged to main.
+- PR [#109](https://github.com/usamaizm/AIDB/pull/109) — strict resource/note create and update validation — has merged as `ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5`; its Python 3.10/3.11/3.12 CI passed in run [43864558782](https://github.com/usamaizm/AIDB/actions/runs/43864558782). The duplicate branches #100 and #102 were closed as superseded.
+- PR [#73](https://github.com/usamaizm/AIDB/pull/73) remains open for artifact-row validation on import.
+- PR [#88](https://github.com/usamaizm/AIDB/pull/88) proposes stable JSON 500 responses for unexpected HTTP handler errors. Its review requested server-side exception logging while keeping client responses sanitized; do not treat it as approved or merged.
+- PRs [#90](https://github.com/usamaizm/AIDB/pull/90), [#92](https://github.com/usamaizm/AIDB/pull/92), [#98](https://github.com/usamaizm/AIDB/pull/98), and [#104](https://github.com/usamaizm/AIDB/pull/104) overlap in `verify_home()`. Consolidate artifact blobs, change payload/revision-chain checks, snapshot content, and stored-row JSON validation before merging a coherent implementation.
+- PRs #70–#105 include related artifact/import validation, export projection/portability, agents-table coverage, dataclass consolidation, and paired documentation-claim PRs. Snapshot-contract versioning (#71) has merged; resource/note validation (#100/#102) has been consolidated and merged as #109. Review code and its paired claim entry together; do not merge a claim-only PR as proof that its implementation landed.
+- Older open proposals #8, #13–#16, #24–#25, #45, #49–#50, #55, #61, and #64 still need individual freshness/overlap review. The agent-discovery/network proposals #14, #15, #49, and #61 must be compared as a family rather than merged independently.
+- The shared journal contains additional unpushed work claims from other contributors. Respect their stated ownership and verify whether branches/PRs have appeared before editing overlapping files.
+
+Next priorities:
+1. Reconcile and land high-confidence correctness fixes in small, tested, non-overlapping batches.
+2. Close the remaining HTTP error-handling and deployment-safety gaps without leaking internals or silently swallowing diagnostics.
+3. Complete import/export/snapshot verification, rollback, privacy, and idempotency coverage.
+4. Add reproducible benchmarks before performance or scale claims.
+5. Demonstrate the AI development loop with repeatable evidence, including failure repair and handoff; documentation alone is insufficient.
+
+This queue is a point-in-time snapshot. Refresh GitHub state before acting. No PR merge, public deployment, permission change, release, or destructive operation is authorized by this handoff.
 
 ## Decision and status rules
 

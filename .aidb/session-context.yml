@@ -1,6 +1,6 @@
 schema_version: 1
 kind: aidb_session_context
-updated_on: "2026-10-10"
+updated_on: "2026-11-16"
 project:
   name: AIDB
   repository: "https://github.com/usamaizm/AIDB"
@@ -122,3 +122,44 @@ priority_order:
   - "Implement bounded/paginated retrieval, streaming, resource budgets, and compact context assembly in tested increments."
   - "Establish reproducible performance and storage benchmarks before scale claims."
   - "Keep proposals clearly separate from shipped and tested capabilities."
+
+
+live_repository_snapshot:
+  as_of: "2026-11-16T12:04:48Z"
+  main_commit: "ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5"
+  open_pull_requests: 42
+  cli_surface:
+    source: aidb/__main__.py
+    commands: [agent, search, serve]
+    session_message_task_subcommands: not_exposed
+  ci_evidence:
+    pull_request: 106
+    head_commit: "66b87198d507238118db96010d49ed09b83742f3"
+    run_id: 43862813272
+    run_url: "https://github.com/usamaizm/AIDB/actions/runs/43862813272"
+    result: success
+    merged: true
+    merge_commit: "721e20bb159a861570320d9cdadf3147b7dc0d59"
+    matrix: ["3.10", "3.11", "3.12"]
+    scope_note: >-
+      PR #106 passed all matrix jobs and was merged to main as the recorded merge commit.
+  priority_pr_clusters:
+    - "PR #88: HTTP safe 500 handling; server-side diagnostic logging review remains."
+    - "PRs #90, #92, #98, #104: overlapping verify_home integrity changes."
+    - "PRs #70-#105: artifact/resource/import/export/schema validation and paired claim entries."
+    - "PRs #14, #15, #49, #61: overlapping discovery, collaboration, and networking proposals."
+  handoff: "Refresh current GitHub state before every new repository task; see docs/repository-audit.md."
+
+  latest_merged_work:
+    - pr: 71
+      title: "snapshot contract versioning"
+      merge_commit: "3652081f993c675896065426660d72ab6d6d803f"
+    - pr: 109
+      title: "resource and note input validation"
+      merge_commit: "ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5"
+      ci_run_id: 43864558782
+      ci_result: success
+      matrix: ["3.10", "3.11", "3.12"]
+  superseded_prs:
+    - 100
+    - 102
