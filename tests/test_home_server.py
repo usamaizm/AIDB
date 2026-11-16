@@ -2,10 +2,10 @@ import json
 import socket
 from http.client import HTTPConnection
 from urllib.request import Request, urlopen
-from http.server import ThreadingHTTPServer
-from threading import Event, Thread
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Event, Lock, Thread
 
-from aidb.server import create_handler, create_server
+from aidb.server import AIDBHTTPServer, create_handler, create_server
 from aidb import AIDB
 
 
@@ -204,3 +204,58 @@ def test_http_maps_request_body_timeout_to_408(monkeypatch):
         server.shutdown()
         server.server_close()
         db.close()
+
+def test_http_server_caps_active_workers_and_returns_503_when_full():
+    active = {"count": 0, "peak": 0}
+    active_lock = Lock()
+    entered = Event()
+    release = Event()
+
+    class BlockingHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            with active_lock:
+                active["count"] += 1
+                active["peak"] = max(active["peak"], active["count"])
+            entered.set()
+            release.wait(timeout=5)
+            self.send_response(200)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            with active_lock:
+                active["count"] -= 1
+
+        def log_message(self, *_args):
+            pass
+
+    server = AIDBHTTPServer(
+        ("127.0.0.1", 0), BlockingHandler, max_workers=1
+    )
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    first = socket.create_connection(server.server_address, timeout=2)
+    second = None
+    try:
+        first.sendall(b"GET / HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n")
+        assert entered.wait(timeout=2)
+
+        second = socket.create_connection(server.server_address, timeout=2)
+        second.sendall(b"GET / HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n")
+        response = bytearray()
+        while True:
+            chunk = second.recv(4096)
+            if not chunk:
+                break
+            response.extend(chunk)
+
+        assert bytes(response).startswith(b"HTTP/1.1 503 Service Unavailable")
+    finally:
+        release.set()
+        first.close()
+        if second is not None:
+            second.close()
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=2)
+
+    assert active["peak"] == 1
+
