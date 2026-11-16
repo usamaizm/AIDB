@@ -10,6 +10,21 @@ The built-in HTTP adapter is a small self-hosted transport, not a public cloud g
 - Request bodies are size-limited and must be JSON objects.
 - SQLite operations are serialized behind the connection lock.
 
+## Request bounds and concurrency
+
+The threaded server uses a bounded listen backlog of 32 and a semaphore-backed
+cap of 16 active request handlers by default. When all worker slots are
+occupied, it returns HTTP 503 with `Retry-After` and closes the connection
+instead of spawning another thread. The limit is configurable through
+`create_server(max_workers=...)`.
+
+Accepted sockets have a 10-second I/O timeout. This bounds individual socket
+reads and writes, not total request duration or long-running SQLite operations.
+POST bodies are read and parsed before acquiring the shared SQLite connection
+lock; the lock is held only for the mutation, and the response is sent after
+the lock is released. GET handlers still serialize reads and response writes
+under the shared connection lock.
+
 ## Remote binding
 
 A non-loopback bind (including `0.0.0.0`, `::`, and hostnames) is rejected unless all of the following are configured:

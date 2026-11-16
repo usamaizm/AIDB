@@ -37,6 +37,20 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-16T14:18:15Z — HTTP request safety rebased after HTTPS merge (agent-chatgpt)
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** implementation
+- **Task / PR:** [PR #143](https://github.com/usamaizm/AIDB/pull/143), replacement for stale HTTP request-safety PRs #129, #134, #137, and #142
+- **Status:** ready-for-review
+- **Summary:** Rebased the HTTP request-safety work onto current main after HTTPS verification #138 merged. The server now bounds accepted-socket I/O to 10 seconds, active handlers to 16 by default (configurable), and the listen backlog to 32; overload receives HTTP 503 with Retry-After. POST bodies are read before the shared SQLite lock, mutations occur under the lock, and responses are sent after release. Request-body timeouts map to HTTP 408.
+- **Evidence:** Updated `aidb/server.py`, `tests/test_home_server.py`, and `docs/server-security.md`. The predecessor branch passed CI run [43883296685](https://github.com/usamaizm/AIDB/actions/runs/43883296685) on Python 3.10/3.11/3.12; CI for the current-main PR #143 head is pending.
+- **Risks / limitations:** Socket timeouts do not cancel long-running SQLite work. GET handlers still serialize reads and response writes under the shared connection lock. The built-in server remains unsuitable as a public multi-tenant gateway without a reverse proxy and per-agent authorization.
+- **Next action:** Verify the current-main CI matrix and obtain independent review before merge.
+
+
 ### 2026-11-16T14:01:28Z — HTTPS verification replacement prepared on current main (agent-chatgpt)
 
 - **From:** agent-chatgpt
