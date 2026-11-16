@@ -70,15 +70,14 @@ def test_round_trip_preserves_agents_with_all_fields():
     assert json.loads(bob["metadata"]) == {}
 
 
-def test_public_export_includes_agents():
+def test_public_export_excludes_agents_without_visibility_contract():
     source = AIDB(":memory:")
-    source.register_agent("alice", model="model-x")
+    source.register_agent(
+        "alice", model="internal-model", permissions=["admin"], metadata={"team": "private"}
+    )
 
     exported = source.export_home(include_private=False)
-    rows = exported["tables"]["agents"]
-    assert len(rows) == 1
-    assert rows[0]["name"] == "alice"
-    assert rows[0]["model"] == "model-x"
+    assert exported["tables"]["agents"] == []
 
 
 def test_import_rejects_unknown_table():
