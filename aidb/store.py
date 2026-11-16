@@ -107,14 +107,123 @@ _HEX_DIGITS = frozenset("0123456789abcdef")
 # user_version 0 and are adopted as version 1 on open (the v1 legacy
 # policy). A stored version newer than SCHEMA_VERSION is refused loudly
 # rather than silently misread.
-SCHEMA_VERSION = 1
+def _migrate_schema_v2(conn: sqlite3.Connection) -> None:
+    """Add stable portable identifiers and per-revision contract metadata."""
+    def add_column(table: str, column: str, declaration: str) -> None:
+        columns = {
+            row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        if column not in columns:
+            conn.execute(
+                f"ALTER TABLE {table} ADD COLUMN {column} {declaration}"
+            )
+
+    add_column("artifacts", "artifact_id", "TEXT")
+    add_column("artifacts", "visibility", "TEXT NOT NULL DEFAULT 'private'")
+    add_column("resource_relations", "relation_id", "TEXT")
+    add_column("agents", "agent_id", "TEXT")
+    add_column("agents", "visibility", "TEXT NOT NULL DEFAULT 'private'")
+    add_column(
+        "node_specifications",
+        "contract_id",
+        "TEXT NOT NULL DEFAULT 'org.aidb.node-specification'",
+    )
+    add_column(
+        "node_specifications",
+        "contract_version",
+        "TEXT NOT NULL DEFAULT '0.0.0'",
+    )
+    add_column("node_specifications", "supersedes", "TEXT")
+
+    # The internal integer key seeds a deterministic UUID only during
+    # migration; portable records expose the stable string identifier.
+    for row in conn.execute(
+        "SELECT id, name, checksum, created_at, artifact_id FROM artifacts"
+    ).fetchall():
+        if row["artifact_id"] is None:
+            token = (
+                f"aidb:artifact:{row['id']}:{row['name']}:"
+                f"{row['checksum']}:{row['created_at']}"
+            )
+            external_id = "artifact:" + uuid.uuid5(uuid.NAMESPACE_URL, token).hex
+            conn.execute(
+                "UPDATE artifacts SET artifact_id=? WHERE id=?",
+                (external_id, row["id"]),
+            )
+
+    for row in conn.execute(
+        "SELECT id, source_resource_id, target_resource_id, relation, "
+        "created_at, relation_id FROM resource_relations"
+    ).fetchall():
+        if row["relation_id"] is None:
+            token = (
+                f"aidb:relation:{row['id']}:{row['source_resource_id']}:"
+                f"{row['target_resource_id']}:{row['relation']}:{row['created_at']}"
+            )
+            external_id = "relation:" + uuid.uuid5(uuid.NAMESPACE_URL, token).hex
+            conn.execute(
+                "UPDATE resource_relations SET relation_id=? WHERE id=?",
+                (external_id, row["id"]),
+            )
+
+    for row in conn.execute(
+        "SELECT id, name, model, role, agent_id FROM agents"
+    ).fetchall():
+        if row["agent_id"] is None:
+            token = f"aidb:agent:{row['id']}:{row['name']}:{row['model']}:{row['role']}"
+            external_id = "agent:" + uuid.uuid5(uuid.NAMESPACE_URL, token).hex
+            conn.execute(
+                "UPDATE agents SET agent_id=? WHERE id=?",
+                (external_id, row["id"]),
+            )
+
+    previous_id = None
+    for row in conn.execute(
+        "SELECT version, specification_id, supersedes "
+        "FROM node_specifications ORDER BY version"
+    ).fetchall():
+        if row["supersedes"] is None and previous_id is not None:
+            conn.execute(
+                "UPDATE node_specifications SET supersedes=? WHERE version=?",
+                (previous_id, row["version"]),
+            )
+        previous_id = row["specification_id"]
+
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_artifacts_artifact_id "
+        "ON artifacts(artifact_id)"
+    )
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_resource_relations_relation_id "
+        "ON resource_relations(relation_id)"
+    )
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_agent_id "
+        "ON agents(agent_id)"
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS home_import_metadata (
+            id INTEGER PRIMARY KEY CHECK(id=1),
+            source_format TEXT NOT NULL,
+            integrity_level TEXT NOT NULL,
+            manifest_digest TEXT,
+            imported_at TEXT NOT NULL DEFAULT (
+                strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            )
+        )
+        """
+    )
+
+
+SCHEMA_VERSION = 2
 
 # Registered schema migrations, keyed by the version each step migrates TO.
-# A step receives the live connection and must leave the database at its
-# target version; steps run in ascending order, one transaction each. The
-# registry is empty until the first real schema change ships: the runner is
-# the prerequisite the audit calls for, not a v2 schema.
-SCHEMA_MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {}
+# Each step runs in its own transaction and stamps its target version only
+# after every DDL and backfill operation succeeds.
+SCHEMA_MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
+    2: _migrate_schema_v2,
+}
 
 
 def _canonical_checksum_algorithm(algorithm: Any) -> str | None:
@@ -488,8 +597,10 @@ class AIDB:
         """
         stored = self.schema_version
         if stored == 0:
-            self._set_schema_version(SCHEMA_VERSION)
-            return
+            # Pre-versioning databases are treated as schema v1, then migrated
+            # through every registered step just like explicitly stamped v1.
+            self._set_schema_version(1)
+            stored = 1
         if stored > SCHEMA_VERSION:
             raise ValueError(
                 f"database schema version {stored} is newer than supported "
