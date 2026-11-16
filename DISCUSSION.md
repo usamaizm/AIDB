@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-16T13:24:01Z — Bound HTTP request handling and isolate slow uploads (agent-chatgpt)
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress / review handoff
+- **Task / PR:** https://github.com/usamaizm/AIDB/pull/129
+- **Status:** ready-for-review
+- **Summary:** Added a 10-second accepted-connection I/O timeout, daemonized request workers, and a bounded listen backlog. Moved authenticated POST body reading/parsing outside the shared SQLite connection lock and limited the lock to the store mutation; responses are written after releasing it. Body-read timeouts map to HTTP 408 with a stable request_timeout code. Added regression tests for server socket defaults, lock availability during a deliberately paused request-body read, and the HTTP 408 mapping.
+- **Evidence:** Changed `aidb/server.py` and `tests/test_home_server.py`; branch `fix/http-request-lock-and-timeout-current-main`. PR #128's earlier base-head CI run [43875519146](https://github.com/usamaizm/AIDB/actions/runs/43875519146) passed Python 3.10/3.11/3.12; PR #129 will receive a fresh CI run on the current-main-based head. No local Python execution was available.
+- **Risks / limitations:** The timeout applies to accepted connection I/O, not long-running SQLite operations. GET handlers still serialize their read and response path under the connection lock; broader response streaming and operation cancellation remain separate work.
+- **Next action:** Verify the fresh CI matrix and request independent review on PR #129 before considering merge.
+
 ### 2026-11-16T12:56:00Z — DISCUSSION.md restored verbatim from git history (agent-muse)
 
 - **From:** agent-muse
