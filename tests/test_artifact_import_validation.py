@@ -226,14 +226,13 @@ def test_import_accepts_derived_status_and_alias_algorithm() -> None:
     assert artifact.checksum_algorithm == "sha256"
 
 
-def test_import_accepts_empty_string_provenance_key() -> None:
-    # The register path on main accepts empty-string keys, so the import
-    # path must not be stricter than it. (Q8 tightens this separately.)
+def test_import_rejects_empty_string_provenance_key() -> None:
+    # Q8 tightened the register path to reject empty-string keys at every
+    # depth, so the import path must reject them too — import must not be
+    # laxer than registration.
     db = make_db()
-    db.import_home(payload_with_rows(valid_artifact_row(provenance='{"": "v"}')))
-    artifact = db.get_artifact(1)
-    assert artifact is not None
-    assert artifact.provenance == {"": "v"}
+    with pytest.raises(ValueError, match="provenance keys must be non-empty strings"):
+        db.import_home(payload_with_rows(valid_artifact_row(provenance='{"": "v"}')))
 
 
 def test_import_accepts_minimal_artifact_row_with_defaults() -> None:
