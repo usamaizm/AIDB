@@ -78,15 +78,17 @@ Acceptance evidence: reproducible scripts or workflow runs, test results, and a 
 
 ## Pull-request reconciliation (snapshot 2026-11-16T12:56:54Z)
 
-There were 27 open PRs at snapshot time. This is a review queue, not a merge plan.
+There were 28 open PRs at snapshot time. This is a review queue, not a merge plan.
 
-- #120 has restored `DISCUSSION.md` from history. PR #118 is a redundant restoration proposal and should be closed as superseded. This PR intentionally leaves the journal unchanged.
+- #120 has restored `DISCUSSION.md` from history. PR #118 has been closed as superseded by the merged restoration in #120. This PR intentionally leaves the journal unchanged.
 - #64 resource application and SQLite adapter extraction: next major refactor; rebase against current main and preserve strict input validation, import validation, integrity checks, and server logging.
 - #55 broad audit/remediation: overlaps several merged narrow fixes. Split or reconcile its unique changes before considering merge.
 - #61 distributed networking/evolution architecture: documentation proposal; this rebased companion preserves the architecture while excluding the conflicting journal edit.
 - #14/#15 older agent discovery/network proposals overlap local network implementation #119 and the proposed distributed design; retain only unique requirements.
 - #45/#24 onboarding proposals and #25 phone-first contribution protocol need independent relevance/compatibility review.
 - #74–#105 include paired agent-muse contribution-claim PRs. Preserve attribution, but verify every claim against the merged implementation and current source; claim documents are not implementation evidence.
+
+PR #122 adds another stored-row JSON integrity claim; compare it with #105 and merged #112 before accepting duplicate claim material.
 
 The current main is still an experimental Python/SQLite reference implementation. The local agent collaboration API does not establish peer federation, cryptographic node identity, distributed chunk transfer, replication, or production-grade multi-tenant authorization.
 
