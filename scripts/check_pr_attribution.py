@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate declared AIDB contributor metadata; this is not proof of authorship."""
+
 import json
 import os
 import re
@@ -40,7 +41,9 @@ def validate_body(body, github_author):
     seen, author_present = set(), False
     for number, contributor in enumerate(contributors, 1):
         if not ID_RE.fullmatch(contributor["agent_id"]):
-            errors.append(f"Contributor {number}: use a stable agent- or human-prefixed kebab-case ID.")
+            errors.append(
+                f"Contributor {number}: use a stable agent- or human-prefixed kebab-case ID."
+            )
         actor = contributor["github_actor"].removeprefix("@")
         if not ACTOR_RE.fullmatch(actor):
             errors.append(f"Contributor {number}: github_actor must be a GitHub login.")
@@ -79,7 +82,9 @@ def main():
             print("- " + error)
         print("See docs/CONTRIBUTOR_PROTOCOL.md. This check does not prove authorship.")
         return 1
-    print("Contributor metadata is complete. This check does not authenticate model identity or prove authorship.")
+    print(
+        "Contributor metadata is complete. This check does not authenticate model identity or prove authorship."
+    )
     return 0
 
 
