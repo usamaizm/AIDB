@@ -106,7 +106,7 @@ Node identity must remain stable across IP address, hostname, and certificate ch
 
 ## Runtime implementation boundary
 
-The reference server exposes the same specification payload at `/specification` and `/.well-known/agent-card.json`; these are aliases, not separate schemas or capability vocabularies. The current built-in adapter is HTTP/1.1, or HTTPS/1.1 when TLS is configured. A handler created without a bearer token advertises read operations only. Configuring a bearer token adds the write operations actually implemented by the handler; this remains authentication, not per-agent authorization.
+The reference server exposes the same specification payload at `/specification`, `/.well-known/aidb.json`, and `/.well-known/agent-card.json`; these are aliases, not separate schemas or capability vocabularies. The current built-in adapter is HTTP/1.1, or HTTPS/1.1 when TLS is configured. A handler created without a bearer token advertises read operations only. Configuring a bearer token adds the write operations actually implemented by the handler; this remains authentication, not per-agent authorization.
 
 The persisted specification history creates a new revision whenever capabilities, resource types, transports, extensions, or constraints change. A repeated read with unchanged fields does not create a revision. The `supersedes` link is derived from the immediately preceding retained history record.
 
