@@ -14,7 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from aidb import AIDB
+from aidb import AIDB, network
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CLI_SOURCE = (REPO_ROOT / "aidb" / "__main__.py").read_text(encoding="utf-8")
@@ -45,9 +45,43 @@ RESOURCE_TYPE_METHODS = {
 }
 
 
+# The agent-network surface is implemented as public functions in
+# aidb.network that take the store as their first argument, not as AIDB
+# methods. Every advertised capability and resource type must still map to
+# an existing, public, callable implementation.
+CAPABILITY_FUNCTIONS = {
+    "agent_network": ["publish_agent_profile", "discover_agents"],
+    "agent_profiles": ["publish_agent_profile"],
+    "knowledge_offers": ["publish_knowledge_offer"],
+    "knowledge_requests": ["request_knowledge"],
+    "collaboration_requests": ["request_collaboration"],
+    "agent_responses": ["respond_to_request"],
+    "knowledge_reviews": ["review_knowledge"],
+    "public_discovery": [
+        "discover_agents",
+        "discover_knowledge_offers",
+        "discover_requests",
+    ],
+}
+
+RESOURCE_TYPE_FUNCTIONS = {
+    "agent_profile": ["publish_agent_profile"],
+    "knowledge_offer": ["publish_knowledge_offer"],
+    "knowledge_request": ["request_knowledge"],
+    "collaboration_request": ["request_collaboration"],
+    "agent_response": ["respond_to_request"],
+    "knowledge_review": ["review_knowledge"],
+}
+
+
 def _public_store_method(name):
     method = getattr(AIDB, name, None)
     return method is not None and not name.startswith("_") and callable(method)
+
+
+def _public_network_function(name):
+    function = getattr(network, name, None)
+    return function is not None and not name.startswith("_") and callable(function)
 
 
 def test_cli_dispatches_only_to_existing_store_methods():
@@ -102,12 +136,16 @@ def test_advertised_capabilities_are_backed_by_store_methods():
     payload = db.specification_dict()
     assert payload["capabilities"], "expected a non-empty capability list"
     for capability in payload["capabilities"]:
-        assert capability in CAPABILITY_METHODS, (
+        assert capability in CAPABILITY_METHODS or capability in CAPABILITY_FUNCTIONS, (
             f"advertised capability has no recorded backing: {capability}"
         )
-        for method in CAPABILITY_METHODS[capability]:
+        for method in CAPABILITY_METHODS.get(capability, []):
             assert _public_store_method(method), (
                 f"capability {capability!r} names missing store method: {method}"
+            )
+        for function in CAPABILITY_FUNCTIONS.get(capability, []):
+            assert _public_network_function(function), (
+                f"capability {capability!r} names missing network function: {function}"
             )
 
 
@@ -116,12 +154,16 @@ def test_advertised_resource_types_are_backed_by_store_methods():
     payload = db.specification_dict()
     assert payload["resources"], "expected a non-empty resource type list"
     for resource_type in payload["resources"]:
-        assert resource_type in RESOURCE_TYPE_METHODS, (
+        assert resource_type in RESOURCE_TYPE_METHODS or resource_type in RESOURCE_TYPE_FUNCTIONS, (
             f"advertised resource type has no recorded backing: {resource_type}"
         )
-        for method in RESOURCE_TYPE_METHODS[resource_type]:
+        for method in RESOURCE_TYPE_METHODS.get(resource_type, []):
             assert _public_store_method(method), (
                 f"resource type {resource_type!r} names missing store method: {method}"
+            )
+        for function in RESOURCE_TYPE_FUNCTIONS.get(resource_type, []):
+            assert _public_network_function(function), (
+                f"resource type {resource_type!r} names missing network function: {function}"
             )
 
 
