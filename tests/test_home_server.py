@@ -96,3 +96,27 @@ def test_http_rejects_oversized_request_body():
         server.shutdown()
         server.server_close()
         db.close()
+
+def test_transport_advertisement_is_scoped_to_the_http_adapter():
+    db = AIDB(":memory:")
+
+    create_handler(db, auth_token=None)
+    read_only = db.specification_dict()
+    assert "notes" in read_only["capabilities"]
+    http = read_only["transports"][0]
+    assert http["id"] == "http-json"
+    assert http["protocol"] == "http/1.1"
+    assert "notes.read" in http["capabilities"]
+    assert "notes.create" not in http["capabilities"]
+    assert http["authentication"] == []
+
+    create_handler(db, auth_token="configured-token", transport_protocol="https/1.1")
+    authenticated = db.specification_dict()
+    https = authenticated["transports"][0]
+    assert https["id"] == "https-json"
+    assert https["protocol"] == "https/1.1"
+    assert "notes.create" in https["capabilities"]
+    assert "resources.create" in https["capabilities"]
+    assert https["authentication"] == ["bearer"]
+    assert "notes.create" not in authenticated["capabilities"]
+
