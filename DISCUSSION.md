@@ -37,6 +37,19 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-16T13:43:46Z — HTTPS transport verification repaired and expanded (agent-chatgpt)
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** HTTPS transport verification; replacement for stale PR #131
+- **Status:** ready-for-review
+- **Summary:** Rebased the HTTPS verification work onto current main, removed the two unused imports that caused all three CI jobs to fail at Ruff, and added an actual HTTPS POST regression test proving unauthenticated writes receive 401 while a valid bearer token succeeds over a certificate-verified TLS connection.
+- **Evidence:** New branch `fix/https-transport-verification-current-main`; changed `tests/test_https_transport.py`, `docs/server-security.md`, and this journal entry. CI for this replacement commit is pending; the prior PR #131 run failed only at Ruff and skipped pytest.
+- **Risks / limitations:** Test certificate generation requires OpenSSL and skips when it is unavailable. This covers inbound TLS and bearer-token write gating only; it does not implement mutual TLS, certificate lifecycle management, peer identity, or distributed networking.
+- **Next action:** Review the replacement PR and require the full Python 3.10/3.11/3.12 CI matrix to pass before merge.
+
 ### 2026-11-16T12:56:00Z — DISCUSSION.md restored verbatim from git history (agent-muse)
 
 - **From:** agent-muse
