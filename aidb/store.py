@@ -1579,6 +1579,105 @@ class AIDB:
         raise ValueError("non-standard JSON numeric constant: " + value)
 
     @staticmethod
+    def _parse_strict_json_column(text, label):
+        """Parse a JSON-text database column without accepting duplicate keys or NaN/Infinity."""
+        if not isinstance(text, str):
+            raise ValueError(f"{label} must be a JSON string")
+        try:
+            return json.loads(
+                text,
+                object_pairs_hook=AIDB._unique_json_object,
+                parse_constant=AIDB._reject_json_constant,
+            )
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"invalid JSON in {label}") from exc
+
+    def _validate_change_payload_row(self, row, valid_resource_ids, resource_types, relation_keys):
+        """Validate one imported home_changes row against the store's operation contract."""
+        operation = row.get("operation")
+        if operation not in {"create", "update", "publish", "relate"}:
+            raise ValueError("unknown home change operation: " + str(operation))
+        resource_id = row.get("resource_id")
+        if not isinstance(resource_id, str) or not resource_id.strip():
+            raise ValueError("home change resource_id must be a non-empty string")
+        payload_text = row.get("payload")
+        if not isinstance(payload_text, str):
+            raise ValueError("home change payload must be a string")
+        payload = self._parse_strict_json_text(payload_text, "home change payload")
+        if not isinstance(payload, dict):
+            raise ValueError("home change payload must be a JSON object")
+        previous_revision = row.get("previous_revision")
+        new_revision = row.get("new_revision")
+        if operation == "create":
+            if set(payload) != {"resource_type", "visibility"}:
+                raise ValueError(
+                    "home change create payload must have resource_type and visibility"
+                )
+            if not isinstance(payload["resource_type"], str) or not payload["resource_type"].strip():
+                raise ValueError(
+                    "home change create payload resource_type must be a non-empty string"
+                )
+            visibility = payload["visibility"]
+            if not isinstance(visibility, str) or visibility not in {"public", "private"}:
+                raise ValueError("home change create payload visibility must be public or private")
+            expected_type = resource_types.get(resource_id)
+            if expected_type is not None and payload["resource_type"] != expected_type:
+                raise ValueError(
+                    "home change create payload resource_type does not match the resource"
+                )
+            if previous_revision is not None or new_revision != 1:
+                raise ValueError(
+                    "home change create revision must be new_revision 1 with no previous_revision"
+                )
+        elif operation == "update":
+            if set(payload) != {"content_changed", "metadata_changed"}:
+                raise ValueError(
+                    "home change update payload must have content_changed and metadata_changed"
+                )
+            if not isinstance(payload["content_changed"], bool) or not isinstance(
+                payload["metadata_changed"], bool
+            ):
+                raise ValueError("home change update payload flags must be booleans")
+            if (
+                previous_revision is None
+                or new_revision is None
+                or new_revision != previous_revision + 1
+            ):
+                raise ValueError("home change update revision must step by exactly one")
+        elif operation == "publish":
+            if payload != {}:
+                raise ValueError("home change publish payload must be empty")
+            if (
+                previous_revision is None
+                or new_revision is None
+                or new_revision != previous_revision + 1
+            ):
+                raise ValueError("home change publish revision must step by exactly one")
+        else:
+            if set(payload) != {"target_resource_id", "relation"}:
+                raise ValueError(
+                    "home change relate payload must have target_resource_id and relation"
+                )
+            target_resource_id = payload["target_resource_id"]
+            relation = payload["relation"]
+            if not isinstance(target_resource_id, str) or not target_resource_id.strip():
+                raise ValueError(
+                    "home change relate payload target_resource_id must be a non-empty string"
+                )
+            if not isinstance(relation, str) or not relation.strip():
+                raise ValueError("home change relate payload relation must be a non-empty string")
+            if target_resource_id == resource_id:
+                raise ValueError(
+                    "home change relate payload target must differ from the source resource"
+                )
+            if target_resource_id not in valid_resource_ids:
+                raise ValueError("home change relate payload references a missing resource")
+            if (resource_id, target_resource_id, relation) not in relation_keys:
+                raise ValueError("home change relate payload has no matching relation row")
+            if previous_revision is not None or new_revision is not None:
+                raise ValueError("home change relate revision must be null")
+
+    @staticmethod
     def _parse_strict_json(text: str, label: str) -> Any:
         """Parse a JSON-encoded string, rejecting duplicate keys and NaN/Infinity."""
         try:
@@ -1718,6 +1817,19 @@ class AIDB:
                 columns = list(row)
                 if any(column not in allowed_columns for column in columns):
                     raise ValueError(f"invalid column in home import row for table: {table}")
+                required_columns = {
+                    "node_identity": ("node_id",),
+                    "node_specifications": ("specification_id", "node_id"),
+                    "home_resources": ("id", "resource_type"),
+                    "notes": ("id", "resource_id", "title", "content"),
+                    "resource_relations": ("source_resource_id", "target_resource_id", "relation"),
+                    "home_changes": ("operation", "payload"),
+                    "artifacts": ("name", "media_type", "checksum"),
+                    "artifact_blobs": ("artifact_id", "content"),
+                }.get(table, ())
+                for column in required_columns:
+                    if column not in row or row[column] is None:
+                        raise ValueError(f"missing {column} in home import row for table: {table}")
                 if any(
                     not isinstance(value, (str, int, float, bytes, bool, type(None)))
                     for value in row.values()
@@ -1809,6 +1921,79 @@ class AIDB:
                     row = self._decode_artifact_blob_row(row)
                 if table == "artifacts":
                     self._validate_artifact_import_row(row)
+                if table == "home_resources":
+                    if "content" in row:
+                        self._parse_strict_json_column(row["content"], "home_resources content")
+                    if "metadata" in row:
+                        self._validate_json_object(
+                            self._parse_strict_json_column(row["metadata"], "home_resources metadata"),
+                            "home_resources metadata",
+                        )
+                    if "revision" in row and (
+                        isinstance(row["revision"], bool)
+                        or not isinstance(row["revision"], int)
+                        or row["revision"] < 1
+                    ):
+                        raise ValueError("invalid revision in home import row for table: home_resources")
+                if table == "notes":
+                    if "metadata" in row:
+                        self._validate_json_object(
+                            self._parse_strict_json_column(row["metadata"], "notes metadata"),
+                            "notes metadata",
+                        )
+                    if "revision" in row and (
+                        isinstance(row["revision"], bool)
+                        or not isinstance(row["revision"], int)
+                        or row["revision"] < 1
+                    ):
+                        raise ValueError("invalid revision in home import row for table: notes")
+                    if "id" in row and "resource_id" in row and row["id"] != row["resource_id"]:
+                        raise ValueError("note id must equal its resource_id in home import row for table: notes")
+                if table == "resource_relations":
+                    if "metadata" in row:
+                        self._validate_json_object(
+                            self._parse_strict_json_column(
+                                row["metadata"], "resource_relations metadata"
+                            ),
+                            "resource_relations metadata",
+                        )
+                    if (
+                        "source_resource_id" in row
+                        and "target_resource_id" in row
+                        and row["source_resource_id"] == row["target_resource_id"]
+                    ):
+                        raise ValueError(
+                            "a resource cannot relate to itself in home import row for table: resource_relations"
+                        )
+                if table == "node_identity":
+                    if "metadata" in row:
+                        self._validate_json_object(
+                            self._parse_strict_json_column(row["metadata"], "node_identity metadata"),
+                            "node_identity metadata",
+                        )
+                    if row.get("id") is not None and row["id"] != 1:
+                        raise ValueError(
+                            "invalid node_identity id in home import row for table: node_identity"
+                        )
+                if table == "node_specifications":
+                    for field in ("capabilities", "resource_types", "transports", "extensions"):
+                        if field in row:
+                            parsed = self._parse_strict_json_column(
+                                row[field], f"node_specifications {field}"
+                            )
+                            if not isinstance(parsed, list) or any(
+                                not isinstance(item, str) for item in parsed
+                            ):
+                                raise ValueError(
+                                    f"node_specifications {field} must be a JSON list of strings"
+                                )
+                    if "constraints" in row:
+                        self._validate_json_object(
+                            self._parse_strict_json_column(
+                                row["constraints"], "node_specifications constraints"
+                            ),
+                            "node_specifications constraints",
+                        )
                 validated_rows[table].append(row)
 
         # Change rows have no schema-level FK, so validate their targets
@@ -1825,6 +2010,44 @@ class AIDB:
             resource_id = row.get("resource_id")
             if resource_id is not None and resource_id not in valid_resource_ids:
                 raise ValueError("home change references a missing resource")
+
+        for row in validated_rows["notes"]:
+            resource_id = row.get("resource_id")
+            if resource_id is not None and resource_id not in valid_resource_ids:
+                raise ValueError("note references a missing resource")
+        for row in validated_rows["resource_relations"]:
+            for field in ("source_resource_id", "target_resource_id"):
+                resource_id = row.get(field)
+                if resource_id is not None and resource_id not in valid_resource_ids:
+                    raise ValueError("resource relation references a missing resource")
+
+        resource_types = {
+            row["id"]: row.get("resource_type")
+            for row in validated_rows["home_resources"]
+            if isinstance(row.get("id"), str)
+        }
+        for existing in self.db.execute(
+            "SELECT id, resource_type FROM home_resources"
+        ).fetchall():
+            resource_types.setdefault(existing["id"], existing["resource_type"])
+        relation_keys = {
+            (
+                row.get("source_resource_id"),
+                row.get("target_resource_id"),
+                row.get("relation"),
+            )
+            for row in validated_rows["resource_relations"]
+        }
+        for existing in self.db.execute(
+            "SELECT source_resource_id, target_resource_id, relation FROM resource_relations"
+        ).fetchall():
+            relation_keys.add(
+                (existing["source_resource_id"], existing["target_resource_id"], existing["relation"])
+            )
+        for row in validated_rows["home_changes"]:
+            self._validate_change_payload_row(
+                row, valid_resource_ids, resource_types, relation_keys
+            )
 
         # Agent identity is home-local: exported integer ids can collide
         # across homes, and silently remapping an id would rewrite
