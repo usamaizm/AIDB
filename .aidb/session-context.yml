@@ -206,7 +206,7 @@ live_repository_snapshot:
     - "Local agent collaboration exists; distributed peer networking does not."
     - "RFC 8785 digest primitives exist; home-format integration is not complete."
   open_work_clusters:
-    - "PR #142 HTTP request safety: current-main branch; 16-worker cap, 10-second socket timeout, backlog bound, POST lock isolation; exact-head CI 43883296685 queued; predecessor #137 CI passed before worker cap; independent review pending."
+    - "PR #142 HTTP request safety: current-main branch; 16-worker cap, 10-second socket timeout, backlog bound, POST lock isolation; exact-head CI 43883296685 passed Python 3.10/3.11/3.12; independent review pending."
     - "PR #138 HTTPS verification: current-main branch; CI 43882236199 passed Python 3.10/3.11/3.12; add negative trusted-certificate hostname-mismatch test; independent review pending."
     - "PR #139 progressive onboarding: additive docs; CI 43882238516 passed Python 3.10/3.11/3.12; independent review pending."
     - "PR #140 refreshes this audit and session snapshot; docs-only; CI run 43882777620 passed before the latest audit observations were added, so recheck the new head."
