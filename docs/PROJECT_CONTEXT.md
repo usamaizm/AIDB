@@ -52,6 +52,8 @@ Progress is measured by demonstrated workflows, not labels. A capability counts 
 - AIDB should improve as it accumulates data and feedback. The intended loop is observe → diagnose → propose → isolate/experiment → evaluate against a baseline → approve/promote → monitor/recover → learn.
 - Knowledge organization, indexes, ranking, caches, adapters, schemas, and even core architecture may evolve through reviewed, tested, versioned migrations.
 - Stable invariants include data integrity, identity, authorization, provenance, version/revision semantics, auditability, and recoverability. No unreviewed self-modification should bypass these invariants.
+- Treat compatibility as an explicit architecture capability: independently version contracts, use adapters or migrations, negotiate capabilities, and require conformance and recovery evidence. Keep storage, interchange, and wire formats distinct unless a contract explicitly unifies them.
+- See [Evolution and Compatibility Architecture](evolution-and-compatibility.md) for the proposed rules; do not claim implementation until verified.
 - Agents may submit competing proposals and evidence; preserve attribution and disagreement. Unreviewed content is not automatically accepted knowledge.
 
 ### 4. Speed, storage, and context efficiency
@@ -81,6 +83,9 @@ Known limitations:
 
 ## Architecture and contract index
 
+- [Evolution and compatibility](evolution-and-compatibility.md) — proposed independent contract versioning, adapter/migration paths, and conformance requirements.
+- [Distributed networking](distributed-networking.md) — proposed peer identity, trust, chunk placement, partial replication, and partition behavior; not implemented.
+
 - [Implementation roadmap](IMPLEMENTATION_ROADMAP.md) — evidence-driven P0–P3 checklist, explicit acceptance workflow, and PR reconciliation.
 - [Repository audit and launch readiness](repository-audit.md) — verified baseline, known bugs, CI, open PRs, launch blockers.
 - [One-stop agent substrate](one-stop-agent-substrate.md) — product scope and shared primitives.
@@ -99,29 +104,42 @@ Known limitations:
 
 ## Current work queue
 
-Verified snapshot on 2026-11-16:
+Verified snapshot on 2026-11-16T12:55:39Z; default branch `main` at `bbcf2bc56a4b29bdc3d74ed184c3d45dd6c056bf`.
 
-- Default branch: `main`, commit `ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5`.
-- Open pull requests: 42. This is a live queue, not a merge plan; inspect each current diff, base/head SHA, review, and CI before taking action.
-- PR [#106](https://github.com/usamaizm/AIDB/pull/106) adds CLI contract tests and was merged to `main` after all three CI jobs passed (Python 3.10, 3.11, 3.12), including compileall, Ruff, and pytest in run [43862813272](https://github.com/usamaizm/AIDB/actions/runs/43862813272). Merge commit: `721e20bb159a861570320d9cdadf3147b7dc0d59`.
-- PR [#71](https://github.com/usamaizm/AIDB/pull/71) — snapshot-contract versioning — has merged to main.
-- PR [#109](https://github.com/usamaizm/AIDB/pull/109) — strict resource/note create and update validation — has merged as `ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5`; its Python 3.10/3.11/3.12 CI passed in run [43864558782](https://github.com/usamaizm/AIDB/actions/runs/43864558782). The duplicate branches #100 and #102 were closed as superseded.
-- PR [#73](https://github.com/usamaizm/AIDB/pull/73) remains open for artifact-row validation on import.
-- PR [#88](https://github.com/usamaizm/AIDB/pull/88) proposes stable JSON 500 responses for unexpected HTTP handler errors. Its review requested server-side exception logging while keeping client responses sanitized; do not treat it as approved or merged.
-- PRs [#90](https://github.com/usamaizm/AIDB/pull/90), [#92](https://github.com/usamaizm/AIDB/pull/92), [#98](https://github.com/usamaizm/AIDB/pull/98), and [#104](https://github.com/usamaizm/AIDB/pull/104) overlap in `verify_home()`. Consolidate artifact blobs, change payload/revision-chain checks, snapshot content, and stored-row JSON validation before merging a coherent implementation.
-- PRs #70–#105 include related artifact/import validation, export projection/portability, agents-table coverage, dataclass consolidation, and paired documentation-claim PRs. Snapshot-contract versioning (#71) has merged; resource/note validation (#100/#102) has been consolidated and merged as #109. Review code and its paired claim entry together; do not merge a claim-only PR as proof that its implementation landed.
-- Older open proposals #8, #13–#16, #24–#25, #45, #49–#50, #55, #61, and #64 still need individual freshness/overlap review. The agent-discovery/network proposals #14, #15, #49, and #61 must be compared as a family rather than merged independently.
-- The shared journal contains additional unpushed work claims from other contributors. Respect their stated ownership and verify whether branches/PRs have appeared before editing overlapping files.
+- There were 28 open PRs at this snapshot. This includes competing proposals to restore `DISCUSSION.md` (#118 and #120); do not merge either until the repository owner confirms which historical journal should be canonical. This documentation update intentionally leaves `DISCUSSION.md` untouched.
+- Merged correctness and contract work:
+  - #71 snapshot-contract versioning.
+  - #73 artifact import-row validation.
+  - #80 agents-table export/import.
+  - #106 public CLI contract tests.
+  - #109 strict resource/note create and update validation.
+  - #111 complete home import-row and change-payload validation.
+  - #112 consolidated read-only `verify_home()` integrity checks.
+  - #113 server-side logging for sanitized HTTP 500 responses.
+  - #115 explicit export projections and per-table portability registry.
+  - #116 RFC 8785 canonical JSON and N4b record-digest primitives.
+  - #117 restored `updated_at` to the v1 home export projection.
+  - #119 local resource-backed agent discovery and collaboration.
+- Public-only home exports deliberately omit agent identity rows until the agents table has an explicit visibility policy; full/private exports preserve them.
+- The canonical digest library exists, but it is not yet wired into a versioned home envelope, import path, or `verify_home()`.
+- The local agent-network API exists, but peer identity, outbound node connections, federation, chunk transfer, and distributed replication remain proposals.
+- PR #64 (resource application and SQLite adapter extraction) is the next major architecture refactor; review it against current validation, import, verification, HTTP logging, and network changes before rebasing.
+- PR #55 is a broad audit/remediation branch that overlaps multiple merged narrow changes and needs to be split or reconciled by unique diff before any merge.
+- PR #61 distributed/evolution architecture docs are being rebased without the journal edit; see the companion documentation PR. Its contents remain proposed requirements, not runtime evidence.
+- PRs #14/#15 are older discovery/network proposals and should be compared against merged #119 and the distributed architecture docs before retaining unique work.
+- PR #45 and #24 are onboarding/handoff proposals; #25 is a phone-first contribution protocol proposal. Review independently for current relevance.
+- PRs #74–#105 include paired contribution-claim/documentation entries. Preserve agent attribution, but verify each claim against merged implementation and current source before accepting it as completion evidence.
+- PR #118 and #120 both restore prior `DISCUSSION.md` content after commit `9d2c296`; this is an owner-level history decision and must not be resolved by an automated merge.
 
 Next priorities:
-1. Reconcile and land high-confidence correctness fixes in small, tested, non-overlapping batches.
-2. Close the remaining HTTP error-handling and deployment-safety gaps without leaking internals or silently swallowing diagnostics.
-3. Complete import/export/snapshot verification, rollback, privacy, and idempotency coverage.
-4. Add reproducible benchmarks before performance or scale claims.
-5. Demonstrate the AI development loop with repeatable evidence, including failure repair and handoff; documentation alone is insufficient.
+1. Complete the adapter refactor or record a bounded decision to defer it, preserving the now-merged validation and integrity guarantees.
+2. Integrate canonical record digests into a versioned export/import/verification contract with golden cross-language vectors.
+3. Finish artifact registration validation, import compatibility, and safe artifact lifecycle semantics.
+4. Close HTTP authorization, timeout, rate-limit, and lifecycle gaps before public deployment.
+5. Establish reproducible performance/storage benchmarks before scale claims.
+6. Only then implement authenticated peer identity, chunk transfer, partial replication, and recovery.
 
-This queue is a point-in-time snapshot. Refresh GitHub state before acting. No PR merge, public deployment, permission change, release, or destructive operation is authorized by this handoff.
-
+This queue is a point-in-time snapshot, not a merge plan. Refresh GitHub state before acting. Do not bulk-merge stale branches or overwrite another contributor's claimed work.
 ## Decision and status rules
 
 For every material feature or design:
