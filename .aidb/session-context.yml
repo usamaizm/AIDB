@@ -126,8 +126,8 @@ priority_order:
 
 live_repository_snapshot:
   as_of: "2026-11-16T12:04:48Z"
-  main_commit: "721e20bb159a861570320d9cdadf3147b7dc0d59"
-  open_pull_requests: 47
+  main_commit: "ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5"
+  open_pull_requests: 42
   cli_surface:
     source: aidb/__main__.py
     commands: [agent, search, serve]
@@ -149,3 +149,17 @@ live_repository_snapshot:
     - "PRs #70-#105: artifact/resource/import/export/schema validation and paired claim entries."
     - "PRs #14, #15, #49, #61: overlapping discovery, collaboration, and networking proposals."
   handoff: "Refresh current GitHub state before every new repository task; see docs/repository-audit.md."
+
+  latest_merged_work:
+    - pr: 71
+      title: "snapshot contract versioning"
+      merge_commit: "3652081f993c675896065426660d72ab6d6d803f"
+    - pr: 109
+      title: "resource and note input validation"
+      merge_commit: "ae8196aac1491c20cfbf35aa7481dbc74cf2e9f5"
+      ci_run_id: 43864558782
+      ci_result: success
+      matrix: ["3.10", "3.11", "3.12"]
+  superseded_prs:
+    - 100
+    - 102
