@@ -317,3 +317,76 @@ def test_session_delete_cascades_participants_and_messages():
     ).fetchone()["c"]
     assert participants == 0
     assert messages == 0
+
+
+def test_concurrent_session_joins_repeatedly():
+    # Q34: the session methods returned via a get_session call after the
+    # atomic section, outside the write lock — the same shared-connection
+    # race as update_resource's trailing re-read. Two threads joining
+    # different agents to one session must both succeed.
+    from threading import Barrier, Thread
+
+    for _ in range(25):
+        db, agents = _db_with_agents("alice", "bob", "carol")
+        session = db.create_session(agents["alice"].id)
+        sid = session["session_id"]
+        barrier = Barrier(3)
+        outcomes = []
+
+        def join(agent_id):
+            barrier.wait()
+            try:
+                db.join_session(sid, agent_id)
+                outcomes.append("ok")
+            except Exception as exc:  # surfaced by the assertion below
+                outcomes.append(f"error:{type(exc).__name__}")
+
+        first = Thread(target=join, args=(agents["bob"].id,))
+        second = Thread(target=join, args=(agents["carol"].id,))
+        first.start()
+        second.start()
+        barrier.wait()
+        first.join(timeout=5)
+        second.join(timeout=5)
+        assert not first.is_alive()
+        assert not second.is_alive()
+        assert outcomes == ["ok", "ok"], outcomes
+        assert sorted(db.get_session(sid)["participants"]) == sorted(
+            [agents["alice"].id, agents["bob"].id, agents["carol"].id]
+        )
+        db.close()
+
+
+def test_concurrent_session_messages_repeatedly():
+    # Q34: post_message fetched the inserted row with a SELECT after the
+    # atomic section, outside the write lock.
+    from threading import Barrier, Thread
+
+    for _ in range(25):
+        db, agents = _db_with_agents("alice", "bob")
+        session = db.create_session(agents["alice"].id)
+        sid = session["session_id"]
+        db.join_session(sid, agents["bob"].id)
+        barrier = Barrier(3)
+        outcomes = []
+
+        def post(agent_id, text):
+            barrier.wait()
+            try:
+                db.post_message(sid, agent_id, "user", text)
+                outcomes.append("ok")
+            except Exception as exc:  # surfaced by the assertion below
+                outcomes.append(f"error:{type(exc).__name__}")
+
+        first = Thread(target=post, args=(agents["alice"].id, "hello"))
+        second = Thread(target=post, args=(agents["bob"].id, "hi"))
+        first.start()
+        second.start()
+        barrier.wait()
+        first.join(timeout=5)
+        second.join(timeout=5)
+        assert not first.is_alive()
+        assert not second.is_alive()
+        assert outcomes == ["ok", "ok"], outcomes
+        assert len(db.list_messages(sid)) == 2
+        db.close()
