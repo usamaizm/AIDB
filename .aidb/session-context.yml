@@ -128,8 +128,8 @@ priority_order:
 
 live_repository_snapshot:
   as_of: "2026-11-16T12:56:54Z"
-  main_commit: "bbcf2bc56a4b29bdc3d74ed184c3d45dd6c056bf"
-  open_pull_requests: 28
+  main_commit: "d10a706659aa15feeeeb4e50c9e6b735c2b19e08"
+  open_pull_requests: 27
   cli_surface:
     source: aidb/__main__.py
     commands: [agent, search, serve]
@@ -192,6 +192,9 @@ live_repository_snapshot:
       merge_commit: "bbcf2bc56a4b29bdc3d74ed184c3d45dd6c056bf"
       ci_run_id: 43870081165
       ci_result: success
+    - pr: 120
+      topic: "restore DISCUSSION.md journal from repository history"
+      merge_commit: "d10a706659aa15feeeeb4e50c9e6b735c2b19e08"
   verified_boundaries:
     - "Import validates all portable rows before writes; failure remains atomic."
     - "verify_home checks strict JSON, snapshots, artifact blobs, and change/revision history."
@@ -200,11 +203,11 @@ live_repository_snapshot:
     - "Local agent collaboration exists; distributed peer networking does not."
     - "RFC 8785 digest primitives exist; home-format integration is not complete."
   open_work_clusters:
-    - "PRs #118 and #120 conflict over DISCUSSION.md restoration after commit 9d2c296; maintainer decision required."
+    - "PR #120 restored DISCUSSION.md; PR #118 is superseded and should be closed."
     - "PR #64 resource application/SQLite adapter refactor needs rebase and preservation of current validations."
     - "PR #55 is broad and overlaps several merged fixes; split/reconcile unique changes before merge."
     - "PR #61 distributed/evolution docs are proposed architecture only; companion rebased docs PR pending."
     - "PRs #14 and #15 overlap the merged local agent-network work and proposed distributed architecture."
     - "PRs #74-#105 contain paired agent-muse claim entries; preserve attribution and verify against merged code."
-  superseded_implementation_prs: [49, 50, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 114]
+  superseded_implementation_prs: [49, 50, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 114, 118]
   handoff: "Refresh live GitHub state before every new task; read docs/repository-audit.md and docs/PROJECT_CONTEXT.md."
