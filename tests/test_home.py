@@ -229,3 +229,62 @@ def test_public_changes_include_public_creation_and_updates():
     db.update_resource(note.id, content="updated")
     events = db.public_changes()
     assert [event["operation"] for event in events] == ["create", "update"]
+
+def test_specification_revisions_track_all_meaningful_fields():
+    db = AIDB(":memory:")
+    first = db.current_specification()
+
+    assert isinstance(first, Specification)
+    assert first.version == 1
+    assert first.contract == {
+        "id": "org.aidb.node-specification",
+        "version": "0.1.0",
+    }
+    assert first.supersedes is None
+
+    transport = {
+        "id": "http-json",
+        "protocol": "http/1.1",
+        "capabilities": ["specification.read", "notes.read"],
+        "authentication": [],
+    }
+    second = db.current_specification(transports=[transport])
+    assert second.version == first.version + 1
+    assert second.supersedes == first.id
+    assert second.transports == [transport]
+
+    third = db.current_specification(extensions=["org.example.search"])
+    assert third.version == second.version + 1
+    assert third.supersedes == second.id
+    assert third.extensions == ["org.example.search"]
+    assert third.transports == [transport]
+
+    fourth = db.current_specification(constraints={"max_page_size": 100})
+    assert fourth.version == third.version + 1
+    assert fourth.supersedes == third.id
+    assert fourth.constraints == {"max_page_size": 100}
+
+    unchanged = db.current_specification()
+    assert unchanged.id == fourth.id
+    assert unchanged.version == fourth.version
+    assert db.specification_dict()["supersedes"] == third.id
+
+
+def test_structured_specification_transports_survive_home_export_import():
+    transport = {
+        "id": "https-json",
+        "protocol": "https/1.1",
+        "capabilities": ["specification.read", "notes.read"],
+        "authentication": ["bearer"],
+    }
+    source = AIDB(":memory:")
+    source.current_specification(transports=[transport])
+
+    payload = source.export_home()
+    restored = AIDB(":memory:")
+    restored.import_home(payload)
+
+    spec = restored.current_specification()
+    assert spec.transports == [transport]
+    assert restored.verify_home()["ok"] is True
+
