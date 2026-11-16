@@ -20,10 +20,22 @@ def main() -> None:
     serve_parser = subparsers.add_parser("serve", help="run the self-hosted AIDB node")
     serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=8765)
-    serve_parser.add_argument("--auth-token", default=None, help="Bearer token enabling network writes; prefer AIDB_AUTH_TOKEN")
-    serve_parser.add_argument("--tls-cert", default=None, help="TLS certificate PEM for non-loopback binds")
-    serve_parser.add_argument("--tls-key", default=None, help="TLS private key PEM for non-loopback binds")
-    serve_parser.add_argument("--tls-client-ca", default=None, help="CA PEM for mutual TLS: require client certificates chaining to this CA")
+    serve_parser.add_argument(
+        "--auth-token",
+        default=None,
+        help="Bearer token enabling network writes; prefer AIDB_AUTH_TOKEN",
+    )
+    serve_parser.add_argument(
+        "--tls-cert", default=None, help="TLS certificate PEM for non-loopback binds"
+    )
+    serve_parser.add_argument(
+        "--tls-key", default=None, help="TLS private key PEM for non-loopback binds"
+    )
+    serve_parser.add_argument(
+        "--tls-client-ca",
+        default=None,
+        help="CA PEM for mutual TLS: require client certificates chaining to this CA",
+    )
     serve_parser.add_argument("--visibility", choices=["private", "public"], default="private")
 
     search_parser = subparsers.add_parser("search", help="search shared knowledge")
@@ -32,8 +44,19 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "serve":
-        token = args.auth_token if args.auth_token is not None else os.environ.get("AIDB_AUTH_TOKEN")
-        serve(args.db, args.host, args.port, token, args.visibility, args.tls_cert, args.tls_key, args.tls_client_ca)
+        token = (
+            args.auth_token if args.auth_token is not None else os.environ.get("AIDB_AUTH_TOKEN")
+        )
+        serve(
+            args.db,
+            args.host,
+            args.port,
+            token,
+            args.visibility,
+            args.tls_cert,
+            args.tls_key,
+            args.tls_client_ca,
+        )
         return
 
     with AIDB(args.db) as db:

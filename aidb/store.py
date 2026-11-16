@@ -65,34 +65,86 @@ _ARTIFACT_STATUSES = {"raw", "derived"}
 _EXPORT_COLUMNS = {
     "node_identity": ("id", "node_id", "owner", "visibility", "metadata"),
     "node_specifications": (
-        "version", "specification_id", "node_id", "visibility", "capabilities",
-        "resource_types", "transports", "extensions", "constraints", "issued_at",
+        "version",
+        "specification_id",
+        "node_id",
+        "visibility",
+        "capabilities",
+        "resource_types",
+        "transports",
+        "extensions",
+        "constraints",
+        "issued_at",
     ),
     "home_resources": (
-        "id", "resource_type", "content", "owner", "visibility", "metadata",
-        "revision", "created_at", "updated_at",
+        "id",
+        "resource_type",
+        "content",
+        "owner",
+        "visibility",
+        "metadata",
+        "revision",
+        "created_at",
+        "updated_at",
     ),
     "notes": (
-        "id", "resource_id", "title", "content", "owner", "visibility", "kind",
-        "metadata", "revision", "created_at", "updated_at",
+        "id",
+        "resource_id",
+        "title",
+        "content",
+        "owner",
+        "visibility",
+        "kind",
+        "metadata",
+        "revision",
+        "created_at",
+        "updated_at",
     ),
     "resource_relations": (
-        "id", "source_resource_id", "target_resource_id", "relation", "metadata",
+        "id",
+        "source_resource_id",
+        "target_resource_id",
+        "relation",
+        "metadata",
         "created_at",
     ),
     "home_changes": (
-        "id", "change_id", "resource_id", "operation", "actor", "previous_revision",
-        "new_revision", "payload", "created_at",
+        "id",
+        "change_id",
+        "resource_id",
+        "operation",
+        "actor",
+        "previous_revision",
+        "new_revision",
+        "payload",
+        "created_at",
     ),
     "artifacts": (
-        "id", "name", "media_type", "filename", "size_bytes", "checksum",
-        "checksum_algorithm", "provenance", "status", "encoding",
-        "parent_artifact_id", "transformation_history", "metadata", "created_at",
+        "id",
+        "name",
+        "media_type",
+        "filename",
+        "size_bytes",
+        "checksum",
+        "checksum_algorithm",
+        "provenance",
+        "status",
+        "encoding",
+        "parent_artifact_id",
+        "transformation_history",
+        "metadata",
+        "created_at",
     ),
     "artifact_blobs": ("artifact_id", "content", "created_at"),
     "agents": (
-        "id", "name", "description", "model", "role", "permissions",
-        "capabilities", "metadata",
+        "id",
+        "name",
+        "description",
+        "model",
+        "role",
+        "permissions",
+        "capabilities",
+        "metadata",
     ),
 }
 
@@ -140,7 +192,6 @@ def _canonical_checksum_algorithm(algorithm: Any) -> str | None:
 SNAPSHOT_FORMAT = "aidb-snapshot-v1"
 _LEGACY_SNAPSHOT_FORMAT = "aidb-home-v1"
 _ACCEPTED_SNAPSHOT_FORMATS = frozenset({SNAPSHOT_FORMAT, _LEGACY_SNAPSHOT_FORMAT})
-
 
 
 def _validate_strict_json_value(value: Any, label: str) -> None:
@@ -735,9 +786,10 @@ class AIDB:
                 "unsupported artifact status in home import row for table: artifacts: "
                 + str(row["status"])
             )
-        if "checksum_algorithm" in row and _canonical_checksum_algorithm(
-            row["checksum_algorithm"]
-        ) is None:
+        if (
+            "checksum_algorithm" in row
+            and _canonical_checksum_algorithm(row["checksum_algorithm"]) is None
+        ):
             raise ValueError(
                 "unsupported checksum algorithm in home import row for table: artifacts: "
                 + str(row["checksum_algorithm"])
@@ -756,16 +808,13 @@ class AIDB:
             if field in row:
                 encoded = row[field]
                 if not isinstance(encoded, str):
-                    raise ValueError(
-                        f"invalid {field} in home import row for table: artifacts"
-                    )
+                    raise ValueError(f"invalid {field} in home import row for table: artifacts")
                 parsed = AIDB._parse_strict_json_text(
                     encoded, f"{label} in home import row for table: artifacts"
                 )
                 if not isinstance(parsed, dict):
                     raise ValueError(
-                        f"{label} must be a JSON object in home import row for "
-                        "table: artifacts"
+                        f"{label} must be a JSON object in home import row for table: artifacts"
                     )
                 AIDB._validate_json_object(parsed, label)
         if "transformation_history" in row:
@@ -778,9 +827,7 @@ class AIDB:
                 encoded,
                 "artifact transformation_history in home import row for table: artifacts",
             )
-            if not isinstance(parsed, list) or any(
-                not isinstance(step, str) for step in parsed
-            ):
+            if not isinstance(parsed, list) or any(not isinstance(step, str) for step in parsed):
                 raise ValueError(
                     "artifact transformation_history must be a list of strings in home "
                     "import row for table: artifacts"
@@ -805,7 +852,9 @@ class AIDB:
             "INSERT INTO workflow_events(kind, message, agent_id, task_id, session_id, metadata) VALUES (?, ?, ?, ?, ?, ?)",
             (kind, message, agent_id, task_id, session_id, self._json(metadata or {})),
         )
-        row = self.db.execute("SELECT * FROM workflow_events WHERE id = ?", (cur.lastrowid,)).fetchone()
+        row = self.db.execute(
+            "SELECT * FROM workflow_events WHERE id = ?", (cur.lastrowid,)
+        ).fetchone()
         return self._event_from_row(row)
 
     def _assert_no_duplicate_checksum(self, checksum_algorithm: str, checksum: str) -> None:
@@ -818,7 +867,9 @@ class AIDB:
                 f"duplicate artifact checksum for algorithm={checksum_algorithm} checksum={checksum}"
             )
 
-    def _metadata_claims_derived(self, artifact: Artifact, interpretation: Interpretation | None = None) -> bool:
+    def _metadata_claims_derived(
+        self, artifact: Artifact, interpretation: Interpretation | None = None
+    ) -> bool:
         metadata_blocks: list[dict[str, Any]] = []
         if isinstance(artifact.metadata, dict):
             metadata_blocks.append(artifact.metadata)
@@ -846,7 +897,9 @@ class AIDB:
         ).fetchone()
         return row is not None
 
-    def _validate_artifact_lineage_chain(self, artifact_id: int, seen: set[int] | None = None) -> None:
+    def _validate_artifact_lineage_chain(
+        self, artifact_id: int, seen: set[int] | None = None
+    ) -> None:
         if seen is None:
             seen = set()
         current_id = artifact_id
@@ -907,7 +960,16 @@ class AIDB:
                 raise ValueError(f"agent name already exists: {name}") from exc
             raise
         self.db.commit()
-        return Agent(name, description, model, role, permissions or [], capabilities or [], metadata or {}, cur.lastrowid)
+        return Agent(
+            name,
+            description,
+            model,
+            role,
+            permissions or [],
+            capabilities or [],
+            metadata or {},
+            cur.lastrowid,
+        )
 
     def create_extraction(
         self,
@@ -918,7 +980,10 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> Extraction:
         self._require_confidence(confidence, "extraction")
-        if self.db.execute("SELECT 1 FROM artifacts WHERE id = ?", (input_artifact_id,)).fetchone() is None:
+        if (
+            self.db.execute("SELECT 1 FROM artifacts WHERE id = ?", (input_artifact_id,)).fetchone()
+            is None
+        ):
             raise ValueError(f"input artifact {input_artifact_id} does not exist")
         if not isinstance(method, str) or not method.strip():
             raise ValueError("extraction method must be a non-empty string")
@@ -931,7 +996,9 @@ class AIDB:
                 "INSERT INTO extractions(input_artifact_id, method, status, confidence, metadata) VALUES (?, ?, ?, ?, ?)",
                 (input_artifact_id, method, status, confidence, self._json(metadata or {})),
             )
-            row = self.db.execute("SELECT * FROM extractions WHERE id = ?", (cur.lastrowid,)).fetchone()
+            row = self.db.execute(
+                "SELECT * FROM extractions WHERE id = ?", (cur.lastrowid,)
+            ).fetchone()
             extraction = self._extraction_from_row(row)
             self._append_workflow_event(
                 "extraction_created",
@@ -961,11 +1028,12 @@ class AIDB:
         if output is None:
             raise ValueError(f"output artifact {output_artifact_id} does not exist")
         if output["parent_artifact_id"] != extraction["input_artifact_id"]:
-            raise ValueError(
-                "output artifact parent must match the extraction input artifact"
-            )
+            raise ValueError("output artifact parent must match the extraction input artifact")
         if sequence is None:
-            rows = self.db.execute("SELECT COUNT(*) AS n FROM extraction_outputs WHERE extraction_id = ?", (extraction_id,)).fetchone()
+            rows = self.db.execute(
+                "SELECT COUNT(*) AS n FROM extraction_outputs WHERE extraction_id = ?",
+                (extraction_id,),
+            ).fetchone()
             sequence = int(rows["n"]) if rows is not None else 0
         try:
             self.db.execute("BEGIN")
@@ -973,7 +1041,9 @@ class AIDB:
                 "INSERT INTO extraction_outputs(extraction_id, output_artifact_id, sequence) VALUES (?, ?, ?)",
                 (extraction_id, output_artifact_id, sequence),
             )
-            row = self.db.execute("SELECT * FROM extraction_outputs WHERE id = ?", (cur.lastrowid,)).fetchone()
+            row = self.db.execute(
+                "SELECT * FROM extraction_outputs WHERE id = ?", (cur.lastrowid,)
+            ).fetchone()
             extraction_output = self._extraction_output_from_row(row)
             self._append_workflow_event(
                 "extraction_output_recorded",
@@ -999,7 +1069,12 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> Interpretation:
         self._require_confidence(confidence, "interpretation")
-        if self.db.execute("SELECT 1 FROM artifacts WHERE id = ?", (output_artifact_id,)).fetchone() is None:
+        if (
+            self.db.execute(
+                "SELECT 1 FROM artifacts WHERE id = ?", (output_artifact_id,)
+            ).fetchone()
+            is None
+        ):
             raise ValueError(f"output artifact {output_artifact_id} does not exist")
         if not isinstance(claim, str) or not claim.strip():
             raise ValueError("interpretation claim must be a non-empty string")
@@ -1012,12 +1087,17 @@ class AIDB:
                 "INSERT INTO interpretations(output_artifact_id, claim, interpreter, confidence, metadata) VALUES (?, ?, ?, ?, ?)",
                 (output_artifact_id, claim, interpreter, confidence, self._json(metadata or {})),
             )
-            row = self.db.execute("SELECT * FROM interpretations WHERE id = ?", (cur.lastrowid,)).fetchone()
+            row = self.db.execute(
+                "SELECT * FROM interpretations WHERE id = ?", (cur.lastrowid,)
+            ).fetchone()
             interpretation = self._interpretation_from_row(row)
             self._append_workflow_event(
                 "interpretation_created",
                 f"interpretation {interpretation.id} created",
-                metadata={"interpretation_id": interpretation.id, "output_artifact_id": output_artifact_id},
+                metadata={
+                    "interpretation_id": interpretation.id,
+                    "output_artifact_id": output_artifact_id,
+                },
             )
             self.db.commit()
             return interpretation
@@ -1033,7 +1113,12 @@ class AIDB:
         metadata: dict[str, Any] | None = None,
     ) -> Knowledge:
         self._require_confidence(confidence, "knowledge")
-        if self.db.execute("SELECT 1 FROM interpretations WHERE id = ?", (interpretation_id,)).fetchone() is None:
+        if (
+            self.db.execute(
+                "SELECT 1 FROM interpretations WHERE id = ?", (interpretation_id,)
+            ).fetchone()
+            is None
+        ):
             raise ValueError(f"interpretation {interpretation_id} does not exist")
         if not isinstance(status, str) or not status.strip():
             raise ValueError("knowledge status must be a non-empty string")
@@ -1044,12 +1129,18 @@ class AIDB:
                 "INSERT INTO epistemic_knowledge(interpretation_id, status, confidence, metadata) VALUES (?, ?, ?, ?)",
                 (interpretation_id, status, confidence, self._json(metadata or {})),
             )
-            row = self.db.execute("SELECT * FROM epistemic_knowledge WHERE id = ?", (cur.lastrowid,)).fetchone()
+            row = self.db.execute(
+                "SELECT * FROM epistemic_knowledge WHERE id = ?", (cur.lastrowid,)
+            ).fetchone()
             knowledge = self._knowledge_from_row(row)
             self._append_workflow_event(
                 "knowledge_created",
                 f"knowledge {knowledge.id} created",
-                metadata={"knowledge_id": knowledge.id, "interpretation_id": interpretation_id, "status": status},
+                metadata={
+                    "knowledge_id": knowledge.id,
+                    "interpretation_id": interpretation_id,
+                    "status": status,
+                },
             )
             self.db.commit()
             return knowledge
@@ -1069,11 +1160,20 @@ class AIDB:
     ) -> KnowledgeRelation:
         self._require_confidence(confidence, "knowledge relation")
         for knowledge_id in (source_knowledge_id, target_knowledge_id):
-            if self.db.execute("SELECT 1 FROM epistemic_knowledge WHERE id = ?", (knowledge_id,)).fetchone() is None:
+            if (
+                self.db.execute(
+                    "SELECT 1 FROM epistemic_knowledge WHERE id = ?", (knowledge_id,)
+                ).fetchone()
+                is None
+            ):
                 raise ValueError(f"knowledge {knowledge_id} does not exist")
-        if evidence_artifact_id is not None and self.db.execute(
-            "SELECT 1 FROM artifacts WHERE id = ?", (evidence_artifact_id,)
-        ).fetchone() is None:
+        if (
+            evidence_artifact_id is not None
+            and self.db.execute(
+                "SELECT 1 FROM artifacts WHERE id = ?", (evidence_artifact_id,)
+            ).fetchone()
+            is None
+        ):
             raise ValueError(f"evidence artifact {evidence_artifact_id} does not exist")
         if not isinstance(relation, str) or not relation.strip():
             raise ValueError("knowledge relation must be a non-empty string")
@@ -1084,9 +1184,19 @@ class AIDB:
             self.db.execute("BEGIN")
             cur = self.db.execute(
                 "INSERT INTO epistemic_knowledge_relations(source_knowledge_id, target_knowledge_id, relation, confidence, evidence_artifact_id, created_by, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (source_knowledge_id, target_knowledge_id, relation, confidence, evidence_artifact_id, created_by, self._json(metadata or {})),
+                (
+                    source_knowledge_id,
+                    target_knowledge_id,
+                    relation,
+                    confidence,
+                    evidence_artifact_id,
+                    created_by,
+                    self._json(metadata or {}),
+                ),
             )
-            row = self.db.execute("SELECT * FROM epistemic_knowledge_relations WHERE id = ?", (cur.lastrowid,)).fetchone()
+            row = self.db.execute(
+                "SELECT * FROM epistemic_knowledge_relations WHERE id = ?", (cur.lastrowid,)
+            ).fetchone()
             relation_obj = self._knowledge_relation_from_row(row)
             self._append_workflow_event(
                 "knowledge_relation_created",
@@ -1117,7 +1227,12 @@ class AIDB:
         self._require_confidence(confidence, "memory")
         if self.db.execute("SELECT 1 FROM agents WHERE id = ?", (agent_id,)).fetchone() is None:
             raise ValueError(f"agent {agent_id} does not exist")
-        if self.db.execute("SELECT 1 FROM epistemic_knowledge WHERE id = ?", (knowledge_id,)).fetchone() is None:
+        if (
+            self.db.execute(
+                "SELECT 1 FROM epistemic_knowledge WHERE id = ?", (knowledge_id,)
+            ).fetchone()
+            is None
+        ):
             raise ValueError(f"knowledge {knowledge_id} does not exist")
         if not isinstance(kind, str) or not kind.strip():
             raise ValueError("memory kind must be a non-empty string")
@@ -1129,14 +1244,28 @@ class AIDB:
             self.db.execute("BEGIN")
             cur = self.db.execute(
                 "INSERT INTO epistemic_memory(agent_id, knowledge_id, kind, confidence, status, context, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (agent_id, knowledge_id, kind, confidence, status, self._json(context or {}), self._json(metadata or {})),
+                (
+                    agent_id,
+                    knowledge_id,
+                    kind,
+                    confidence,
+                    status,
+                    self._json(context or {}),
+                    self._json(metadata or {}),
+                ),
             )
-            row = self.db.execute("SELECT * FROM epistemic_memory WHERE id = ?", (cur.lastrowid,)).fetchone()
+            row = self.db.execute(
+                "SELECT * FROM epistemic_memory WHERE id = ?", (cur.lastrowid,)
+            ).fetchone()
             memory = self._memory_from_row(row)
             self._append_workflow_event(
                 "memory_created",
                 f"memory {memory.id} created",
-                metadata={"memory_id": memory.id, "agent_id": agent_id, "knowledge_id": knowledge_id},
+                metadata={
+                    "memory_id": memory.id,
+                    "agent_id": agent_id,
+                    "knowledge_id": knowledge_id,
+                },
             )
             self.db.commit()
             return memory
@@ -1161,35 +1290,53 @@ class AIDB:
         return chain
 
     def trace_memory_to_source(self, memory_id: int) -> EpistemicChain:
-        row = self.db.execute("SELECT * FROM epistemic_memory WHERE id = ?", (memory_id,)).fetchone()
+        row = self.db.execute(
+            "SELECT * FROM epistemic_memory WHERE id = ?", (memory_id,)
+        ).fetchone()
         if row is None:
             raise ValueError(f"memory {memory_id} does not exist")
         memory = self._memory_from_row(row)
 
-        knowledge_row = self.db.execute("SELECT * FROM epistemic_knowledge WHERE id = ?", (memory.knowledge_id,)).fetchone()
+        knowledge_row = self.db.execute(
+            "SELECT * FROM epistemic_knowledge WHERE id = ?", (memory.knowledge_id,)
+        ).fetchone()
         if knowledge_row is None:
-            raise EpistemicChainBrokenError(f"memory {memory_id} references knowledge {memory.knowledge_id}, which does not exist")
+            raise EpistemicChainBrokenError(
+                f"memory {memory_id} references knowledge {memory.knowledge_id}, which does not exist"
+            )
         knowledge = self._knowledge_from_row(knowledge_row)
 
-        interpretation_row = self.db.execute("SELECT * FROM interpretations WHERE id = ?", (knowledge.interpretation_id,)).fetchone()
+        interpretation_row = self.db.execute(
+            "SELECT * FROM interpretations WHERE id = ?", (knowledge.interpretation_id,)
+        ).fetchone()
         if interpretation_row is None:
-            raise EpistemicChainBrokenError(f"knowledge {knowledge.id} references interpretation {knowledge.interpretation_id}, which does not exist")
+            raise EpistemicChainBrokenError(
+                f"knowledge {knowledge.id} references interpretation {knowledge.interpretation_id}, which does not exist"
+            )
         interpretation = self._interpretation_from_row(interpretation_row)
 
-        output_artifact_row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (interpretation.output_artifact_id,)).fetchone()
+        output_artifact_row = self.db.execute(
+            "SELECT * FROM artifacts WHERE id = ?", (interpretation.output_artifact_id,)
+        ).fetchone()
         if output_artifact_row is None:
             raise EpistemicChainBrokenError(
                 f"interpretation {interpretation.id} references artifact {interpretation.output_artifact_id}, which does not exist"
             )
         output_artifact = self._artifact_from_row(output_artifact_row)
 
-        if output_artifact.parent_artifact_id is None and not self._metadata_claims_derived(output_artifact, interpretation):
-            return EpistemicChain(memory, knowledge, interpretation, output_artifact, None, output_artifact)
+        if output_artifact.parent_artifact_id is None and not self._metadata_claims_derived(
+            output_artifact, interpretation
+        ):
+            return EpistemicChain(
+                memory, knowledge, interpretation, output_artifact, None, output_artifact
+            )
 
         if output_artifact.parent_artifact_id is not None:
             self._validate_artifact_lineage_chain(output_artifact.id)
 
-        if self._metadata_claims_derived(output_artifact, interpretation) and not self._artifact_has_valid_extraction_link(output_artifact.id):
+        if self._metadata_claims_derived(
+            output_artifact, interpretation
+        ) and not self._artifact_has_valid_extraction_link(output_artifact.id):
             raise EpistemicChainBrokenError(
                 "artifact metadata claims extraction provenance but no valid extraction/output relationship exists"
             )
@@ -1208,13 +1355,17 @@ class AIDB:
             raise EpistemicChainBrokenError(
                 "extraction input artifact does not match output artifact parent"
             )
-        source_row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (extraction.input_artifact_id,)).fetchone()
+        source_row = self.db.execute(
+            "SELECT * FROM artifacts WHERE id = ?", (extraction.input_artifact_id,)
+        ).fetchone()
         if source_row is None:
             raise EpistemicChainBrokenError(
                 f"extraction {extraction.id} references input_artifact_id {extraction.input_artifact_id}, which does not exist"
             )
         source_artifact = self._artifact_from_row(source_row)
-        return EpistemicChain(memory, knowledge, interpretation, output_artifact, extraction, source_artifact)
+        return EpistemicChain(
+            memory, knowledge, interpretation, output_artifact, extraction, source_artifact
+        )
 
     def get_artifact(self, artifact_id: int) -> Artifact | None:
         row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (artifact_id,)).fetchone()
@@ -1270,7 +1421,9 @@ class AIDB:
                     self._json(metadata or {}),
                 ),
             )
-            row = self.db.execute("SELECT * FROM artifacts WHERE id = ?", (cur.lastrowid,)).fetchone()
+            row = self.db.execute(
+                "SELECT * FROM artifacts WHERE id = ?", (cur.lastrowid,)
+            ).fetchone()
             artifact = self._artifact_from_row(row)
             if content is not None:
                 self.db.execute(
@@ -1280,7 +1433,11 @@ class AIDB:
             self._append_workflow_event(
                 "artifact_created",
                 f"artifact {artifact.id} created",
-                metadata={"artifact_id": artifact.id, "checksum": checksum, "checksum_algorithm": checksum_algorithm},
+                metadata={
+                    "artifact_id": artifact.id,
+                    "checksum": checksum,
+                    "checksum_algorithm": checksum_algorithm,
+                },
             )
             self.db.commit()
             return artifact
@@ -1395,13 +1552,19 @@ class AIDB:
             ("tasks", "id", task_id, "task"),
             ("sessions", "session_id", session_id, "session"),
         ):
-            if value is not None and self.db.execute(
-                f"SELECT 1 FROM {table} WHERE {column} = ?", (value,)
-            ).fetchone() is None:
+            if (
+                value is not None
+                and self.db.execute(
+                    f"SELECT 1 FROM {table} WHERE {column} = ?", (value,)
+                ).fetchone()
+                is None
+            ):
                 raise ValueError(f"{label} {value} does not exist")
         return self._append_workflow_event(kind, message, agent_id, task_id, session_id, metadata)
 
-    def list_artifacts(self, media_type: str | None = None, parent_artifact_id: int | None = None) -> list[Artifact]:
+    def list_artifacts(
+        self, media_type: str | None = None, parent_artifact_id: int | None = None
+    ) -> list[Artifact]:
         if media_type is not None and parent_artifact_id is not None:
             rows = self.db.execute(
                 "SELECT * FROM artifacts WHERE media_type = ? AND parent_artifact_id = ? ORDER BY id DESC",
@@ -1440,7 +1603,11 @@ class AIDB:
             raise ValueError("legacy memory content must be a string")
         if not isinstance(kind, str) or not kind.strip():
             raise ValueError("legacy memory kind must be a non-empty string")
-        if isinstance(importance, bool) or not isinstance(importance, (int, float)) or not 0 <= importance <= 1:
+        if (
+            isinstance(importance, bool)
+            or not isinstance(importance, (int, float))
+            or not 0 <= importance <= 1
+        ):
             raise ValueError("legacy memory importance must be between 0 and 1")
         _validate_metadata(metadata, "legacy memory metadata")
         cur = self.db.execute(
@@ -1448,7 +1615,16 @@ class AIDB:
             (agent_id, content, kind, importance, self._json(metadata or {})),
         )
         self.db.commit()
-        return Memory(agent_id=agent_id, knowledge_id=0, kind=kind, confidence=importance, status="active", context={}, metadata=metadata or {}, id=cur.lastrowid)
+        return Memory(
+            agent_id=agent_id,
+            knowledge_id=0,
+            kind=kind,
+            confidence=importance,
+            status="active",
+            context={},
+            metadata=metadata or {},
+            id=cur.lastrowid,
+        )
 
     def recall(self, agent_id: int, query: str = "", limit: int = 20) -> list[Memory]:
         warnings.warn(
@@ -1480,18 +1656,25 @@ class AIDB:
                 break
         return results
 
-
     def initialize_home(self, node_id=None, owner=None, visibility="private", metadata=None):
-        if visibility not in {"public", "private"}: raise ValueError("visibility must be public or private")
+        if visibility not in {"public", "private"}:
+            raise ValueError("visibility must be public or private")
         row = self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone()
-        if row: return dict(row)
+        if row:
+            return dict(row)
         node_id = node_id or "node:" + str(uuid.uuid4())
-        self.db.execute("INSERT INTO node_identity(id,node_id,owner,visibility,metadata) VALUES(1,?,?,?,?)", (node_id, owner, visibility, self._json(metadata or {})))
+        self.db.execute(
+            "INSERT INTO node_identity(id,node_id,owner,visibility,metadata) VALUES(1,?,?,?,?)",
+            (node_id, owner, visibility, self._json(metadata or {})),
+        )
         self.db.commit()
         return dict(self.db.execute("SELECT * FROM node_identity WHERE id=1").fetchone())
 
-    def create_resource(self, resource_type, content=None, owner=None, visibility="private", metadata=None):
-        if visibility not in {"public", "private"}: raise ValueError("visibility must be public or private")
+    def create_resource(
+        self, resource_type, content=None, owner=None, visibility="private", metadata=None
+    ):
+        if visibility not in {"public", "private"}:
+            raise ValueError("visibility must be public or private")
         if not isinstance(resource_type, str) or not resource_type.strip():
             raise ValueError("resource_type must be a non-empty string")
         if owner is not None and not isinstance(owner, str):
@@ -1500,35 +1683,91 @@ class AIDB:
         _validate_metadata(metadata)
         rid = "res:" + str(uuid.uuid4())
         with self._atomic("create_resource"):
-            self.db.execute("INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)", (rid, resource_type, json.dumps(content), owner, visibility, self._json(metadata or {})))
-            self._append_workflow_event("resource_created", "resource created", metadata={"resource_id": rid, "resource_type": resource_type, "owner": owner, "visibility": visibility})
-            self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,new_revision,payload) VALUES(?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), rid, "create", owner, 1, self._json({"resource_type":resource_type,"visibility":visibility})))
+            self.db.execute(
+                "INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)",
+                (
+                    rid,
+                    resource_type,
+                    json.dumps(content),
+                    owner,
+                    visibility,
+                    self._json(metadata or {}),
+                ),
+            )
+            self._append_workflow_event(
+                "resource_created",
+                "resource created",
+                metadata={
+                    "resource_id": rid,
+                    "resource_type": resource_type,
+                    "owner": owner,
+                    "visibility": visibility,
+                },
+            )
+            self.db.execute(
+                "INSERT INTO home_changes(change_id,resource_id,operation,actor,new_revision,payload) VALUES(?,?,?,?,?,?)",
+                (
+                    "chg:" + str(uuid.uuid4()),
+                    rid,
+                    "create",
+                    owner,
+                    1,
+                    self._json({"resource_type": resource_type, "visibility": visibility}),
+                ),
+            )
         return self.get_resource(rid)
 
     def get_resource(self, resource_id, include_private=True):
         row = self.db.execute("SELECT * FROM home_resources WHERE id=?", (resource_id,)).fetchone()
-        if row is None: raise ValueError("resource does not exist")
-        if row["visibility"] == "private" and not include_private: raise PermissionError("private resource")
-        return Resource(row["resource_type"], json.loads(row["content"]), row["owner"], row["visibility"], json.loads(row["metadata"]), row["id"], row["revision"], row["created_at"], row["updated_at"])
+        if row is None:
+            raise ValueError("resource does not exist")
+        if row["visibility"] == "private" and not include_private:
+            raise PermissionError("private resource")
+        return Resource(
+            row["resource_type"],
+            json.loads(row["content"]),
+            row["owner"],
+            row["visibility"],
+            json.loads(row["metadata"]),
+            row["id"],
+            row["revision"],
+            row["created_at"],
+            row["updated_at"],
+        )
 
-    def list_resources(self, resource_type=None, visibility=None, include_private=True, limit=None, offset=0):
-        clauses=[]; params=[]
-        if resource_type: clauses.append("resource_type=?"); params.append(resource_type)
-        if visibility: clauses.append("visibility=?"); params.append(visibility)
-        elif not include_private: clauses.append("visibility='public'")
-        where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
-        sql="SELECT id FROM home_resources"+where+" ORDER BY updated_at DESC, id ASC"
+    def list_resources(
+        self, resource_type=None, visibility=None, include_private=True, limit=None, offset=0
+    ):
+        clauses = []
+        params = []
+        if resource_type:
+            clauses.append("resource_type=?")
+            params.append(resource_type)
+        if visibility:
+            clauses.append("visibility=?")
+            params.append(visibility)
+        elif not include_private:
+            clauses.append("visibility='public'")
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        sql = "SELECT id FROM home_resources" + where + " ORDER BY updated_at DESC, id ASC"
         if limit is not None:
-            if not isinstance(limit, int) or limit < 1: raise ValueError("limit must be a positive integer")
-            sql += " LIMIT ?"; params.append(limit)
-        if not isinstance(offset, int) or offset < 0: raise ValueError("offset must be a non-negative integer")
+            if not isinstance(limit, int) or limit < 1:
+                raise ValueError("limit must be a positive integer")
+            sql += " LIMIT ?"
+            params.append(limit)
+        if not isinstance(offset, int) or offset < 0:
+            raise ValueError("offset must be a non-negative integer")
         if offset:
-            if limit is None: sql += " LIMIT -1"
-            sql += " OFFSET ?"; params.append(offset)
-        rows=self.db.execute(sql,params).fetchall()
+            if limit is None:
+                sql += " LIMIT -1"
+            sql += " OFFSET ?"
+            params.append(offset)
+        rows = self.db.execute(sql, params).fetchall()
         return [self.get_resource(r["id"]) for r in rows]
 
-    def create_note(self, title, content, owner=None, visibility="private", kind="note", metadata=None):
+    def create_note(
+        self, title, content, owner=None, visibility="private", kind="note", metadata=None
+    ):
         if visibility not in {"public", "private"}:
             raise ValueError("visibility must be public or private")
         if not isinstance(title, str) or not title.strip():
@@ -1546,20 +1785,48 @@ class AIDB:
             self.db.execute("BEGIN")
             self.db.execute(
                 "INSERT INTO home_resources(id,resource_type,content,owner,visibility,metadata) VALUES(?,?,?,?,?,?)",
-                (resource_id, "note", json.dumps(resource_content), owner, visibility, self._json(metadata or {})),
+                (
+                    resource_id,
+                    "note",
+                    json.dumps(resource_content),
+                    owner,
+                    visibility,
+                    self._json(metadata or {}),
+                ),
             )
             self.db.execute(
                 "INSERT INTO notes(id,resource_id,title,content,owner,visibility,kind,metadata) VALUES(?,?,?,?,?,?,?,?)",
-                (resource_id, resource_id, title, content, owner, visibility, kind, self._json(metadata or {})),
+                (
+                    resource_id,
+                    resource_id,
+                    title,
+                    content,
+                    owner,
+                    visibility,
+                    kind,
+                    self._json(metadata or {}),
+                ),
             )
             self._append_workflow_event(
-                "resource_created", "note created",
-                metadata={"resource_id": resource_id, "resource_type": "note", "owner": owner, "visibility": visibility},
+                "resource_created",
+                "note created",
+                metadata={
+                    "resource_id": resource_id,
+                    "resource_type": "note",
+                    "owner": owner,
+                    "visibility": visibility,
+                },
             )
             self.db.execute(
                 "INSERT INTO home_changes(change_id,resource_id,operation,actor,new_revision,payload) VALUES(?,?,?,?,?,?)",
-                ("chg:" + str(uuid.uuid4()), resource_id, "create", owner, 1,
-                 self._json({"resource_type": "note", "visibility": visibility})),
+                (
+                    "chg:" + str(uuid.uuid4()),
+                    resource_id,
+                    "create",
+                    owner,
+                    1,
+                    self._json({"resource_type": "note", "visibility": visibility}),
+                ),
             )
             self.db.commit()
         except Exception:
@@ -1568,58 +1835,175 @@ class AIDB:
         return self.get_note(resource_id)
 
     def get_note(self, note_id, include_private=True):
-        row=self.db.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
-        if row is None: raise ValueError("note does not exist")
-        if row["visibility"] == "private" and not include_private: raise PermissionError("private note")
-        return Note(row["title"],row["content"],row["owner"],row["visibility"],row["kind"],json.loads(row["metadata"]),row["id"],row["resource_id"],row["revision"],row["created_at"],row["updated_at"])
+        row = self.db.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
+        if row is None:
+            raise ValueError("note does not exist")
+        if row["visibility"] == "private" and not include_private:
+            raise PermissionError("private note")
+        return Note(
+            row["title"],
+            row["content"],
+            row["owner"],
+            row["visibility"],
+            row["kind"],
+            json.loads(row["metadata"]),
+            row["id"],
+            row["resource_id"],
+            row["revision"],
+            row["created_at"],
+            row["updated_at"],
+        )
 
     def list_notes(self, owner=None, visibility=None, include_private=True, limit=None, offset=0):
-        clauses=[]; params=[]
-        if owner is not None: clauses.append("owner=?"); params.append(owner)
-        if visibility: clauses.append("visibility=?"); params.append(visibility)
-        elif not include_private: clauses.append("visibility='public'")
-        where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
-        sql="SELECT id FROM notes"+where+" ORDER BY updated_at DESC, id ASC"
+        clauses = []
+        params = []
+        if owner is not None:
+            clauses.append("owner=?")
+            params.append(owner)
+        if visibility:
+            clauses.append("visibility=?")
+            params.append(visibility)
+        elif not include_private:
+            clauses.append("visibility='public'")
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        sql = "SELECT id FROM notes" + where + " ORDER BY updated_at DESC, id ASC"
         if limit is not None:
-            if not isinstance(limit, int) or limit < 1: raise ValueError("limit must be a positive integer")
-            sql += " LIMIT ?"; params.append(limit)
-        if not isinstance(offset, int) or offset < 0: raise ValueError("offset must be a non-negative integer")
+            if not isinstance(limit, int) or limit < 1:
+                raise ValueError("limit must be a positive integer")
+            sql += " LIMIT ?"
+            params.append(limit)
+        if not isinstance(offset, int) or offset < 0:
+            raise ValueError("offset must be a non-negative integer")
         if offset:
-            if limit is None: sql += " LIMIT -1"
-            sql += " OFFSET ?"; params.append(offset)
-        return [self.get_note(r["id"]) for r in self.db.execute(sql,params)]
+            if limit is None:
+                sql += " LIMIT -1"
+            sql += " OFFSET ?"
+            params.append(offset)
+        return [self.get_note(r["id"]) for r in self.db.execute(sql, params)]
 
     def publish_resource(self, resource_id):
         with self._atomic("publish_resource"):
-            row=self.db.execute("SELECT revision,owner,visibility FROM home_resources WHERE id=?", (resource_id,)).fetchone()
-            if row is None: raise ValueError("resource does not exist")
+            row = self.db.execute(
+                "SELECT revision,owner,visibility FROM home_resources WHERE id=?", (resource_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError("resource does not exist")
             if row["visibility"] == "public":
                 return self.get_resource(resource_id)
-            old_revision=row["revision"]
+            old_revision = row["revision"]
             # Guard on the revision just read so a concurrent writer cannot
             # be overwritten silently between the check and the write.
-            cursor=self.db.execute("UPDATE home_resources SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=? AND revision=? AND visibility='private'", (resource_id, old_revision))
-            if cursor.rowcount != 1: raise ValueError("revision conflict")
-            self.db.execute("UPDATE notes SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE resource_id=?", (resource_id,))
-            self._append_workflow_event("resource_published", "resource published", metadata={"resource_id":resource_id})
-            self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)", ("chg:"+str(uuid.uuid4()), resource_id, "publish", row["owner"], old_revision, old_revision+1, self._json({})))
+            cursor = self.db.execute(
+                "UPDATE home_resources SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id=? AND revision=? AND visibility='private'",
+                (resource_id, old_revision),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError("revision conflict")
+            self.db.execute(
+                "UPDATE notes SET visibility='public', revision=revision+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE resource_id=?",
+                (resource_id,),
+            )
+            self._append_workflow_event(
+                "resource_published", "resource published", metadata={"resource_id": resource_id}
+            )
+            self.db.execute(
+                "INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)",
+                (
+                    "chg:" + str(uuid.uuid4()),
+                    resource_id,
+                    "publish",
+                    row["owner"],
+                    old_revision,
+                    old_revision + 1,
+                    self._json({}),
+                ),
+            )
         return self.get_resource(resource_id)
 
     def current_specification(self):
-        identity=self.initialize_home()
-        caps=["resources","notes","artifacts","knowledge","changes","export","restore","public_private","ownership","agent_network","agent_profiles","knowledge_offers","knowledge_requests","collaboration_requests","agent_responses","knowledge_reviews","public_discovery"]
-        types=["resource","note","artifact","knowledge","memory","agent_profile","knowledge_offer","knowledge_request","collaboration_request","agent_response","knowledge_review"]
-        latest=self.db.execute("SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1").fetchone()
-        desired=(caps,types)
-        if latest is None or (json.loads(latest["capabilities"]), json.loads(latest["resource_types"])) != desired:
-            self.db.execute("INSERT INTO node_specifications(specification_id,node_id,visibility,capabilities,resource_types,transports) VALUES(?,?,?,?,?,?)", ("spec:"+str(uuid.uuid4()),identity["node_id"],"public",self._json(caps),self._json(types),self._json([])))
+        identity = self.initialize_home()
+        caps = [
+            "resources",
+            "notes",
+            "artifacts",
+            "knowledge",
+            "changes",
+            "export",
+            "restore",
+            "public_private",
+            "ownership",
+            "agent_network",
+            "agent_profiles",
+            "knowledge_offers",
+            "knowledge_requests",
+            "collaboration_requests",
+            "agent_responses",
+            "knowledge_reviews",
+            "public_discovery",
+        ]
+        types = [
+            "resource",
+            "note",
+            "artifact",
+            "knowledge",
+            "memory",
+            "agent_profile",
+            "knowledge_offer",
+            "knowledge_request",
+            "collaboration_request",
+            "agent_response",
+            "knowledge_review",
+        ]
+        latest = self.db.execute(
+            "SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1"
+        ).fetchone()
+        desired = (caps, types)
+        if (
+            latest is None
+            or (json.loads(latest["capabilities"]), json.loads(latest["resource_types"])) != desired
+        ):
+            self.db.execute(
+                "INSERT INTO node_specifications(specification_id,node_id,visibility,capabilities,resource_types,transports) VALUES(?,?,?,?,?,?)",
+                (
+                    "spec:" + str(uuid.uuid4()),
+                    identity["node_id"],
+                    "public",
+                    self._json(caps),
+                    self._json(types),
+                    self._json([]),
+                ),
+            )
             self.db.commit()
-            latest=self.db.execute("SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1").fetchone()
-        return Specification(latest["specification_id"],latest["version"],latest["node_id"],latest["visibility"],json.loads(latest["capabilities"]),json.loads(latest["resource_types"]),json.loads(latest["transports"]),json.loads(latest["extensions"]),json.loads(latest["constraints"]),latest["issued_at"])
+            latest = self.db.execute(
+                "SELECT * FROM node_specifications ORDER BY version DESC LIMIT 1"
+            ).fetchone()
+        return Specification(
+            latest["specification_id"],
+            latest["version"],
+            latest["node_id"],
+            latest["visibility"],
+            json.loads(latest["capabilities"]),
+            json.loads(latest["resource_types"]),
+            json.loads(latest["transports"]),
+            json.loads(latest["extensions"]),
+            json.loads(latest["constraints"]),
+            latest["issued_at"],
+        )
 
     def specification_dict(self):
-        s=self.current_specification()
-        return {"id":s.id,"version":s.version,"node":{"id":s.node_id},"visibility":s.visibility,"capabilities":s.capabilities,"resources":s.resource_types,"transports":s.transports,"extensions":s.extensions,"constraints":s.constraints,"issued_at":s.issued_at}
+        s = self.current_specification()
+        return {
+            "id": s.id,
+            "version": s.version,
+            "node": {"id": s.node_id},
+            "visibility": s.visibility,
+            "capabilities": s.capabilities,
+            "resources": s.resource_types,
+            "transports": s.transports,
+            "extensions": s.extensions,
+            "constraints": s.constraints,
+            "issued_at": s.issued_at,
+        }
 
     def _verify_home_json_columns(self, issues):
         """Check stored JSON-text columns using strict parsing and read-path shapes."""
@@ -1671,10 +2055,14 @@ class AIDB:
                             object_pairs_hook=self._unique_json_object,
                             parse_constant=self._reject_json_constant,
                         )
-                    except (json.JSONDecodeError, ValueError, TypeError, UnicodeDecodeError, RecursionError):
-                        issues.append(
-                            f"invalid JSON in {label} for {id_column}={row[id_column]}"
-                        )
+                    except (
+                        json.JSONDecodeError,
+                        ValueError,
+                        TypeError,
+                        UnicodeDecodeError,
+                        RecursionError,
+                    ):
+                        issues.append(f"invalid JSON in {label} for {id_column}={row[id_column]}")
                         continue
                     if shape == "object":
                         if not isinstance(value, dict):
@@ -1703,7 +2091,10 @@ class AIDB:
         ).fetchall()
         for row in rows:
             snapshot_id = row["snapshot_id"]
-            if not isinstance(row["home_format"], str) or row["home_format"] not in _ACCEPTED_SNAPSHOT_FORMATS:
+            if (
+                not isinstance(row["home_format"], str)
+                or row["home_format"] not in _ACCEPTED_SNAPSHOT_FORMATS
+            ):
                 issues.append("snapshot unknown format:" + str(snapshot_id))
             content = row["content"]
             content_hash = row["content_hash"]
@@ -1724,7 +2115,13 @@ class AIDB:
                     object_pairs_hook=self._unique_json_object,
                     parse_constant=self._reject_json_constant,
                 )
-            except (json.JSONDecodeError, ValueError, TypeError, UnicodeDecodeError, RecursionError):
+            except (
+                json.JSONDecodeError,
+                ValueError,
+                TypeError,
+                UnicodeDecodeError,
+                RecursionError,
+            ):
                 issues.append("snapshot invalid content:" + str(snapshot_id))
                 continue
             if (
@@ -1756,9 +2153,7 @@ class AIDB:
                 issues.append("artifact payload size mismatch:" + str(artifact_id))
                 continue
             try:
-                actual_checksum = self._checksum_bytes(
-                    content, blob["checksum_algorithm"]
-                )
+                actual_checksum = self._checksum_bytes(content, blob["checksum_algorithm"])
             except (TypeError, ValueError):
                 issues.append("artifact checksum algorithm unsupported:" + str(artifact_id))
                 continue
@@ -1803,13 +2198,24 @@ class AIDB:
                     parse_constant=self._reject_json_constant,
                 )
                 payload_ok = isinstance(payload, dict)
-            except (json.JSONDecodeError, ValueError, TypeError, UnicodeDecodeError, RecursionError):
+            except (
+                json.JSONDecodeError,
+                ValueError,
+                TypeError,
+                UnicodeDecodeError,
+                RecursionError,
+            ):
                 payload = None
                 payload_ok = False
             if not payload_ok:
                 issues.append("invalid change payload:" + str(change_id))
 
-            if not isinstance(operation, str) or operation not in {"create", "update", "publish", "relate"}:
+            if not isinstance(operation, str) or operation not in {
+                "create",
+                "update",
+                "publish",
+                "relate",
+            }:
                 issues.append("unknown change operation:" + str(change_id))
                 continue
             if not isinstance(resource_id, str) or not resource_id.strip():
@@ -1937,8 +2343,7 @@ class AIDB:
         otherwise verify clean.
         """
         resources = {
-            row["id"]: row
-            for row in self.db.execute("SELECT * FROM home_resources").fetchall()
+            row["id"]: row for row in self.db.execute("SELECT * FROM home_resources").fetchall()
         }
         for note in self.db.execute("SELECT * FROM notes ORDER BY id").fetchall():
             resource = resources.get(note["resource_id"])
@@ -1982,12 +2387,10 @@ class AIDB:
         is only visible by checking the rows themselves.
         """
         resource_ids = {
-            row["id"]
-            for row in self.db.execute("SELECT id FROM home_resources").fetchall()
+            row["id"] for row in self.db.execute("SELECT id FROM home_resources").fetchall()
         }
         for relation in self.db.execute(
-            "SELECT id,source_resource_id,target_resource_id "
-            "FROM resource_relations ORDER BY id"
+            "SELECT id,source_resource_id,target_resource_id FROM resource_relations ORDER BY id"
         ).fetchall():
             if relation["source_resource_id"] not in resource_ids:
                 issues.append("missing relation source:" + str(relation["id"]))
@@ -2011,8 +2414,7 @@ class AIDB:
             for row in self.db.execute("SELECT artifact_id FROM artifact_blobs").fetchall()
         }
         for artifact in self.db.execute(
-            "SELECT id,size_bytes,checksum,checksum_algorithm,status "
-            "FROM artifacts ORDER BY id"
+            "SELECT id,size_bytes,checksum,checksum_algorithm,status FROM artifacts ORDER BY id"
         ).fetchall():
             invalid = (
                 isinstance(artifact["size_bytes"], bool)
@@ -2023,10 +2425,7 @@ class AIDB:
                 or not artifact["checksum"]
             )
             if not invalid and artifact["id"] not in blob_ids:
-                invalid = (
-                    _canonical_checksum_algorithm(artifact["checksum_algorithm"])
-                    is None
-                )
+                invalid = _canonical_checksum_algorithm(artifact["checksum_algorithm"]) is None
             if invalid:
                 issues.append("invalid artifact metadata:" + str(artifact["id"]))
 
@@ -2040,21 +2439,19 @@ class AIDB:
         """
         changed_ids = {
             row["resource_id"]
-            for row in self.db.execute(
-                "SELECT DISTINCT resource_id FROM home_changes"
-            ).fetchall()
+            for row in self.db.execute("SELECT DISTINCT resource_id FROM home_changes").fetchall()
         }
         for resource in self.db.execute(
-            "SELECT id,resource_type,visibility,revision "
-            "FROM home_resources ORDER BY id"
+            "SELECT id,resource_type,visibility,revision FROM home_resources ORDER BY id"
         ).fetchall():
             if resource["id"] in changed_ids:
                 continue
             if not isinstance(resource["id"], str) or not resource["id"].strip():
                 issues.append("invalid resource id")
-            if not isinstance(resource["resource_type"], str) or not resource[
-                "resource_type"
-            ].strip():
+            if (
+                not isinstance(resource["resource_type"], str)
+                or not resource["resource_type"].strip()
+            ):
                 issues.append("invalid resource type:" + str(resource["id"]))
             if resource["visibility"] not in {"public", "private"}:
                 issues.append("invalid resource visibility:" + str(resource["id"]))
@@ -2088,9 +2485,7 @@ class AIDB:
         if include_private:
             for table in tables:
                 columns = ", ".join(_EXPORT_COLUMNS[table])
-                rows = self.db.execute(
-                    f"SELECT {columns} FROM {table}"
-                ).fetchall()
+                rows = self.db.execute(f"SELECT {columns} FROM {table}").fetchall()
                 payload["tables"][table] = [dict(row) for row in rows]
             payload["tables"]["artifact_blobs"] = [
                 {
@@ -2140,9 +2535,7 @@ class AIDB:
             # Whole-home verification can leak private row state through its
             # aggregate result or diagnostics. A filtered export deliberately
             # does not claim whole-database verification.
-            payload["verification"] = {
-                "ok": None, "issues": [], "scope": "filtered_public_export"
-            }
+            payload["verification"] = {"ok": None, "issues": [], "scope": "filtered_public_export"}
         return payload
 
     @staticmethod
@@ -2193,7 +2586,10 @@ class AIDB:
                 raise ValueError(
                     "home change create payload must have resource_type and visibility"
                 )
-            if not isinstance(payload["resource_type"], str) or not payload["resource_type"].strip():
+            if (
+                not isinstance(payload["resource_type"], str)
+                or not payload["resource_type"].strip()
+            ):
                 raise ValueError(
                     "home change create payload resource_type must be a non-empty string"
                 )
@@ -2290,12 +2686,8 @@ class AIDB:
             if value is None:
                 continue
             parsed = AIDB._parse_strict_json(value, f"agent {field}")
-            if not isinstance(parsed, list) or any(
-                not isinstance(item, str) for item in parsed
-            ):
-                raise ValueError(
-                    f"invalid {field} in home import row for table: agents"
-                )
+            if not isinstance(parsed, list) or any(not isinstance(item, str) for item in parsed):
+                raise ValueError(f"invalid {field} in home import row for table: agents")
         metadata = row.get("metadata")
         if metadata is not None:
             parsed = AIDB._parse_strict_json(metadata, "agent metadata")
@@ -2323,9 +2715,8 @@ class AIDB:
         if set(payload) - allowed_top_level:
             raise ValueError("unknown home import field")
         required_extensions = payload.get("required_extensions", [])
-        if (
-            not isinstance(required_extensions, list)
-            or any(not isinstance(item, str) for item in required_extensions)
+        if not isinstance(required_extensions, list) or any(
+            not isinstance(item, str) for item in required_extensions
         ):
             raise ValueError("invalid required_extensions")
         if required_extensions:
@@ -2342,42 +2733,101 @@ class AIDB:
 
         columns_by_table = {
             "node_identity": {
-                "id", "node_id", "owner", "visibility", "metadata",
+                "id",
+                "node_id",
+                "owner",
+                "visibility",
+                "metadata",
             },
             "node_specifications": {
-                "version", "specification_id", "node_id", "visibility",
-                "capabilities", "resource_types", "transports", "extensions",
-                "constraints", "issued_at",
+                "version",
+                "specification_id",
+                "node_id",
+                "visibility",
+                "capabilities",
+                "resource_types",
+                "transports",
+                "extensions",
+                "constraints",
+                "issued_at",
             },
             "home_resources": {
-                "id", "resource_type", "content", "owner", "visibility",
-                "metadata", "revision", "created_at", "updated_at",
+                "id",
+                "resource_type",
+                "content",
+                "owner",
+                "visibility",
+                "metadata",
+                "revision",
+                "created_at",
+                "updated_at",
             },
             "notes": {
-                "id", "resource_id", "title", "content", "owner", "visibility",
-                "kind", "metadata", "revision", "created_at", "updated_at",
+                "id",
+                "resource_id",
+                "title",
+                "content",
+                "owner",
+                "visibility",
+                "kind",
+                "metadata",
+                "revision",
+                "created_at",
+                "updated_at",
             },
             "resource_relations": {
-                "id", "source_resource_id", "target_resource_id", "relation",
-                "metadata", "created_at",
+                "id",
+                "source_resource_id",
+                "target_resource_id",
+                "relation",
+                "metadata",
+                "created_at",
             },
             "home_changes": {
-                "id", "change_id", "resource_id", "operation", "actor",
-                "previous_revision", "new_revision", "payload", "created_at",
+                "id",
+                "change_id",
+                "resource_id",
+                "operation",
+                "actor",
+                "previous_revision",
+                "new_revision",
+                "payload",
+                "created_at",
             },
             "home_snapshots": {
-                "id", "snapshot_id", "home_format", "content", "content_hash",
+                "id",
+                "snapshot_id",
+                "home_format",
+                "content",
+                "content_hash",
                 "created_at",
             },
             "artifacts": {
-                "id", "name", "media_type", "filename", "size_bytes", "checksum",
-                "checksum_algorithm", "provenance", "status", "encoding",
-                "parent_artifact_id", "transformation_history", "metadata", "created_at",
+                "id",
+                "name",
+                "media_type",
+                "filename",
+                "size_bytes",
+                "checksum",
+                "checksum_algorithm",
+                "provenance",
+                "status",
+                "encoding",
+                "parent_artifact_id",
+                "transformation_history",
+                "metadata",
+                "created_at",
             },
             "artifact_blobs": {"artifact_id", "content", "created_at", "content_encoding"},
             "agents": {
-                "id", "name", "description", "model", "role", "permissions",
-                "capabilities", "metadata",
+                "id",
+                "name",
+                "description",
+                "model",
+                "role",
+                "permissions",
+                "capabilities",
+                "metadata",
             },
         }
         unknown_tables = set(tables) - set(columns_by_table)
@@ -2416,8 +2866,7 @@ class AIDB:
                 ):
                     raise ValueError(f"invalid value in home import row for table: {table}")
                 if any(
-                    isinstance(value, float) and not math.isfinite(value)
-                    for value in row.values()
+                    isinstance(value, float) and not math.isfinite(value) for value in row.values()
                 ):
                     raise ValueError(f"non-finite number in home import row for table: {table}")
 
@@ -2426,11 +2875,30 @@ class AIDB:
                     "node_specifications": ("specification_id", "node_id"),
                     "home_resources": ("id", "resource_type", "content", "metadata"),
                     "notes": ("id", "resource_id", "title", "content", "kind", "metadata"),
-                    "resource_relations": ("source_resource_id", "target_resource_id", "relation", "metadata"),
+                    "resource_relations": (
+                        "source_resource_id",
+                        "target_resource_id",
+                        "relation",
+                        "metadata",
+                    ),
                     "home_changes": ("change_id", "operation", "actor", "payload"),
-                    "artifacts": ("name", "media_type", "checksum", "provenance", "transformation_history", "metadata"),
+                    "artifacts": (
+                        "name",
+                        "media_type",
+                        "checksum",
+                        "provenance",
+                        "transformation_history",
+                        "metadata",
+                    ),
                     "home_snapshots": ("snapshot_id", "home_format", "content", "content_hash"),
-                    "agents": ("description", "model", "role", "permissions", "capabilities", "metadata"),
+                    "agents": (
+                        "description",
+                        "model",
+                        "role",
+                        "permissions",
+                        "capabilities",
+                        "metadata",
+                    ),
                 }.get(table, ())
                 for field in string_fields:
                     if field in row and row[field] is not None and not isinstance(row[field], str):
@@ -2447,9 +2915,7 @@ class AIDB:
                     "agents": ("name", "role"),
                 }.get(table, ())
                 for field in nonempty_fields:
-                    if field in row and (
-                        not isinstance(row[field], str) or not row[field].strip()
-                    ):
+                    if field in row and (not isinstance(row[field], str) or not row[field].strip()):
                         raise ValueError(f"invalid {field} in home import row for table: {table}")
                 integer_fields = {
                     "node_identity": ("id",),
@@ -2464,22 +2930,30 @@ class AIDB:
                     "agents": ("id",),
                 }.get(table, ())
                 for field in integer_fields:
-                    if field in row and row[field] is not None and (
-                        isinstance(row[field], bool) or not isinstance(row[field], int)
+                    if (
+                        field in row
+                        and row[field] is not None
+                        and (isinstance(row[field], bool) or not isinstance(row[field], int))
                     ):
-                        raise ValueError(f"invalid integer {field} in home import row for table: {table}")
+                        raise ValueError(
+                            f"invalid integer {field} in home import row for table: {table}"
+                        )
                 if table == "home_resources" and "id" in row and not isinstance(row["id"], str):
                     raise ValueError("resource IDs must be non-empty strings")
                 if table == "notes" and "id" in row and not isinstance(row["id"], str):
                     raise ValueError("note IDs must be non-empty strings")
-                if table == "home_changes" and row.get("resource_id") is not None and (
-                    not isinstance(row["resource_id"], str) or not row["resource_id"].strip()
+                if (
+                    table == "home_changes"
+                    and row.get("resource_id") is not None
+                    and (not isinstance(row["resource_id"], str) or not row["resource_id"].strip())
                 ):
                     raise ValueError("change resource_id must be a non-empty string or null")
                 if table in {"home_resources", "notes", "node_identity", "node_specifications"}:
                     visibility = row.get("visibility")
                     if visibility is not None and visibility not in {"public", "private"}:
-                        raise ValueError(f"invalid visibility in home import row for table: {table}")
+                        raise ValueError(
+                            f"invalid visibility in home import row for table: {table}"
+                        )
                 if table == "home_snapshots":
                     content = row.get("content")
                     digest = row.get("content_hash")
@@ -2506,7 +2980,9 @@ class AIDB:
                         self._parse_strict_json_column(row["content"], "home_resources content")
                     if "metadata" in row:
                         self._validate_json_object(
-                            self._parse_strict_json_column(row["metadata"], "home_resources metadata"),
+                            self._parse_strict_json_column(
+                                row["metadata"], "home_resources metadata"
+                            ),
                             "home_resources metadata",
                         )
                     if "revision" in row and (
@@ -2514,7 +2990,9 @@ class AIDB:
                         or not isinstance(row["revision"], int)
                         or row["revision"] < 1
                     ):
-                        raise ValueError("invalid revision in home import row for table: home_resources")
+                        raise ValueError(
+                            "invalid revision in home import row for table: home_resources"
+                        )
                 if table == "notes":
                     if "metadata" in row:
                         self._validate_json_object(
@@ -2528,7 +3006,9 @@ class AIDB:
                     ):
                         raise ValueError("invalid revision in home import row for table: notes")
                     if "id" in row and "resource_id" in row and row["id"] != row["resource_id"]:
-                        raise ValueError("note id must equal its resource_id in home import row for table: notes")
+                        raise ValueError(
+                            "note id must equal its resource_id in home import row for table: notes"
+                        )
                 if table == "resource_relations":
                     if "metadata" in row:
                         self._validate_json_object(
@@ -2548,7 +3028,9 @@ class AIDB:
                 if table == "node_identity":
                     if "metadata" in row:
                         self._validate_json_object(
-                            self._parse_strict_json_column(row["metadata"], "node_identity metadata"),
+                            self._parse_strict_json_column(
+                                row["metadata"], "node_identity metadata"
+                            ),
                             "node_identity metadata",
                         )
                     if row.get("id") is not None and row["id"] != 1:
@@ -2579,8 +3061,7 @@ class AIDB:
         # Change rows have no schema-level FK, so validate their targets
         # against both incoming resources and resources already in this home.
         imported_resource_ids = {
-            row["id"] for row in validated_rows["home_resources"]
-            if isinstance(row.get("id"), str)
+            row["id"] for row in validated_rows["home_resources"] if isinstance(row.get("id"), str)
         }
         existing_resource_ids = {
             row["id"] for row in self.db.execute("SELECT id FROM home_resources").fetchall()
@@ -2606,9 +3087,7 @@ class AIDB:
             for row in validated_rows["home_resources"]
             if isinstance(row.get("id"), str)
         }
-        for existing in self.db.execute(
-            "SELECT id, resource_type FROM home_resources"
-        ).fetchall():
+        for existing in self.db.execute("SELECT id, resource_type FROM home_resources").fetchall():
             resource_types.setdefault(existing["id"], existing["resource_type"])
         relation_keys = {
             (
@@ -2622,7 +3101,11 @@ class AIDB:
             "SELECT source_resource_id, target_resource_id, relation FROM resource_relations"
         ).fetchall():
             relation_keys.add(
-                (existing["source_resource_id"], existing["target_resource_id"], existing["relation"])
+                (
+                    existing["source_resource_id"],
+                    existing["target_resource_id"],
+                    existing["relation"],
+                )
             )
         for row in validated_rows["home_changes"]:
             self._validate_change_payload_row(
@@ -2640,12 +3123,9 @@ class AIDB:
         agent_rows = validated_rows["agents"]
         if agent_rows:
             existing_by_id = {
-                row["id"]: dict(row)
-                for row in self.db.execute("SELECT * FROM agents").fetchall()
+                row["id"]: dict(row) for row in self.db.execute("SELECT * FROM agents").fetchall()
             }
-            existing_by_name = {
-                row["name"]: row for row in existing_by_id.values()
-            }
+            existing_by_name = {row["name"]: row for row in existing_by_id.values()}
             seen_by_id: dict[int, dict] = {}
             seen_by_name: dict[str, dict] = {}
             for row in agent_rows:
@@ -2669,9 +3149,7 @@ class AIDB:
                     seen_by_name.get(name),
                 ):
                     if other is not None and other != full_row:
-                        raise ValueError(
-                            "imported agent collides with an existing agent"
-                        )
+                        raise ValueError("imported agent collides with an existing agent")
                 if agent_id is not None:
                     seen_by_id[agent_id] = full_row
                 seen_by_name[name] = full_row
@@ -2685,15 +3163,22 @@ class AIDB:
                     columns = list(row)
                     placeholders = ",".join("?" for _ in columns)
                     cursor = self.db.execute(
-                        "INSERT OR IGNORE INTO " + table + " ("
-                        + ",".join(columns) + ") VALUES (" + placeholders + ")",
+                        "INSERT OR IGNORE INTO "
+                        + table
+                        + " ("
+                        + ",".join(columns)
+                        + ") VALUES ("
+                        + placeholders
+                        + ")",
                         [row[column] for column in columns],
                     )
                     if cursor.rowcount == 0:
                         primary_keys = [
-                            info["name"] for info in self.db.execute(
+                            info["name"]
+                            for info in self.db.execute(
                                 "PRAGMA table_info(" + table + ")"
-                            ).fetchall() if info["pk"]
+                            ).fetchall()
+                            if info["pk"]
                         ]
                         existing = None
                         if primary_keys and all(key in row for key in primary_keys):
@@ -2702,7 +3187,9 @@ class AIDB:
                                 "SELECT * FROM " + table + " WHERE " + where,
                                 [row[key] for key in primary_keys],
                             ).fetchone()
-                        if existing is None or any(existing[key] != value for key, value in row.items()):
+                        if existing is None or any(
+                            existing[key] != value for key, value in row.items()
+                        ):
                             raise ValueError(
                                 "conflicting existing row while importing table: " + table
                             )
@@ -2724,20 +3211,38 @@ class AIDB:
         if source_resource_id == target_resource_id:
             raise ValueError("a resource cannot relate to itself")
         for rid in (source_resource_id, target_resource_id):
-            if self.db.execute("SELECT 1 FROM home_resources WHERE id=?", (rid,)).fetchone() is None:
+            if (
+                self.db.execute("SELECT 1 FROM home_resources WHERE id=?", (rid,)).fetchone()
+                is None
+            ):
                 raise ValueError("resource does not exist: " + rid)
         with self._atomic("relate_resources"):
-            self.db.execute("INSERT OR IGNORE INTO resource_relations(source_resource_id,target_resource_id,relation,metadata) VALUES(?,?,?,?)", (source_resource_id,target_resource_id,relation,self._json(metadata or {})))
-            self.db.execute("INSERT INTO home_changes(change_id,resource_id,operation,actor,payload) VALUES(?,?,?,?,?)", ("chg:"+str(uuid.uuid4()),source_resource_id,"relate",None,self._json({"target_resource_id":target_resource_id,"relation":relation})))
+            self.db.execute(
+                "INSERT OR IGNORE INTO resource_relations(source_resource_id,target_resource_id,relation,metadata) VALUES(?,?,?,?)",
+                (source_resource_id, target_resource_id, relation, self._json(metadata or {})),
+            )
+            self.db.execute(
+                "INSERT INTO home_changes(change_id,resource_id,operation,actor,payload) VALUES(?,?,?,?,?)",
+                (
+                    "chg:" + str(uuid.uuid4()),
+                    source_resource_id,
+                    "relate",
+                    None,
+                    self._json({"target_resource_id": target_resource_id, "relation": relation}),
+                ),
+            )
 
     def resource_relations(self, resource_id):
-        rows=self.db.execute("SELECT * FROM resource_relations WHERE source_resource_id=? OR target_resource_id=? ORDER BY id ASC", (resource_id,resource_id)).fetchall()
+        rows = self.db.execute(
+            "SELECT * FROM resource_relations WHERE source_resource_id=? OR target_resource_id=? ORDER BY id ASC",
+            (resource_id, resource_id),
+        ).fetchall()
         return [dict(r) for r in rows]
 
-    def update_resource(self, resource_id, content=None, metadata=None, owner=None, expected_revision=None):
-        row = self.db.execute(
-            "SELECT * FROM home_resources WHERE id=?", (resource_id,)
-        ).fetchone()
+    def update_resource(
+        self, resource_id, content=None, metadata=None, owner=None, expected_revision=None
+    ):
+        row = self.db.execute("SELECT * FROM home_resources WHERE id=?", (resource_id,)).fetchone()
         if row is None:
             raise ValueError("resource does not exist")
         if owner is not None and row["owner"] != owner:
@@ -2795,9 +3300,7 @@ class AIDB:
                     note_title = note["title"]
                     note_content = new_content
                     note_kind = note["kind"]
-                    new_content = {
-                        "title": note_title, "content": note_content, "kind": note_kind
-                    }
+                    new_content = {"title": note_title, "content": note_content, "kind": note_kind}
                     self.db.execute(
                         "UPDATE home_resources SET content=? WHERE id=?",
                         (json.dumps(new_content), resource_id),
@@ -2808,9 +3311,20 @@ class AIDB:
                 )
             self.db.execute(
                 "INSERT INTO home_changes(change_id,resource_id,operation,actor,previous_revision,new_revision,payload) VALUES(?,?,?,?,?,?,?)",
-                ("chg:" + str(uuid.uuid4()), resource_id, "update", owner or row["owner"],
-                 old_revision, old_revision + 1,
-                 self._json({"content_changed": content is not None, "metadata_changed": metadata is not None})),
+                (
+                    "chg:" + str(uuid.uuid4()),
+                    resource_id,
+                    "update",
+                    owner or row["owner"],
+                    old_revision,
+                    old_revision + 1,
+                    self._json(
+                        {
+                            "content_changed": content is not None,
+                            "metadata_changed": metadata is not None,
+                        }
+                    ),
+                ),
             )
         return self.get_resource(resource_id)
 
@@ -2879,21 +3393,33 @@ class AIDB:
         return visible[:limit]
 
     def create_snapshot(self, include_private=True):
-        payload=self.export_home(include_private=include_private)
-        content=json.dumps(payload, sort_keys=True, separators=(",",":"), ensure_ascii=False)
-        digest=hashlib.sha256(content.encode("utf-8")).hexdigest()
-        snapshot_id="snap:"+digest
-        self.db.execute("INSERT OR IGNORE INTO home_snapshots(snapshot_id,home_format,content,content_hash) VALUES(?,?,?,?)", (snapshot_id,SNAPSHOT_FORMAT,content,digest))
+        payload = self.export_home(include_private=include_private)
+        content = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        snapshot_id = "snap:" + digest
+        self.db.execute(
+            "INSERT OR IGNORE INTO home_snapshots(snapshot_id,home_format,content,content_hash) VALUES(?,?,?,?)",
+            (snapshot_id, SNAPSHOT_FORMAT, content, digest),
+        )
         self.db.commit()
-        return {"snapshot_id":snapshot_id,"content_hash":digest,"created_at":self.db.execute("SELECT created_at FROM home_snapshots WHERE snapshot_id=?",(snapshot_id,)).fetchone()["created_at"]}
+        return {
+            "snapshot_id": snapshot_id,
+            "content_hash": digest,
+            "created_at": self.db.execute(
+                "SELECT created_at FROM home_snapshots WHERE snapshot_id=?", (snapshot_id,)
+            ).fetchone()["created_at"],
+        }
 
     def restore_snapshot(self, snapshot_id):
-        row=self.db.execute("SELECT home_format,content,content_hash FROM home_snapshots WHERE snapshot_id=?", (snapshot_id,)).fetchone()
+        row = self.db.execute(
+            "SELECT home_format,content,content_hash FROM home_snapshots WHERE snapshot_id=?",
+            (snapshot_id,),
+        ).fetchone()
         if row is None:
             raise ValueError("snapshot does not exist")
         if row["home_format"] not in _ACCEPTED_SNAPSHOT_FORMATS:
             raise ValueError("unsupported snapshot format: " + str(row["home_format"]))
-        digest=hashlib.sha256(row["content"].encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(row["content"].encode("utf-8")).hexdigest()
         if digest != row["content_hash"]:
             raise ValueError("snapshot integrity check failed")
         return self.import_home_json(row["content"])
@@ -2902,9 +3428,14 @@ class AIDB:
         if limit < 1:
             raise ValueError("limit must be positive")
         if resource_id is None:
-            rows = self.db.execute("SELECT * FROM home_changes WHERE id>? ORDER BY id ASC LIMIT ?", (after_id, limit)).fetchall()
+            rows = self.db.execute(
+                "SELECT * FROM home_changes WHERE id>? ORDER BY id ASC LIMIT ?", (after_id, limit)
+            ).fetchall()
         else:
-            rows = self.db.execute("SELECT * FROM home_changes WHERE id>? AND resource_id=? ORDER BY id ASC LIMIT ?", (after_id, resource_id, limit)).fetchall()
+            rows = self.db.execute(
+                "SELECT * FROM home_changes WHERE id>? AND resource_id=? ORDER BY id ASC LIMIT ?",
+                (after_id, resource_id, limit),
+            ).fetchall()
         return [dict(r) for r in rows]
 
     def close(self) -> None:
@@ -3048,11 +3579,17 @@ class AIDB:
             created_at=row["created_at"],
         )
 
-    def list_events(self, task_id: int | None = None, session_id: str | None = None) -> list[WorkflowEvent]:
+    def list_events(
+        self, task_id: int | None = None, session_id: str | None = None
+    ) -> list[WorkflowEvent]:
         if task_id is not None:
-            rows = self.db.execute("SELECT * FROM workflow_events WHERE task_id = ? ORDER BY id DESC", (task_id,)).fetchall()
+            rows = self.db.execute(
+                "SELECT * FROM workflow_events WHERE task_id = ? ORDER BY id DESC", (task_id,)
+            ).fetchall()
         elif session_id is not None:
-            rows = self.db.execute("SELECT * FROM workflow_events WHERE session_id = ? ORDER BY id DESC", (session_id,)).fetchall()
+            rows = self.db.execute(
+                "SELECT * FROM workflow_events WHERE session_id = ? ORDER BY id DESC", (session_id,)
+            ).fetchall()
         else:
             rows = self.db.execute("SELECT * FROM workflow_events ORDER BY id DESC").fetchall()
         return [self._event_from_row(row) for row in rows]
@@ -3075,7 +3612,9 @@ class AIDB:
             (agent_id, title, content, self._json(tags or []), self._json(metadata or {})),
         )
         self.db.commit()
-        return KnowledgeRecord(title, content, tags or [], metadata or {}, 0.0, cur.lastrowid, agent_id)
+        return KnowledgeRecord(
+            title, content, tags or [], metadata or {}, 0.0, cur.lastrowid, agent_id
+        )
 
     def search(self, query: str, limit: int = 10) -> list[KnowledgeRecord]:
         warnings.warn(
@@ -3087,10 +3626,20 @@ class AIDB:
         tokens = set(query.lower().split())
         scored: list[KnowledgeRecord] = []
         for row in rows:
-            text = f'{row["title"]} {row["content"]} {row["tags"]}'.lower()
+            text = f"{row['title']} {row['content']} {row['tags']}".lower()
             score = sum(token in text for token in tokens)
             if score or not tokens:
-                scored.append(KnowledgeRecord(row["title"], row["content"], json.loads(row["tags"]), json.loads(row["metadata"]), score, row["id"], row["agent_id"]))
+                scored.append(
+                    KnowledgeRecord(
+                        row["title"],
+                        row["content"],
+                        json.loads(row["tags"]),
+                        json.loads(row["metadata"]),
+                        score,
+                        row["id"],
+                        row["agent_id"],
+                    )
+                )
         scored.sort(key=lambda item: item.score, reverse=True)
         return scored[:limit]
 
@@ -3119,7 +3668,14 @@ class AIDB:
     ) -> ToolCall:
         cur = self.db.execute(
             "INSERT INTO tool_calls(agent_id, tool_name, arguments, result, status, session_id) VALUES (?, ?, ?, ?, ?, ?)",
-            (agent_id, tool_name, self._json(arguments or {}), self._json(result if result is not None else {}), status, session_id),
+            (
+                agent_id,
+                tool_name,
+                self._json(arguments or {}),
+                self._json(result if result is not None else {}),
+                status,
+                session_id,
+            ),
         )
         self.db.commit()
         row = self.db.execute("SELECT * FROM tool_calls WHERE id = ?", (cur.lastrowid,)).fetchone()

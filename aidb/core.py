@@ -7,6 +7,7 @@ from typing import Any
 @dataclass
 class Resource:
     """Language-neutral home resource with ownership and visibility semantics."""
+
     resource_type: str
     content: Any = None
     owner: str | None = None
@@ -21,6 +22,7 @@ class Resource:
 @dataclass
 class Note:
     """A first-class thought, observation, question, plan, draft, or reminder."""
+
     title: str
     content: str
     owner: str | None = None
@@ -37,6 +39,7 @@ class Note:
 @dataclass
 class Specification:
     """Runtime description of a node's current contract and capabilities."""
+
     id: str
     version: int
     node_id: str
