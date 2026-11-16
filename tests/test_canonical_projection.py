@@ -26,14 +26,14 @@ from aidb.canonical import (
 
 RFC_EXAMPLE = {
     "numbers": [333333333.33333329, 1e30, 4.50, 2e-3, 0.000000000000000000000000001],
-    "string": '\u20ac$\u000f\nA\'B"\\\\"/',
+    "string": '\u20ac$\u000f\nA\'B"\\\\/',
     "literals": [None, True, False],
 }
 
 RFC_EXAMPLE_CANONICAL = (
     b'{"literals":[null,true,false],'
     b'"numbers":[333333333.3333333,1e+30,4.5,0.002,1e-27],'
-    b'"string":"\xe2\x82\xac$\\u000f\\nA\'B\\"\\\\\\\\\\"/"}'
+    b'"string":"\xe2\x82\xac$\\u000f\\nA\'B\\"\\\\\\"/"}'
 )
 
 RFC_EXAMPLE_HEX = (
@@ -172,6 +172,22 @@ def test_non_nfc_string_is_preserved_as_is():
     # rejecting non-NFC input would reject the RFC's own test data.
     assert canonical_json("e\u0301") == b'"e\xcc\x81"'
     assert canonical_json({"e\u0301": 1}) == b'{"e\xcc\x81":1}'
+
+
+def test_multilingual_text_is_preserved_and_round_trips():
+    payload = {
+        "ar": "مرحبا بالعالم — العربية",
+        "zh": "中文简体与繁體字",
+        "ja": "日本語と絵文字😀",
+        "mix": "English + 中文 + العربية + 日本語 + مرحبا",
+        "rtl_mixed": "ABC مرحبا world",
+    }
+    encoded = canonical_json(payload)
+    decoded = json.loads(encoded.decode("utf-8"))
+    assert decoded == payload
+    assert encoded.startswith(b'{"ar":')
+    assert b"\xe2\x9c\x88\xef\xb8\x8f" in encoded or b"\xe6\x97\xa5\xe6\x9c\xac" in encoded
+    assert b"\xe2\x9d\x93" not in encoded
 
 
 @pytest.mark.parametrize(
