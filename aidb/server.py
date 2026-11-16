@@ -13,9 +13,37 @@ from .store import AIDB
 logger = logging.getLogger(__name__)
 
 
-def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int = 1048576, max_page_size: int = 200):
+def create_handler(
+    db: AIDB,
+    auth_token: str | None = None,
+    max_body_bytes: int = 1048576,
+    max_page_size: int = 200,
+    transport_protocol: str = "http/1.1",
+):
     if max_body_bytes < 1 or max_page_size < 1:
         raise ValueError("limits must be positive")
+    if transport_protocol not in {"http/1.1", "https/1.1"}:
+        raise ValueError("unsupported transport protocol")
+
+    transport_capabilities = [
+        "health.read",
+        "specification.read",
+        "notes.read",
+        "resources.read",
+        "changes.read",
+    ]
+    if auth_token:
+        transport_capabilities.extend(
+            ["notes.create", "resources.create", "resources.relate"]
+        )
+    transport = {
+        "id": "https-json" if transport_protocol.startswith("https") else "http-json",
+        "protocol": transport_protocol,
+        "capabilities": transport_capabilities,
+        "authentication": ["bearer"] if auth_token else [],
+    }
+    # Publish the adapter's real surface separately from node-level capabilities.
+    db.current_specification(transports=[transport])
 
     class Handler(BaseHTTPRequestHandler):
         def _send(self, status: int, payload) -> None:
@@ -92,7 +120,7 @@ def create_handler(db: AIDB, auth_token: str | None = None, max_body_bytes: int 
 
         def _handle_post(self):
             path = urlparse(self.path).path
-            if auth_token is None:
+            if not auth_token:
                 return self._send(
                     503,
                     {"error": "network writes are disabled until an authorization token is configured"},
@@ -185,16 +213,25 @@ def create_server(
     tls_keyfile: str | None = None,
 ) -> ThreadingHTTPServer:
     validate_bind_security(host, auth_token, tls_certfile, tls_keyfile)
-    server = ThreadingHTTPServer((host, port), create_handler(db, auth_token))
+    context = None
     if tls_certfile and tls_keyfile:
-        try:
-            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            context.minimum_version = ssl.TLSVersion.TLSv1_2
-            context.load_cert_chain(tls_certfile, tls_keyfile)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(tls_certfile, tls_keyfile)
+
+    transport_protocol = "https/1.1" if context is not None else "http/1.1"
+    server = ThreadingHTTPServer((host, port), BaseHTTPRequestHandler)
+    try:
+        if context is not None:
             server.socket = context.wrap_socket(server.socket, server_side=True)
-        except Exception:
-            server.server_close()
-            raise
+        # Publish the transport only after TLS setup succeeds, so a failed
+        # certificate load never leaves a false HTTPS advertisement in history.
+        server.RequestHandlerClass = create_handler(
+            db, auth_token, transport_protocol=transport_protocol
+        )
+    except Exception:
+        server.server_close()
+        raise
     return server
 
 

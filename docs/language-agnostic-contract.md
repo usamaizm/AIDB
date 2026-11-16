@@ -101,6 +101,12 @@ Backward-compatible additions SHOULD be additive and optional. Breaking changes 
 
 The specification describes current behavior; it is not itself an authorization token.
 
+### Python reference status
+
+The current Python/SQLite reference endpoint returns contract `org.aidb.node-specification` version `0.1.0`. Its `version` field is a monotonically increasing per-node revision, and `supersedes` links that revision to the previous retained specification. Node-level capabilities are separate from each transport descriptor's `capabilities`, which lists only operations served by that adapter. The built-in HTTP/HTTPS adapter advertises read operations and advertises writes only when bearer authentication is configured.
+
+The reference implementation currently performs discovery and truthful capability advertisement; it does **not** yet provide an endpoint for required/optional capability negotiation. Clients must check required capabilities themselves and stop when a required capability is absent. Capability advertisement never grants authorization.
+
 ## 10. Portable snapshots
 
 A portable snapshot MUST declare its format identifier and version. It SHOULD preserve resource identities, relationships, provenance, revision information, relevant change history, and schema/contract versions.
@@ -141,4 +147,4 @@ Minimum conformance scenarios:
 
 ## 14. Current limitations
 
-This document is a proposal, not evidence that the existing code already conforms. The current Python package contains implementation-specific dataclasses, integer IDs in several domain models, and SQLite-backed storage. Those details must remain internal or be translated at the contract boundary. Before production use, the project still needs tested authorization semantics, transaction boundaries, conflict behavior, portable import guarantees, and compatibility tests.
+This document remains a draft, not a claim of full conformance. The Python package contains implementation-specific dataclasses, integer IDs in several domain models, and SQLite-backed storage. Those details must remain internal or be translated at the contract boundary. The current reference adapter implements only a subset of the operations and error taxonomy above. Before production use, the project still needs explicit required-capability negotiation, tested authorization semantics, transaction boundaries, conflict behavior, portable import guarantees, a language-neutral conformance suite, and compatibility tests.

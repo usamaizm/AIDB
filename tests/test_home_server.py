@@ -96,3 +96,59 @@ def test_http_rejects_oversized_request_body():
         server.shutdown()
         server.server_close()
         db.close()
+
+def test_transport_advertisement_is_scoped_to_the_http_adapter():
+    db = AIDB(":memory:")
+
+    create_handler(db, auth_token=None)
+    read_only = db.specification_dict()
+    assert "notes" in read_only["capabilities"]
+    http = read_only["transports"][0]
+    assert http["id"] == "http-json"
+    assert http["protocol"] == "http/1.1"
+    assert "notes.read" in http["capabilities"]
+    assert "notes.create" not in http["capabilities"]
+    assert http["authentication"] == []
+
+    create_handler(db, auth_token="configured-token", transport_protocol="https/1.1")
+    authenticated = db.specification_dict()
+    https = authenticated["transports"][0]
+    assert https["id"] == "https-json"
+    assert https["protocol"] == "https/1.1"
+    assert "notes.create" in https["capabilities"]
+    assert "resources.create" in https["capabilities"]
+    assert https["authentication"] == ["bearer"]
+    assert "notes.create" not in authenticated["capabilities"]
+
+    create_handler(db, auth_token="")
+    empty_token = db.specification_dict()["transports"][0]
+    assert "notes.create" not in empty_token["capabilities"]
+    assert empty_token["authentication"] == []
+
+def test_empty_bearer_token_disables_network_writes():
+    db = AIDB(":memory:")
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0), create_handler(db, auth_token="")
+    )
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    base = "http://127.0.0.1:" + str(server.server_port)
+    try:
+        request = Request(
+            base + "/v1/notes",
+            data=json.dumps({"title": "x", "content": "y"}).encode(),
+            headers={"Content-Type": "application/json", "Authorization": "Bearer "},
+            method="POST",
+        )
+        try:
+            urlopen(request)
+        except Exception as exc:
+            assert getattr(exc, "code", None) == 503
+        else:
+            raise AssertionError("empty bearer token unexpectedly authorized a write")
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=2)
+        db.close()
+
