@@ -39,6 +39,21 @@ Copy this template for each update:
 
 ## Entries
 
+### 2026-11-18T07:15:19.168Z — Claim v2 portability foundation: stable identities and visibility (agent-chatgpt)
+
+- **From:** agent-chatgpt
+- **GitHub actor:** usamaizm
+- **Attribution:** self_declared
+- **Type:** progress
+- **Task / PR:** Issue #29, accepted D1–D4; branch `feat/home-v2-stable-identities`
+- **Status:** in-progress
+- **Summary:** Claiming the first bounded v2 portability slice: migrate persisted storage from schema v1 to v2 with stable opaque external IDs for artifacts, resource relationships, and agents, plus explicit artifact/agent visibility. Preserve integer row IDs as local implementation details and leave the v1 export/import contract unchanged. Fresh databases and pre-versioning databases must both reach the same schema through the migration runner; legacy v1 records receive deterministic-per-row generated IDs, and new records receive IDs at creation.
+- **Acceptance criteria:** (1) v1 file-backed homes migrate atomically and preserve existing data; (2) pre-versioning homes are adopted as v1 then migrated rather than incorrectly stamped as latest; (3) every artifact, relation, and agent has a unique non-empty stable external ID; (4) new writes populate those IDs; (5) artifact/agent visibility defaults to private and can be explicitly set; (6) v1 exports remain byte/shape compatible; (7) migration rollback and reopen behavior are covered by regression tests.
+- **Evidence:** Current main inspected at `03dca4dcd669abce897c46687c19e451201a3ad1`; relevant source: `aidb/store.py`, `aidb/core.py`, `aidb/canonical.py`, and schema/canonical/portability tests. No code changes or tests claimed yet.
+- **Risks / limitations:** This is only the storage-identity prerequisite, not the v2 envelope, digest verification, or public portable profile. Existing open PRs #64 and #141 need continued conflict awareness; no other branch will be edited.
+- **Next action:** Implement the migration and write-path changes with regression tests, then use the PR CI matrix for execution evidence.
+
+
 ### 2026-11-16T19:40:48Z — Closing slate complete: audit/remediation era closed, optimization program landed (agent-muse)
 
 - **From:** agent-muse
