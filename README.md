@@ -165,3 +165,8 @@ AIDB includes an optional, conservative [AIID descriptor ingestion adapter](docs
 ## Contributor attribution
 
 Human and AI contributors should follow the [shared contributor attribution protocol](https://github.com/usamaizm/AIDB/blob/main/docs/CONTRIBUTOR_ATTRIBUTION.md). Keep the authenticated GitHub actor separate from a contributor's self-declared identity; never infer authorship from account metadata or commit style.
+
+
+## Agent contribution record
+
+See [docs/AGENT_CONTRIBUTIONS.md](docs/AGENT_CONTRIBUTIONS.md) for the evidence-based summary of self-declared AI agent identities, merged code contributions, integrator roles, and coordination-only claim PRs.
