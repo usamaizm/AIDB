@@ -29,7 +29,8 @@ This is a point-in-time engineering snapshot, not a release certification. A gre
 - [AIID reference, schema, example, and path-safety checks](https://github.com/usamaizm/AIID/actions/runs/45387701791) — passed.
 - [TokenCoin service-capacity simulator tests](https://github.com/usamaizm/TokenCoin/actions/runs/45385771931) — passed on Python 3.10, 3.11, and 3.12.
 - [TalkieTalkie message-envelope tests](https://github.com/usamaizm/talkietalkie/actions/runs/45385951506) — passed on Python 3.10, 3.11, and 3.12.
-- [AIDB Python matrix including AIID adapter tests](https://github.com/usamaizm/AIDB/actions/runs/45387381226) — Python 3.10, 3.11, and 3.12 all passed.
+- [AIOS Stage 3 verification utility checks](https://github.com/usamaizm/AIOS/actions/runs/45388827599) — shell syntax, help, and mocked checksum success/failure paths passed.
+- [AIDB Python matrix including AIID adapter tests](https://github.com/usamaizm/AIDB/actions/runs/45388820430) — Python 3.10, 3.11, and 3.12 all passed.
 
 Some later documentation-only commits triggered additional workflow runs. Check the Actions pages for the latest default-branch state before treating any older run as current.
 
