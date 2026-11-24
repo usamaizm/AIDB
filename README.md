@@ -155,3 +155,8 @@ See the [ecosystem status snapshot](docs/ECOSYSTEM_STATUS.md) for verified imple
 
 
 AIDB is part of a set of independent, interoperable projects. See the [ecosystem integration contract](docs/ECOSYSTEM_INTEGRATION.md) for project responsibilities, dependency boundaries, and the proposed integration sequence.
+
+
+## AIID interoperability
+
+AIDB includes an optional, conservative [AIID descriptor ingestion adapter](docs/aiid-integration.md). It stores descriptors as untrusted metadata and does not fetch or execute described resources.
