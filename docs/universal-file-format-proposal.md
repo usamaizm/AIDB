@@ -67,3 +67,34 @@ The design must be evaluated against representative text, graph, tabular, tensor
 The existing architecture distinguishes storage, interchange, and wire formats. This proposal asks the project to consider standardizing `.aidb` as the canonical **file/container and interchange format**. It does not automatically make the same encoding mandatory for internal database storage or every network message. Any decision to unify those boundaries must be explicit and justified separately.
 
 This proposal is intended to record the project's direction for discussion and review. It does not claim that the format has been implemented, finalized, or adopted as a stable release.
+
+
+## Spatial, CAD, and real-time requirements
+
+Spatial information is a core AIDB use case, not merely an opaque attachment category. The format design must account for:
+
+- CAD/product-definition data, including assemblies, parametric or boundary-representation geometry, dimensions, constraints, tolerances, and product/manufacturing metadata where available.
+- Runtime geometry such as meshes, materials, transforms, animation, point clouds, and level-of-detail representations.
+- Explicit coordinate frames, axis conventions, units, precision, and transformations between coordinate systems.
+- Time-dependent states, trajectories, simulation outputs, and sensor observations.
+- Partial access: implementations should be able to identify and retrieve relevant objects, metadata, and payload ranges without decoding an entire large model.
+- Streaming and progressive loading where appropriate, with clear integrity checks for independently retrievable chunks.
+- Preservation of the original source artifact when conversion to a normalized or optimized representation could lose authoring intent or domain-specific information.
+
+The format should distinguish authoritative engineering data from derived runtime/visualization data. For example, a CAD source model, a tessellated preview mesh, and a compressed rendering asset may describe the same object but are not interchangeable representations. Each representation should be linked by stable identity and derivation/provenance metadata.
+
+### Performance principle
+
+AIDB is intended to be local-first and suitable for latency-sensitive applications. A conforming implementation should support efficient local reads, indexing, memory mapping or equivalent zero/minimal-copy access where practical, chunked payloads, and incremental updates. The file specification must define access and integrity semantics, but must not prescribe one programming language, database engine, GPU, or hardware architecture.
+
+No universal format can guarantee low latency by itself. Performance depends on data layout, indexing, caching, implementation, hardware, and workload. These must be measured with representative benchmarks before performance claims are made.
+
+### Standards to evaluate, not blindly adopt
+
+The format design should study established domain standards as evidence and possible embedded/adapter payloads:
+
+- **STEP / ISO 10303**, especially product-definition and engineering exchange use cases, for CAD semantics and lifecycle information.
+- **JT / ISO 14306**, for lightweight 3D visualization/interrogation and product manufacturing information.
+- **glTF / GLB**, for efficient runtime delivery of 3D scenes, meshes, materials, and animation.
+
+These solve different parts of the problem; none should be assumed to be the entire universal AIDB information model. The project should test fidelity and conversion loss before choosing how any of them fit inside or alongside an AIDB container.
