@@ -16,6 +16,7 @@ from .core import (
     WorkflowEvent,
 )
 from .store import AIDB
+from .aiid import AIIDDescriptorError, parse_aiid_descriptor, register_aiid_descriptor
 from .http_client import (
     PeerFetchError,
     fetch_agent_card,
@@ -42,6 +43,9 @@ from .network import (
 
 __all__ = [
     "AIDB",
+    "AIIDDescriptorError",
+    "parse_aiid_descriptor",
+    "register_aiid_descriptor",
     "Agent",
     "Note",
     "Resource",
