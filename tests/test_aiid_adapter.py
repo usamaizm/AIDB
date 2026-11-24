@@ -35,6 +35,18 @@ def test_parse_aiid_descriptor_rejects_nan_in_json_text():
         parse_aiid_descriptor(invalid)
 
 
+def test_parse_aiid_descriptor_rejects_non_string_object_keys():
+    invalid = {**VALID, "metadata": {1: "not a JSON object key"}}
+    with pytest.raises(AIIDDescriptorError, match="keys must be strings"):
+        parse_aiid_descriptor(invalid)
+
+
+def test_parse_aiid_descriptor_rejects_tuple_values():
+    invalid = {**VALID, "metadata": {"items": (1, 2)}}
+    with pytest.raises(AIIDDescriptorError, match="JSON values"):
+        parse_aiid_descriptor(invalid)
+
+
 def test_parse_aiid_descriptor_rejects_wrong_version():
     with pytest.raises(AIIDDescriptorError, match="aiid_version"):
         parse_aiid_descriptor({**VALID, "aiid_version": "9"})
