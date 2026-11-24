@@ -29,6 +29,12 @@ def test_parse_aiid_descriptor_rejects_non_finite_json_values():
         parse_aiid_descriptor(invalid)
 
 
+def test_parse_aiid_descriptor_rejects_nan_in_json_text():
+    invalid = json.dumps(VALID).replace("\\"aiid_version\\":", "\\"metadata\\": {\\"value\\": NaN}, \\"aiid_version\\":")
+    with pytest.raises(AIIDDescriptorError, match="non-finite"):
+        parse_aiid_descriptor(invalid)
+
+
 def test_parse_aiid_descriptor_rejects_wrong_version():
     with pytest.raises(AIIDDescriptorError, match="aiid_version"):
         parse_aiid_descriptor({**VALID, "aiid_version": "9"})
