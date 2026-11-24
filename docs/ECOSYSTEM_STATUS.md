@@ -18,7 +18,7 @@ This is a point-in-time engineering snapshot, not a release certification. A gre
 | **AIOS** | Project vision and roadmap documentation | No executable build or test suite found in the default-branch tree | OS implementation and capability/security interfaces are not yet present in the inspected tree |
 | **OpenOS** | Architecture, roadmap, and project documentation | No executable build or test suite found in the default-branch tree | Kernel, drivers, userspace, boot path, and target platform are not yet present in the inspected tree |
 | **FreeOS** | No-cost OS concept with architecture and roadmap documentation; “free” refers to price, not a blanket free-software requirement | No executable build or test suite found in the default-branch tree | Kernel, drivers, userspace, boot path, and a concrete target platform are not yet present in the inspected tree |
-| **TalkieTalkie** | Transport-neutral Python message-envelope prototype and draft protocol for text/file metadata, replies, grouping, and reactions | Automated tests and Python 3.10–3.12 CI added; latest run pending at this snapshot | No accounts, network delivery, end-to-end encryption, durable storage, or actual file transfer yet |
+| **TalkieTalkie** | Transport-neutral Python message-envelope prototype and draft protocol for text/file metadata, replies, grouping, and reactions | Automated message-envelope tests and CI passed | No accounts, network delivery, end-to-end encryption, durable storage, or actual file transfer yet |
 | **TokenCoin** | Extensive economic/security documentation plus a Python service-capacity and compute-cost simulator | Simulator tests passed on Python 3.10, 3.11, and 3.12 | No token ledger, wallet, blockchain/node, live service, or validated economic/security model; simulator is not a price model or service guarantee |
 
 ## Recent verified CI runs
@@ -28,6 +28,7 @@ This is a point-in-time engineering snapshot, not a release certification. A gre
 - [AIMA build and smoke test](https://github.com/usamaizm/aima/actions/runs/45384963592) — passed.
 - [AIID reference, schema, and example checks](https://github.com/usamaizm/AIID/actions/runs/45385257969) — passed.
 - [TokenCoin service-capacity simulator tests](https://github.com/usamaizm/TokenCoin/actions/runs/45385771931) — passed on Python 3.10, 3.11, and 3.12.
+- [TalkieTalkie message-envelope tests](https://github.com/usamaizm/talkietalkie/actions/runs/45385951506) — passed.
 - [AIDB Python matrix](https://github.com/usamaizm/AIDB/actions/runs/45383051385) — Python 3.10, 3.11, and 3.12 all passed.
 
 Some later documentation-only commits triggered additional workflow runs. Check the Actions pages for the latest default-branch state before treating any older run as current.
