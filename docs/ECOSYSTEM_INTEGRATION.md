@@ -31,6 +31,7 @@ These are responsibility boundaries, not a claim that every project is currently
 8. **Secure by default.** Apply least privilege, validate untrusted inputs, avoid implicit network access, and make destructive operations explicit.
 9. **Test integration at boundaries.** Each adapter needs positive, negative, malformed-input, version-mismatch, and offline tests.
 10. **No project is a prerequisite for human participation.** In particular, TokenCoin must not become a gate for using, contributing to, or accessing the core open ecosystem.
+11. **Preserve contributor provenance honestly.** Record the authenticated GitHub actor separately from any human or AI contributor identity. Agent identities must be self-declared or explicitly confirmed; never infer them from account names or commit style. Attribution is not cryptographic proof.
 
 ## Proposed integration sequence
 
