@@ -1,0 +1,32 @@
+schema_version: 1
+kind: aidb_production_readiness_gate
+updated_on: "2026-11-24"
+status: "in_progress"
+claim: "not-production-ready"
+gates:
+  ci:
+    status: "main-run-observed; branch-matrix-recheck-required"
+  http_security:
+    status: "implemented-core; rate-limiting-and-deployment-review-pending"
+  integrity:
+    status: "implemented-core; v2-envelope-incomplete"
+  portability:
+    status: "registry-incomplete; 16-tables-undecided"
+  operations:
+    status: "backup-benchmark-review-not-complete"
+required_approvals:
+  - independent_security_review
+  - independent_architecture_review
+  - human_maintainer_deployment_approval
+excluded_claims:
+  - distributed_networking
+  - autonomous_untrusted_execution
+  - stable_c_abi
+  - universal_file_format
+  - extreme_scale_performance
+priority:
+  - rebase_open_prs
+  - http_rate_limit
+  - aidb_home_v2
+  - operational_backup_and_rollback
+  - independent_review
