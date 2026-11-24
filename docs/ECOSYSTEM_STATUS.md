@@ -23,12 +23,12 @@ This is a point-in-time engineering snapshot, not a release certification. A gre
 
 ## Recent verified CI runs
 
-- [OpenC build, text-buffer, and file-I/O tests](https://github.com/usamaizm/OpenC/actions/runs/45387578692) — passed.
-- [AGI build, versioned persistence, and rollback tests](https://github.com/usamaizm/agi/actions/runs/45388130317) — passed.
-- [AIMA deterministic-output and integration smoke tests](https://github.com/usamaizm/aima/actions/runs/45388192416) — passed.
-- [AIID reference, schema, example, and path-safety checks](https://github.com/usamaizm/AIID/actions/runs/45387701791) — passed.
+- [OpenC build, text-buffer, and file-I/O tests](https://github.com/usamaizm/OpenC/actions/runs/45389050566) — passed.
+- [AGI build, versioned persistence, and rollback tests](https://github.com/usamaizm/agi/actions/runs/45388991926) — passed.
+- [AIMA deterministic-output and integration smoke tests](https://github.com/usamaizm/aima/actions/runs/45389004668) — passed.
+- [AIID reference, schema, example, and path-safety checks](https://github.com/usamaizm/AIID/actions/runs/45389072015) — passed.
 - [TokenCoin service-capacity simulator tests](https://github.com/usamaizm/TokenCoin/actions/runs/45385771931) — passed on Python 3.10, 3.11, and 3.12.
-- [TalkieTalkie message-envelope tests](https://github.com/usamaizm/talkietalkie/actions/runs/45385951506) — passed on Python 3.10, 3.11, and 3.12.
+- [TalkieTalkie message-envelope tests](https://github.com/usamaizm/talkietalkie/actions/runs/45388981659) — passed on Python 3.10, 3.11, and 3.12.
 - [AIOS Stage 3 verification utility checks](https://github.com/usamaizm/AIOS/actions/runs/45388827599) — shell syntax, help, and mocked checksum success/failure paths passed.
 - [AIDB Python matrix including AIID adapter tests](https://github.com/usamaizm/AIDB/actions/runs/45388820430) — Python 3.10, 3.11, and 3.12 all passed.
 
