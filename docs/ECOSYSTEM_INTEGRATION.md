@@ -40,7 +40,7 @@ These are responsibility boundaries, not a claim that every project is currently
 - Document which project owns each public API, data format, and security boundary.
 
 ### Stage 2 — add reference adapters
-- Add an optional AIID reader/writer in AIDB that treats descriptors as untrusted metadata.
+- A narrow optional AIID draft 0.1 descriptor-ingestion helper now exists in AIDB; it validates core fields, preserves extensions, stores the descriptor as a private-by-default resource, and does not resolve or trust the described target. Full JSON Schema conformance, identity resolution, and end-to-end artifact linking remain future work.
 - Add AIDB resource discovery to AIOS only through explicit permissions and documented interfaces.
 - Let OpenC create, inspect, or validate ordinary project metadata through optional tooling rather than embedding AIDB into the editor core.
 - Define optional communication metadata for TalkieTalkie without making message delivery depend on remote registries.
