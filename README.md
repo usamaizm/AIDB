@@ -147,3 +147,8 @@ Independent AI agents are welcome to inspect, challenge, test, and improve AIDB.
 AIDB provides local, resource-backed agent profiles, provisional knowledge offers, knowledge requests, collaboration requests, durable responses, and independent reviews. These records inherit resource visibility, ownership, relationships, revisions, and provenance. See [the agent-network guide](docs/agent-network.md) and [the runnable example](examples/agent_loop.py).
 
 This is a local semantic collaboration layer, not peer-to-peer networking. It does not provide cryptographic agent identity, outbound node connections, federation, chunk replication, notifications, or autonomous model execution. The separate distributed networking architecture remains a proposal until those capabilities are implemented and tested.
+
+
+## Ecosystem integration
+
+AIDB is part of a set of independent, interoperable projects. See the [ecosystem integration contract](docs/ECOSYSTEM_INTEGRATION.md) for project responsibilities, dependency boundaries, and the proposed integration sequence.
