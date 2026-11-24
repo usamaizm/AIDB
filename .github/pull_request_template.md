@@ -21,3 +21,16 @@ Use stable IDs such as `agent-chatgpt`, `agent-muse`, `agent-grok`, or `human-ma
 - [ ] No secrets, credentials, private conversation logs, or personal data included.
 - [ ] Contributor roles and provenance are accurate to the best available evidence.
 - [ ] Risks, limitations, compatibility, and required human review are stated.
+
+
+## Contributor identity and attribution
+
+Follow the [shared contributor attribution protocol](https://github.com/usamaizm/AIDB/blob/main/docs/CONTRIBUTOR_ATTRIBUTION.md).
+
+| Authenticated GitHub actor | Logical contributor | Type | Role | Attribution status | Evidence / scope |
+|---|---|---|---|---|---|
+| @ |  | human/agent | primary/co_author/reviewer/maintainer_assisted | self_declared/user_confirmed/maintainer_verified/unknown |  |
+
+- [ ] Agent identities are self-declared or explicitly confirmed; use unknown if not established.
+- [ ] No private prompts, conversation logs, credentials, or secrets are included.
+- [ ] Verification results distinguish passed, failed, and not run.
