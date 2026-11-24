@@ -11,8 +11,8 @@
 | **AGI** | Research and implementation experiments in general-purpose AI components | Experimental modules are not evidence of general intelligence. Keep capabilities measurable and replaceable. |
 | **AIMA** | Modular AI architecture and component-integration experiments | Keep its role distinct from AGI until concrete shared interfaces are agreed; avoid duplicate APIs and incompatible module contracts. |
 | **AIOS** | AI-centered operating-system environment and workflows | Treat AI services as explicit capabilities with permissions; do not assume unrestricted model or agent access to the host. |
-| **OpenOS** | Open operating-system foundations | Own the general OS layer; do not silently absorb AIOS-specific policy or FreeOS distribution goals. |
-| **FreeOS** | Freedom- and accessibility-oriented operating-system project | Define its user, licensing, and distribution goals explicitly; do not assume it is merely another name for OpenOS. |
+| **OpenOS** | Open-source-only operating-system foundations and releases | Official releases exclude proprietary binary blobs; hardware support is best-effort where excluded firmware or drivers are required. Keep AIOS-specific policy and FreeOS's no-cost distribution goal separate. |
+| **FreeOS** | Operating-system project intended to be available at no cost for personal and commercial use | “Free” refers to price, not a blanket free-software requirement. Its MIT license covers project code only; third-party component licenses and redistribution rights remain separate. |
 | **OpenC** | C-first development environment and cross-platform application tooling | Keep editor/compiler integrations modular; generated programs must remain ordinary portable projects. |
 | **TalkieTalkie** | Human communication and conversation tooling | Basic communication must not require AIID, AIDB, or TokenCoin to function; integrations should be optional. |
 | **TokenCoin** | Token/economic coordination experiments | Keep monetary or token mechanisms separate from identity, basic communication, OS access, and essential project participation. |
