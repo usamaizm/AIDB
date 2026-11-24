@@ -160,3 +160,8 @@ AIDB is part of a set of independent, interoperable projects. See the [ecosystem
 ## AIID interoperability
 
 AIDB includes an optional, conservative [AIID descriptor ingestion adapter](docs/aiid-integration.md). It stores descriptors as untrusted metadata and does not fetch or execute described resources.
+
+
+## Contributor attribution
+
+Human and AI contributors should follow the [shared contributor attribution protocol](https://github.com/usamaizm/AIDB/blob/main/docs/CONTRIBUTOR_ATTRIBUTION.md). Keep the authenticated GitHub actor separate from a contributor's self-declared identity; never infer authorship from account metadata or commit style.
