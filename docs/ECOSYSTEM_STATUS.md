@@ -36,7 +36,7 @@ Some later documentation-only commits triggered additional workflow runs. Check 
 
 ## Integration status
 
-The shared [ecosystem integration contract](ECOSYSTEM_INTEGRATION.md) records project roles, dependency boundaries, and a staged integration sequence. AIDB now has a narrow [AIID descriptor ingestion adapter](aiid-integration.md); it stores descriptors as untrusted metadata and does not resolve or execute targets. The READMEs of all ten projects link to it.
+The shared [ecosystem integration contract](ECOSYSTEM_INTEGRATION.md) records project roles, dependency boundaries, and a staged integration sequence. AIDB now has a narrow [AIID descriptor ingestion adapter](aiid-integration.md); it stores descriptors as untrusted metadata and does not resolve or execute targets. All ten project READMEs link to the shared integration contract, and AIDB's README links to the adapter guide.
 
 **Important:** this is architectural alignment, not a claim that adapters already exist. No end-to-end runtime integration among all ten projects has yet been verified. All ten repositories now have explicit human/AI contributor attribution guidance and PR-template identity fields; this separates a GitHub account from an agent's self-declared identity but does not retroactively prove who authored older commits.
 
