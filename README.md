@@ -151,4 +151,7 @@ This is a local semantic collaboration layer, not peer-to-peer networking. It do
 
 ## Ecosystem integration
 
+See the [ecosystem status snapshot](docs/ECOSYSTEM_STATUS.md) for verified implementation and CI status across all ten projects.
+
+
 AIDB is part of a set of independent, interoperable projects. See the [ecosystem integration contract](docs/ECOSYSTEM_INTEGRATION.md) for project responsibilities, dependency boundaries, and the proposed integration sequence.
