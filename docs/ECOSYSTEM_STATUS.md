@@ -44,10 +44,10 @@ The shared [ecosystem integration contract](ECOSYSTEM_INTEGRATION.md) now record
 1. **AIID:** finish conformance tests, define identifier semantics, and keep the schema/spec/examples/reference implementation synchronized.
 2. **AIDB:** maintain test coverage and define a narrow, versioned resource/metadata adapter without making AIID mandatory.
 3. **AGI and AIMA:** separate research sketches from supported modules; add tests for every module that enters the build.
-4. **OpenC:** add file-I/O tests, terminal restoration/error-path tests, and a platform abstraction before claiming cross-platform support.
+4. **OpenC:** expand terminal interaction/error-path coverage and add a platform abstraction before claiming cross-platform support.
 5. **AIOS, OpenOS, and FreeOS:** select target platforms and bootable milestones; turn architecture documents into small executable prototypes.
-6. **TalkieTalkie:** decide the minimum interoperable message model and transport, then create a local, testable prototype.
-7. **TokenCoin:** review threat model and economic assumptions before implementation; do not connect token ownership to access to the rest of the ecosystem.
+6. **TalkieTalkie:** choose an account and transport model, design end-to-end encryption and key recovery, then implement delivery and file transfer behind the tested envelope.
+7. **TokenCoin:** validate throughput assumptions with representative benchmarks, model provider failures and queueing, and independently review the threat model before any ledger or real-value deployment.
 8. **All projects:** add reproducible clean-checkout builds, test commands, versioned public contracts, and integration fixtures.
 
 ## Working rule
