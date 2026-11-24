@@ -10,11 +10,11 @@ This is a point-in-time engineering snapshot, not a release certification. A gre
 
 | Project | Verified repository state | CI / verification | Main gap |
 |---|---|---|---|
-| **AIDB** | Python/SQLite knowledge and memory substrate with extensive documentation, tests, and an optional AIID descriptor-ingestion adapter | Python 3.10, 3.11, and 3.12: compile, Ruff, and pytest passed on the checked revision | Architecture proposals and distributed capabilities must continue to be distinguished from shipped code; no verified end-to-end integration workflow across the other nine projects |
+| **AIDB** | Python/SQLite knowledge and memory substrate with extensive documentation, tests, and an optional AIID descriptor-ingestion adapter | Python 3.10, 3.11, and 3.12: compile, Ruff, and pytest passed, including AIID adapter tests | Architecture proposals and distributed capabilities must continue to be distinguished from shipped code; no verified end-to-end integration workflow across the other nine projects |
 | **AIID** | Draft 0.1 specification, JSON Schema, examples, and standard-library reference helper | Expanded reference tests plus schema/example JSON syntax checks passed | Draft is not ratified; formal identifier governance, signature/trust model, extension registry, and broad interoperability suite remain open |
-| **AGI** | Runnable C prototype with a knowledge-graph store and a small reasoning loop | Build and knowledge-graph tests passed | Most other modules remain experiments or incomplete; the current reasoning behavior is intentionally simple and is not AGI |
+| **AGI** | Runnable C prototype with a knowledge-graph store and a small reasoning loop | Build, persistence, and malformed-state rollback tests passed | Most other modules remain experiments or incomplete; the current reasoning behavior is intentionally simple and is not AGI |
 | **AIMA** | Deterministic C11 module-integration demonstration | Build and smoke test passed | No trained model, real perception, language understanding, or measured learning capability |
-| **OpenC** | Terminal text-editor prototype with line editing, file I/O, cursor navigation, save/quit controls | Build, text-buffer, and file-I/O tests passed | Terminal input is POSIX-specific; file I/O, rendering, and interactive behavior need broader tests; this is not yet a cross-platform IDE |
+| **OpenC** | Terminal text-editor prototype with line editing, file I/O, cursor navigation, save/quit controls | Build, text-buffer, and file-I/O tests passed | Terminal input is POSIX-specific; rendering and interactive behavior need broader tests; this is not yet a cross-platform IDE |
 | **AIOS** | Mark I Gentoo/OpenRC/Plasma roadmap plus an architecture brief defining system layers, AI permissions, bootstrap requirements, and release gates | No executable build or test suite found in the default-branch tree | Bootable image, isolated agent service, desktop integration, and installer are not yet present in the inspected tree |
 | **OpenOS** | Architecture, roadmap, and project documentation | No executable build or test suite found in the default-branch tree | Kernel, drivers, userspace, boot path, and target platform are not yet present in the inspected tree |
 | **FreeOS** | No-cost OS concept with architecture and roadmap documentation; “free” refers to price, not a blanket free-software requirement | No executable build or test suite found in the default-branch tree | Kernel, drivers, userspace, boot path, and a concrete target platform are not yet present in the inspected tree |
@@ -23,13 +23,13 @@ This is a point-in-time engineering snapshot, not a release certification. A gre
 
 ## Recent verified CI runs
 
-- [OpenC build, text-buffer, and file-I/O tests](https://github.com/usamaizm/OpenC/actions/runs/45386507432) — passed.
-- [AGI build and knowledge-graph tests](https://github.com/usamaizm/agi/actions/runs/45385091106) — passed.
+- [OpenC build, text-buffer, and file-I/O tests](https://github.com/usamaizm/OpenC/actions/runs/45387578692) — passed.
+- [AGI build, persistence, and rollback tests](https://github.com/usamaizm/agi/actions/runs/45387544202) — passed.
 - [AIMA build and smoke test](https://github.com/usamaizm/aima/actions/runs/45384963592) — passed.
 - [AIID reference, schema, example, and path-safety checks](https://github.com/usamaizm/AIID/actions/runs/45386227627) — passed.
 - [TokenCoin service-capacity simulator tests](https://github.com/usamaizm/TokenCoin/actions/runs/45385771931) — passed on Python 3.10, 3.11, and 3.12.
 - [TalkieTalkie message-envelope tests](https://github.com/usamaizm/talkietalkie/actions/runs/45385951506) — passed on Python 3.10, 3.11, and 3.12.
-- [AIDB Python matrix](https://github.com/usamaizm/AIDB/actions/runs/45383051385) — Python 3.10, 3.11, and 3.12 all passed.
+- [AIDB Python matrix including AIID adapter tests](https://github.com/usamaizm/AIDB/actions/runs/45387381226) — Python 3.10, 3.11, and 3.12 all passed.
 
 Some later documentation-only commits triggered additional workflow runs. Check the Actions pages for the latest default-branch state before treating any older run as current.
 
