@@ -13,6 +13,10 @@ class AIIDDescriptorError(ValueError):
     """Raised when an AIID descriptor does not satisfy the draft 0.1 core."""
 
 
+def _reject_json_constant(value: str) -> None:
+    raise AIIDDescriptorError(f"non-finite JSON number is not allowed: {value}")
+
+
 def parse_aiid_descriptor(value: bytes | str | dict[str, Any]) -> dict[str, Any]:
     """Parse and validate the minimum AIID 0.1 structure, preserving extensions."""
     if isinstance(value, bytes):
@@ -23,9 +27,11 @@ def parse_aiid_descriptor(value: bytes | str | dict[str, Any]) -> dict[str, Any]
 
     if isinstance(value, str):
         try:
-            parsed = json.loads(value)
+            parsed = json.loads(value, parse_constant=_reject_json_constant)
         except json.JSONDecodeError as exc:
             raise AIIDDescriptorError(f"invalid descriptor JSON: {exc}") from exc
+        except ValueError as exc:
+            raise AIIDDescriptorError(str(exc)) from exc
     elif isinstance(value, dict):
         try:
             parsed = json.loads(json.dumps(value, allow_nan=False))
