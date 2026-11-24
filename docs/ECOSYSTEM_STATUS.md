@@ -10,7 +10,7 @@ This is a point-in-time engineering snapshot, not a release certification. A gre
 
 | Project | Verified repository state | CI / verification | Main gap |
 |---|---|---|---|
-| **AIDB** | Python/SQLite knowledge and memory substrate with extensive documentation and tests | Python 3.10, 3.11, and 3.12: compile, Ruff, and pytest passed on the checked revision | Architecture proposals and distributed capabilities must continue to be distinguished from shipped code; no confirmed integrations with the other nine projects |
+| **AIDB** | Python/SQLite knowledge and memory substrate with extensive documentation, tests, and an optional AIID descriptor-ingestion adapter | Python 3.10, 3.11, and 3.12: compile, Ruff, and pytest passed on the checked revision | Architecture proposals and distributed capabilities must continue to be distinguished from shipped code; no verified end-to-end integration workflow across the other nine projects |
 | **AIID** | Draft 0.1 specification, JSON Schema, examples, and standard-library reference helper | Expanded reference tests plus schema/example JSON syntax checks passed | Draft is not ratified; formal identifier governance, signature/trust model, extension registry, and broad interoperability suite remain open |
 | **AGI** | Runnable C prototype with a knowledge-graph store and a small reasoning loop | Build and knowledge-graph tests passed | Most other modules remain experiments or incomplete; the current reasoning behavior is intentionally simple and is not AGI |
 | **AIMA** | Deterministic C11 module-integration demonstration | Build and smoke test passed | No trained model, real perception, language understanding, or measured learning capability |
@@ -35,7 +35,7 @@ Some later documentation-only commits triggered additional workflow runs. Check 
 
 ## Integration status
 
-The shared [ecosystem integration contract](ECOSYSTEM_INTEGRATION.md) now records project roles, dependency boundaries, and a staged integration sequence. The READMEs of all ten projects link to it.
+The shared [ecosystem integration contract](ECOSYSTEM_INTEGRATION.md) records project roles, dependency boundaries, and a staged integration sequence. AIDB now has a narrow [AIID descriptor ingestion adapter](aiid-integration.md); it stores descriptors as untrusted metadata and does not resolve or execute targets. The READMEs of all ten projects link to it.
 
 **Important:** this is architectural alignment, not a claim that adapters already exist. No end-to-end integration among the ten projects has yet been verified.
 
