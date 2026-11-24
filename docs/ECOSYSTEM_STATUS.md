@@ -14,23 +14,23 @@ This is a point-in-time engineering snapshot, not a release certification. A gre
 | **AIID** | Draft 0.1 specification, JSON Schema, examples, and standard-library reference helper | Expanded reference tests plus schema/example JSON syntax checks passed | Draft is not ratified; formal identifier governance, signature/trust model, extension registry, and broad interoperability suite remain open |
 | **AGI** | Runnable C prototype with a knowledge-graph store, simple reasoning loop, versioned escaped state format, legacy-state reader, and atomic state-file replacement | Build, persistence, escaped-field round-trip, legacy compatibility, and malformed-state rollback tests passed | Most other modules remain experiments or incomplete; the current reasoning behavior is intentionally simple and is not AGI |
 | **AIMA** | Deterministic C11 module-integration demonstration | Build and deterministic-output smoke tests passed | No trained model, real perception, language understanding, or measured learning capability |
-| **OpenC** | Terminal text-editor prototype with line editing, file I/O, cursor navigation, save/quit controls | Build, text-buffer, and file-I/O tests passed | Terminal input is POSIX-specific; rendering and interactive behavior need broader tests; this is not yet a cross-platform IDE |
-| **AIOS** | Mark I Gentoo/OpenRC/Plasma architecture plus a Stage 3 signature/SHA-512 verification utility and bootstrap guide | Shell syntax, argument handling, and mocked checksum success/failure-path CI passed (signature verification itself uses real gpgv at runtime) | Verified real-world keyring setup, reproducible image build, QEMU boot, isolated agent service, and desktop integration remain |
+| **OpenC** | Terminal text-editor prototype with line editing, cursor navigation, atomic file saves, existing-mode preservation, and symlink/non-regular-target refusal | Build, text-buffer, file-I/O, newline round-trip, permission-preservation, and symlink-refusal tests passed | Terminal input is POSIX-specific; rendering and interactive behavior need broader tests; this is not yet a cross-platform IDE |
+| **AIOS** | Mark I Gentoo/OpenRC/Plasma architecture plus a Stage 3 signature/SHA-512 verification utility and bootstrap guide | Shell syntax, argument handling, real ephemeral-key GPG signature verification, expected-fingerprint pinning, and checksum success/failure-path tests passed | Verified real-world keyring setup, reproducible image build, QEMU boot, isolated agent service, and desktop integration remain |
 | **OpenOS** | Architecture, roadmap, and project documentation | No executable build or test suite found in the default-branch tree | Kernel, drivers, userspace, boot path, and target platform are not yet present in the inspected tree |
 | **FreeOS** | No-cost OS concept with architecture and roadmap documentation; “free” refers to price, not a blanket free-software requirement | No executable build or test suite found in the default-branch tree | Kernel, drivers, userspace, boot path, and a concrete target platform are not yet present in the inspected tree |
-| **TalkieTalkie** | Transport-neutral Python message-envelope prototype and draft protocol for text/file metadata, replies, grouping, and reactions | Automated message-envelope tests and CI passed on Python 3.10, 3.11, and 3.12 | No accounts, network delivery, end-to-end encryption, durable storage, or actual file transfer yet |
+| **TalkieTalkie** | Transport-neutral Python message-envelope prototype, draft protocol, JSON Schema, and text/file/reaction examples | Automated message-envelope tests and CI passed on Python 3.10, 3.11, and 3.12 | No accounts, network delivery, end-to-end encryption, durable storage, or actual file transfer yet |
 | **TokenCoin** | Extensive economic/security documentation plus a Python service-capacity and compute-cost simulator | Simulator tests passed on Python 3.10, 3.11, and 3.12 | No token ledger, wallet, blockchain/node, live service, or validated economic/security model; simulator is not a price model or service guarantee |
 
 ## Recent verified CI runs
 
-- [OpenC build, text-buffer, and file-I/O tests](https://github.com/usamaizm/OpenC/actions/runs/45389050566) — passed.
-- [AGI build, versioned persistence, and rollback tests](https://github.com/usamaizm/agi/actions/runs/45388991926) — passed.
-- [AIMA deterministic-output and integration smoke tests](https://github.com/usamaizm/aima/actions/runs/45389004668) — passed.
-- [AIID reference, schema, example, and path-safety checks](https://github.com/usamaizm/AIID/actions/runs/45389072015) — passed.
-- [TokenCoin service-capacity simulator tests](https://github.com/usamaizm/TokenCoin/actions/runs/45385771931) — passed on Python 3.10, 3.11, and 3.12.
-- [TalkieTalkie message-envelope tests](https://github.com/usamaizm/talkietalkie/actions/runs/45388981659) — passed on Python 3.10, 3.11, and 3.12.
-- [AIOS Stage 3 verification utility checks](https://github.com/usamaizm/AIOS/actions/runs/45388827599) — shell syntax, help, and mocked checksum success/failure paths passed.
-- [AIDB Python matrix including AIID adapter tests](https://github.com/usamaizm/AIDB/actions/runs/45388820430) — Python 3.10, 3.11, and 3.12 all passed.
+- [OpenC build, atomic-save, text-buffer, and file-I/O tests](https://github.com/usamaizm/OpenC/actions/runs/45389766473) — passed.
+- [AGI build, versioned persistence, and rollback tests](https://github.com/usamaizm/agi/actions/runs/45389745963) — passed.
+- [AIMA deterministic-output and integration smoke tests](https://github.com/usamaizm/aima/actions/runs/45389750854) — passed.
+- [AIID reference, schema, example, and path-safety checks](https://github.com/usamaizm/AIID/actions/runs/45389774785) — passed.
+- [TokenCoin service-capacity simulator tests](https://github.com/usamaizm/TokenCoin/actions/runs/45389779869) — passed on Python 3.10, 3.11, and 3.12.
+- [TalkieTalkie schema, example, and message-envelope tests](https://github.com/usamaizm/talkietalkie/actions/runs/45389738854) — passed on Python 3.10, 3.11, and 3.12.
+- [AIOS Stage 3 verification utility checks](https://github.com/usamaizm/AIOS/actions/runs/45389771030) — shell syntax, real GPG signature verification, fingerprint pinning, and checksum success/failure paths passed.
+- [AIDB Python matrix including AIID adapter tests](https://github.com/usamaizm/AIDB/actions/runs/45389139164) — Python 3.10, 3.11, and 3.12 all passed.
 
 Some later documentation-only commits triggered additional workflow runs. Check the Actions pages for the latest default-branch state before treating any older run as current.
 
