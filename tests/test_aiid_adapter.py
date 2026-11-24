@@ -25,7 +25,7 @@ def test_parse_aiid_descriptor_rejects_invalid_utf8():
 
 def test_parse_aiid_descriptor_rejects_non_finite_json_values():
     invalid = {**VALID, "metadata": {"not_a_number": float("nan")}}
-    with pytest.raises(AIIDDescriptorError, match="JSON values"):
+    with pytest.raises(AIIDDescriptorError, match="finite JSON numbers"):
         parse_aiid_descriptor(invalid)
 
 
