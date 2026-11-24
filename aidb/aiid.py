@@ -6,11 +6,32 @@ resolve resource paths, fetch URIs, authenticate publishers, or execute data.
 from __future__ import annotations
 
 import json
+from math import isfinite
 from typing import Any
 
 
 class AIIDDescriptorError(ValueError):
     """Raised when an AIID descriptor does not satisfy the draft 0.1 core."""
+
+
+def _validate_python_json_value(value: Any) -> None:
+    if value is None or isinstance(value, (str, bool, int)):
+        return
+    if isinstance(value, float):
+        if not isfinite(value):
+            raise AIIDDescriptorError("descriptor must contain only finite JSON numbers")
+        return
+    if isinstance(value, list):
+        for item in value:
+            _validate_python_json_value(item)
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise AIIDDescriptorError("descriptor object keys must be strings")
+            _validate_python_json_value(item)
+        return
+    raise AIIDDescriptorError("descriptor must contain only JSON values")
 
 
 def _reject_json_constant(value: str) -> None:
@@ -33,10 +54,8 @@ def parse_aiid_descriptor(value: bytes | str | dict[str, Any]) -> dict[str, Any]
         except ValueError as exc:
             raise AIIDDescriptorError(str(exc)) from exc
     elif isinstance(value, dict):
-        try:
-            parsed = json.loads(json.dumps(value, allow_nan=False))
-        except (TypeError, ValueError) as exc:
-            raise AIIDDescriptorError("descriptor must contain only JSON values") from exc
+        _validate_python_json_value(value)
+        parsed = json.loads(json.dumps(value, allow_nan=False))
     else:
         raise AIIDDescriptorError("descriptor must be UTF-8 JSON bytes, text, or an object")
 
