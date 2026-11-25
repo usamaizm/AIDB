@@ -100,6 +100,7 @@ the code before quoting it as state.*
 | `docs/performance-context-and-scale.md` | Performance/scale goals and proposed designs | Performance work |
 | `docs/storage-efficiency-and-numeric-data.md` | Storage-efficiency proposal | Storage work |
 | `docs/self-evolving-architecture.md` | Self-evolution proposal | Background only |
+| `docs/autonomous-kaizen.md` | Operational contract and phased implementation sequence for autonomous continuous improvement | Kaizen/autonomy work |
 | `docs/live-build-and-emulation.md` | Live build/emulation runtime proposal | Background only |
 | `docs/standards.md` | Standards and interoperability notes | Interop questions |
 
